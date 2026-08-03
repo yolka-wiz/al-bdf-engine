@@ -30,6 +30,8 @@ add_executable(PdfTool
     pdftoolcolorprofiles.cpp 
     pdftooldecrypt.cpp 
     pdftooldiff.cpp 
+    pdftooldeleteobject.cpp
+    pdftooldeleteobject.h
     pdftoolencrypt.cpp 
     pdftoolfetchimages.cpp 
     pdftoolfetchtext.cpp 
