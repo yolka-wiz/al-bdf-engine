@@ -1,0 +1,1439 @@
+// MIT License
+//
+// Copyright (c) 2018-2025 Jakub Melka and Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include "pdftoolabstractapplication.h"
+#include "pdfdocumentreader.h"
+#include "pdfutils.h"
+
+#include <QFileInfo>
+#include <QCommandLineParser>
+
+namespace pdftool
+{
+
+class PDFToolHelpApplication : public PDFToolAbstractApplication
+{
+public:
+    PDFToolHelpApplication() : PDFToolAbstractApplication(true) { }
+
+    virtual QString getStandardString(StandardString standardString) const override;
+    virtual int execute(const PDFToolOptions& options) override;
+    virtual Options getOptionsFlags() const override;
+};
+
+static PDFToolHelpApplication s_helpApplication;
+
+QString PDFToolHelpApplication::getStandardString(StandardString standardString) const
+{
+    switch (standardString)
+    {
+        case Command:
+            return "help";
+
+        case Name:
+            return PDFToolTranslationContext::tr("Help");
+
+        case Description:
+            return PDFToolTranslationContext::tr("Show list of all available commands.");
+
+        default:
+            Q_ASSERT(false);
+            break;
+    }
+
+    return QString();
+}
+
+int PDFToolHelpApplication::execute(const PDFToolOptions& options)
+{
+    PDFOutputFormatter formatter(options.outputStyle);
+    formatter.beginDocument("help", PDFToolTranslationContext::tr("PDFTool help"));
+    formatter.endl();
+
+    formatter.beginTable("commands", PDFToolTranslationContext::tr("List of available commands"));
+
+    // Table header
+    formatter.beginTableHeaderRow("header");
+    formatter.writeTableHeaderColumn("command", PDFToolTranslationContext::tr("Command"));
+    formatter.writeTableHeaderColumn("tool", PDFToolTranslationContext::tr("Tool"));
+    formatter.writeTableHeaderColumn("description", PDFToolTranslationContext::tr("Description"));
+    formatter.endTableHeaderRow();
+
+    struct Info
+    {
+        bool operator<(const Info& other) const
+        {
+            return command < other.command;
+        }
+
+        QString command;
+        QString name;
+        QString description;
+    };
+
+    std::vector<Info> infos;
+    for (PDFToolAbstractApplication* application : PDFToolApplicationStorage::getApplications())
+    {
+        Info info;
+
+        info.command = application->getStandardString(Command);
+        info.name = application->getStandardString(Name);
+        info.description = application->getStandardString(Description);
+
+        infos.emplace_back(qMove(info));
+    }
+    std::sort(infos.begin(), infos.end());
+
+    for (const Info& info : infos)
+    {
+        formatter.beginTableRow("command");
+        formatter.writeTableColumn("command", info.command);
+        formatter.writeTableColumn("name", info.name);
+        formatter.writeTableColumn("description", info.description);
+        formatter.endTableRow();
+    }
+
+    formatter.endTable();
+
+    formatter.endl();
+    formatter.beginHeader("text-output", PDFToolTranslationContext::tr("Text Encoding"));
+
+    formatter.writeText("header", PDFToolTranslationContext::tr("When you redirect console to a file, then specific codec is used to transform output text to target encoding. UTF-8 encoding is used by default. For XML output, you should use only UTF-8 codec. Available codecs:"));
+    formatter.endl();
+
+    QList<QByteArray> codecs = getAvailableEncodings();
+    QStringList codecNames;
+    for (const QByteArray& codecName : codecs)
+    {
+        codecNames << QString::fromLatin1(codecName);
+    }
+    formatter.writeText("codecs", codecNames.join(", "));
+    formatter.endl();
+    formatter.writeText("default-codec", PDFToolTranslationContext::tr("Suggested codec: UTF-8 or %1").arg(QString::fromLatin1(getDefaultEncoding())));
+
+    formatter.endHeader();
+
+    formatter.endDocument();
+
+    PDFConsole::writeText(formatter.getString(), options.outputCodec);
+    return ExitSuccess;
+}
+
+PDFToolAbstractApplication::Options PDFToolHelpApplication::getOptionsFlags() const
+{
+    return ConsoleFormat;
+}
+
+PDFToolAbstractApplication::PDFToolAbstractApplication(bool isDefault)
+{
+    PDFToolApplicationStorage::registerApplication(this, isDefault);
+}
+
+void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser* parser) const
+{
+    Options optionFlags = getOptionsFlags();
+
+    if (optionFlags.testFlag(ConsoleFormat))
+    {
+        parser->addOption(QCommandLineOption("console-format", "Console output text format (valid values: text|xml|html).", "format", "text"));
+        parser->addOption(QCommandLineOption("text-codec", QString("Text codec used when writing text output to redirected standard output. UTF-8 is default."), "text codec", "UTF-8"));
+    }
+
+    if (optionFlags.testFlag(DateFormat))
+    {
+        parser->addOption(QCommandLineOption("date-format", "Console output date/time format (valid values: short|long|iso|rfc2822).", "date format", "short"));
+    }
+
+    if (optionFlags.testFlag(OpenDocument))
+    {
+        parser->addOption(QCommandLineOption("pswd", "Password for encrypted document.", "password"));
+        parser->addPositionalArgument("document", "Processed document.");
+        parser->addOption(QCommandLineOption("no-permissive-reading", "Do not attempt to fix damaged documents."));
+    }
+
+    if (optionFlags.testFlag(Separate))
+    {
+        parser->addPositionalArgument("pattern", "Page pattern, must contain '%' character if multiple pages are selected.");
+    }
+
+    if (optionFlags.testFlag(Unite))
+    {
+        parser->addPositionalArgument("source", "Documents to be merged into single document.", "file1.pdf [file2.pdf, ...]");
+        parser->addPositionalArgument("target", "Merged document filename.");
+    }
+
+    if (optionFlags.testFlag(Diff))
+    {
+        parser->addPositionalArgument("left", "Left (old) document to be compared.");
+        parser->addPositionalArgument("right", "Right (new) document to be compared.");
+    }
+
+    if (optionFlags.testFlag(Redact))
+    {
+        parser->addPositionalArgument("redacteddocument", "Output redacted document filename.");
+        parser->addOption(QCommandLineOption("redact-copy-title", "Copy source title into the redacted document."));
+        parser->addOption(QCommandLineOption("redact-copy-metadata", "Copy source metadata into the redacted document."));
+        parser->addOption(QCommandLineOption("redact-copy-outline", "Copy source outline into the redacted document."));
+    }
+
+    if (optionFlags.testFlag(SignatureVerification))
+    {
+        parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
+        parser->addOption(QCommandLineOption("ver-no-sys-cert", "Disable system certificate store."));
+        parser->addOption(QCommandLineOption("ver-no-cert-check", "Disable certificate validation."));
+        parser->addOption(QCommandLineOption("ver-details", "Print details (including certificate chain, if found)."));
+        parser->addOption(QCommandLineOption("ver-ignore-exp-date", "Ignore certificate expiration date."));
+    }
+
+    if (optionFlags.testFlag(XmlExport))
+    {
+        parser->addOption(QCommandLineOption("xml-export-streams", "Export streams as hexadecimally encoded data. By default, stream data are not exported."));
+        parser->addOption(QCommandLineOption("xml-export-streams-as-text", "Export streams as text, if possible."));
+        parser->addOption(QCommandLineOption("xml-use-indent", "Use automatic indent when writing output xml file."));
+        parser->addOption(QCommandLineOption("xml-always-binary", "Do not try to attempt transform strings to text."));
+    }
+
+    if (optionFlags.testFlag(Attachments))
+    {
+        parser->addOption(QCommandLineOption("att-save-n", "Save the specified file attached in document. File name is, by default, same as attachment, it can be changed by a switch.", "number", QString()));
+        parser->addOption(QCommandLineOption("att-save-file", "Save the specified file attached in document. File name is, by default, same as attachment, it can be changed by a switch.", "file", QString()));
+        parser->addOption(QCommandLineOption("att-save-all", "Save all attachments to target directory."));
+        parser->addOption(QCommandLineOption("att-target-dir", "Target directory to which is attachment saved.", "directory", QString()));
+        parser->addOption(QCommandLineOption("att-target-file", "File, to which is attachment saved.", "target", QString()));
+    }
+
+    if (optionFlags.testFlag(ComputeHashes))
+    {
+        parser->addOption(QCommandLineOption("compute-hashes", "Compute hashes (MD5, SHA1, SHA256...) of document."));
+    }
+
+    if (optionFlags.testFlag(PageSelector))
+    {
+        parser->addOption(QCommandLineOption("page-first", "First page of page range.", "number"));
+        parser->addOption(QCommandLineOption("page-last", "Last page of page range.", "number"));
+        parser->addOption(QCommandLineOption("page-select", "Choose arbitrary pages, in form '1,5,3,7-11,-29,43-.'.", "number"));
+    }
+
+    if (optionFlags.testFlag(TextAnalysis))
+    {
+        parser->addOption(QCommandLineOption("text-analysis-alg", "Text analysis algorithm (auto - select automatically, layout - perform automatic layout algorithm, content - simple content stream reading order, structure - use tagged document structure).", "algorithm", "auto"));
+    }
+
+    if (optionFlags.testFlag(TextShow))
+    {
+        parser->addOption(QCommandLineOption("text-show-page-numbers", "Show page numbers in extracted text."));
+        parser->addOption(QCommandLineOption("text-show-struct-title", "Show title extracted from structure tree."));
+        parser->addOption(QCommandLineOption("text-show-struct-lang", "Show language extracted from structure tree."));
+        parser->addOption(QCommandLineOption("text-show-struct-alt-desc", "Show alternative description extracted from structure tree."));
+        parser->addOption(QCommandLineOption("text-show-struct-expanded-form", "Show expanded form extracted from structure tree."));
+        parser->addOption(QCommandLineOption("text-show-struct-act-text", "Show actual text extracted from structure tree."));
+        parser->addOption(QCommandLineOption("text-show-phoneme", "Show phoneme extracted from structure tree."));
+    }
+
+    if (optionFlags.testFlag(VoiceSelector))
+    {
+        parser->addOption(QCommandLineOption("voice-name", "Choose voice name for text-to-speech engine.", "name"));
+        parser->addOption(QCommandLineOption("voice-gender", "Choose voice gender for text-to-speech engine.", "gender"));
+        parser->addOption(QCommandLineOption("voice-age", "Choose voice age for text-to-speech engine.", "age"));
+        parser->addOption(QCommandLineOption("voice-lang-code", "Choose voice language code for text-to-speech engine.", "code"));
+    }
+
+    if (optionFlags.testFlag(TextSpeech))
+    {
+        parser->addOption(QCommandLineOption("audio-format", "Audio fromat, valid values are wav/mp3.", "audio format", "mp3"));
+        parser->addOption(QCommandLineOption("mark-page-numbers", "Mark page numbers in audio stream."));
+        parser->addOption(QCommandLineOption("say-page-numbers", "Say page numbers."));
+        parser->addOption(QCommandLineOption("say-struct-titles", "Say titles extracted from structure tree (only for tagged pdf)."));
+        parser->addOption(QCommandLineOption("say-struct-alt-desc", "Say alternative descriptions extracted from structure tree (only for tagged pdf)."));
+        parser->addOption(QCommandLineOption("say-struct-exp-form", "Say expanded form extracted from structure tree (only for tagged pdf)."));
+        parser->addOption(QCommandLineOption("say-struct-act-text", "Say actual text extracted from structure tree (only for tagged pdf)."));
+    }
+
+    if (optionFlags.testFlag(CharacterMaps))
+    {
+        parser->addOption(QCommandLineOption("character-maps", "Show character maps for embedded fonts."));
+    }
+
+    if (optionFlags.testFlag(ImageWriterSettings))
+    {
+        parser->addOption(QCommandLineOption("image-format", "Image format. Common formats as png, jpeg, are supported.", "format", "png"));
+        parser->addOption(QCommandLineOption("image-subtype", "Image format subtype. Some image formats can have this setting.", "subtype"));
+        parser->addOption(QCommandLineOption("image-compress-lvl", "Image compression level. Different formats can have different meaning.", "level", "9"));
+        parser->addOption(QCommandLineOption("image-quality", "Image quality. Different formats can have different meaning.", "quality", "100"));
+        parser->addOption(QCommandLineOption("image-optimized-write", "Use optimized write mode."));
+        parser->addOption(QCommandLineOption("image-progressive-scan-write", "Use image progressive scan mode."));
+    }
+
+    if (optionFlags.testFlag(ImageExportSettingsFiles))
+    {
+        parser->addOption(QCommandLineOption("image-output-dir", "Output directory, where images are saved.", "dir"));
+        parser->addOption(QCommandLineOption("image-template-fn", "Template file name, must contain '%' character, must not contain suffix.", "template file name", "Image_%"));
+    }
+
+    if (optionFlags.testFlag(ImageExportSettingsResolution))
+    {
+        parser->addOption(QCommandLineOption("image-res-mode", "Image resolution mode (valid values are dpi|pixel). Dpi is default.", "mode", "dpi"));
+        parser->addOption(QCommandLineOption("image-res-dpi", "DPI resolution of target image.", "dpi"));
+        parser->addOption(QCommandLineOption("image-res-pixel", "Pixel resolution of target image.", "pixel"));
+    }
+
+    if (optionFlags.testFlag(ColorManagementSystem))
+    {
+        parser->addOption(QCommandLineOption("cms", "Color management system. Valid values are generic|lcms.", "cms", "lcms"));
+        parser->addOption(QCommandLineOption("cms-accuracy", "Accuracy of cms system. Valid values are low|medium|high. Higher accuracy means higher memory consumption.", "accuracy", "medium"));
+        parser->addOption(QCommandLineOption("cms-color-adaptation", "Color adaptation method for XYZ whitepoint scaling. Valid values are none|xyzscaling|cat97|cat02|bradford. Higher accuracy means higher memory consumption.", "color-adaptation-method", "bradford"));
+        parser->addOption(QCommandLineOption("cms-intent", "Rendering intent. Valid values are auto|perceptual|abs|rel|saturation.", "intent", "auto"));
+        parser->addOption(QCommandLineOption("cms-black-compensated", "Black point compensation.", "bool", "1"));
+        parser->addOption(QCommandLineOption("cms-white-paper-trans", "Transform also color of paper using cms.", "bool", "0"));
+        parser->addOption(QCommandLineOption("cms-consider-output-intents", "Consider output rendering intents in the document.", "bool", "1"));
+        parser->addOption(QCommandLineOption("cms-profile-output", "Output color profile.", "profile"));
+        parser->addOption(QCommandLineOption("cms-profile-gray", "Gray color profile for gray device.", "profile"));
+        parser->addOption(QCommandLineOption("cms-profile-rgb", "RGB color profile for RGB device.", "profile"));
+        parser->addOption(QCommandLineOption("cms-profile-cmyk", "CMYK color profile for CMYK device.", "profile"));
+        parser->addOption(QCommandLineOption("cms-profile-dir", "External directory containing color profiles.", "directory"));
+    }
+
+    if (optionFlags.testFlag(RenderFlags))
+    {
+        const pdf::PDFRenderer::Features defaultFeatures = pdf::PDFRenderer::getDefaultFeatures();
+        for (const PDFToolOptions::RenderFeatureInfo& info : PDFToolOptions::getRenderFeatures())
+        {
+            parser->addOption(QCommandLineOption(info.option, info.description, "bool", defaultFeatures.testFlag(info.feature) ? "1" : "0"));
+        }
+
+        parser->addOption(QCommandLineOption("render-hw-accel", "Use hardware acceleration (using GPU).", "bool", "1"));
+        parser->addOption(QCommandLineOption("render-show-page-stat", "Show page rendering statistics."));
+        parser->addOption(QCommandLineOption("render-msaa-samples", "MSAA sample count for GPU rendering.", "samples", "4"));
+        parser->addOption(QCommandLineOption("render-rasterizers", "Number of rasterizer contexts.", "rasterizers", QString::number(pdf::PDFRasterizerPool::getDefaultRasterizerCount())));
+    }
+
+    if (optionFlags.testFlag(Optimize))
+    {
+        for (const PDFToolOptions::OptimizeFeatureInfo& info : PDFToolOptions::getOptimizeFlagInfos())
+        {
+            parser->addOption(QCommandLineOption(info.option, info.description));
+        }
+
+        parser->addOption(QCommandLineOption("opt-images", "Enable image optimization/compression."));
+        parser->addOption(QCommandLineOption("opt-images-mode", "Image optimization mode (auto|custom).", "mode", "auto"));
+        parser->addOption(QCommandLineOption("opt-images-color-mode", "Image color mode (auto|preserve|color|gray|bitonal).", "mode", "auto"));
+        parser->addOption(QCommandLineOption("opt-images-goal", "Optimization goal (quality|size).", "goal", "quality"));
+        parser->addOption(QCommandLineOption("opt-images-keep-original", "Keep original stream if compression is not smaller.", "bool", "1"));
+        parser->addOption(QCommandLineOption("opt-images-preserve-alpha", "Preserve transparency using soft masks when needed.", "bool", "1"));
+
+        parser->addOption(QCommandLineOption("opt-images-color-alg", "Color image compression algorithm (auto|flate|jpeg|jpx|runlength).", "algorithm", "auto"));
+        parser->addOption(QCommandLineOption("opt-images-color-dpi", "Target DPI for color images (0 disables).", "dpi", "150"));
+        parser->addOption(QCommandLineOption("opt-images-color-jpeg-quality", "JPEG quality for color images (0-100).", "quality", "85"));
+        parser->addOption(QCommandLineOption("opt-images-color-jpx-rate", "JPEG2000 rate for color images (0=lossless).", "rate", "0"));
+        parser->addOption(QCommandLineOption("opt-images-color-resample", "Resample filter for color images (nearest|bilinear|bicubic|lanczos).", "filter", "bicubic"));
+        parser->addOption(QCommandLineOption("opt-images-color-png-predictor", "Enable PNG predictor for flate (color).", "bool", "1"));
+
+        parser->addOption(QCommandLineOption("opt-images-gray-alg", "Grayscale image compression algorithm (auto|flate|jpeg|jpx|runlength).", "algorithm", "auto"));
+        parser->addOption(QCommandLineOption("opt-images-gray-dpi", "Target DPI for grayscale images (0 disables).", "dpi", "150"));
+        parser->addOption(QCommandLineOption("opt-images-gray-jpeg-quality", "JPEG quality for grayscale images (0-100).", "quality", "85"));
+        parser->addOption(QCommandLineOption("opt-images-gray-jpx-rate", "JPEG2000 rate for grayscale images (0=lossless).", "rate", "0"));
+        parser->addOption(QCommandLineOption("opt-images-gray-resample", "Resample filter for grayscale images (nearest|bilinear|bicubic|lanczos).", "filter", "bicubic"));
+        parser->addOption(QCommandLineOption("opt-images-gray-png-predictor", "Enable PNG predictor for flate (grayscale).", "bool", "1"));
+
+        parser->addOption(QCommandLineOption("opt-images-bitonal-alg", "Bitonal image compression algorithm (auto|flate|runlength|ccittg4|jbig2).", "algorithm", "auto"));
+        parser->addOption(QCommandLineOption("opt-images-bitonal-dpi", "Target DPI for bitonal images (0 disables).", "dpi", "300"));
+        parser->addOption(QCommandLineOption("opt-images-bitonal-threshold", "Bitonal threshold (0-255, -1=auto).", "threshold", "-1"));
+        parser->addOption(QCommandLineOption("opt-images-bitonal-resample", "Resample filter for bitonal images (nearest|bilinear|bicubic|lanczos).", "filter", "bicubic"));
+        parser->addOption(QCommandLineOption("opt-images-bitonal-png-predictor", "Enable PNG predictor for flate (bitonal).", "bool", "1"));
+    }
+
+    if (optionFlags.testFlag(CertStore))
+    {
+        parser->addOption(QCommandLineOption("list-user-certs", "Show list of user certificates.", "bool", "1"));
+        parser->addOption(QCommandLineOption("list-system-certs", "Show list of system certificates.", "bool", "0"));
+    }
+
+    if (optionFlags.testFlag(CertStoreInstall))
+    {
+        parser->addPositionalArgument("certificate", "Certificate file");
+    }
+
+    if (optionFlags.testFlag(Encrypt))
+    {
+        parser->addOption(QCommandLineOption("enc-algorithm", "Encryption algorithm (valid values: rc4|aes-128|aes-256).", "encryption algorithm", "aes-256"));
+        parser->addOption(QCommandLineOption("enc-contents", "Encryption scope (valid values: all|all-except-metadata|only-embedded-files).", "encryption contents", "all"));
+        parser->addOption(QCommandLineOption("enc-user-password", "User password (for document reading).", "user password"));
+        parser->addOption(QCommandLineOption("enc-owner-password", "Owner password.", "owner password"));
+        parser->addOption(QCommandLineOption("enc-permissions", "Document permissions (flags represented as a number).", "permissions"));
+    }
+}
+
+PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser) const
+{
+    PDFToolOptions options;
+
+    QStringList positionalArguments = parser->positionalArguments();
+
+    Options optionFlags = getOptionsFlags();
+    if (optionFlags.testFlag(ConsoleFormat))
+    {
+        QString consoleFormat = parser->value("console-format");
+        if (consoleFormat == "text")
+        {
+            options.outputStyle = PDFOutputFormatter::Style::Text;
+        }
+        else if (consoleFormat == "xml")
+        {
+            options.outputStyle = PDFOutputFormatter::Style::Xml;
+        }
+        else if (consoleFormat == "html")
+        {
+            options.outputStyle = PDFOutputFormatter::Style::Html;
+        }
+        else
+        {
+            if (!consoleFormat.isEmpty())
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown console format '%1'. Defaulting to text console format.").arg(consoleFormat), options.outputCodec);
+            }
+
+            options.outputStyle = PDFOutputFormatter::Style::Text;
+        }
+
+        options.outputCodec = getEncoding(parser->value("text-codec"));
+    }
+
+    if (optionFlags.testFlag(DateFormat))
+    {
+        QString dateFormat = parser->value("date-format");
+        if (dateFormat == "short")
+        {
+            options.outputDateFormat = PDFToolOptions::LocaleShortDate;
+        }
+        else if (dateFormat == "long")
+        {
+            options.outputDateFormat = PDFToolOptions::LocaleLongDate;
+        }
+        else if (dateFormat == "iso")
+        {
+            options.outputDateFormat = PDFToolOptions::ISODate;
+        }
+        else if (dateFormat == "rfc2822")
+        {
+            options.outputDateFormat = PDFToolOptions::RFC2822Date;
+        }
+        else if (!dateFormat.isEmpty())
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown console date/time format '%1'. Defaulting to short date/time format.").arg(dateFormat), options.outputCodec);
+        }
+    }
+
+    if (optionFlags.testFlag(OpenDocument))
+    {
+        options.document = positionalArguments.isEmpty() ? QString() : positionalArguments.front();
+        options.password = parser->isSet("pswd") ? parser->value("pswd") : QString();
+        options.permissiveReading = !parser->isSet("no-permissive-reading");
+    }
+
+    if (optionFlags.testFlag(Redact))
+    {
+        options.redactedDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+
+        options.redactOptions = pdf::PDFRedact::None;
+
+        if (parser->isSet("redact-copy-title"))
+        {
+            options.redactOptions |= pdf::PDFRedact::CopyTitle;
+        }
+
+        if (parser->isSet("redact-copy-metadata"))
+        {
+            options.redactOptions |= pdf::PDFRedact::CopyMetadata;
+        }
+
+        if (parser->isSet("redact-copy-outline"))
+        {
+            options.redactOptions |= pdf::PDFRedact::CopyOutline;
+        }
+    }
+
+    if (optionFlags.testFlag(Separate))
+    {
+        options.separatePagePattern = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(SignatureVerification))
+    {
+        options.verificationUseUserCertificates = !parser->isSet("ver-no-user-cert");
+        options.verificationUseSystemCertificates = !parser->isSet("ver-no-sys-cert");
+        options.verificationOmitCertificateCheck = parser->isSet("ver-no-cert-check");
+        options.verificationPrintCertificateDetails = parser->isSet("ver-details");
+        options.verificationIgnoreExpirationDate = parser->isSet("ver-ignore-exp-date");
+    }
+
+    if (optionFlags.testFlag(XmlExport))
+    {
+        options.xmlExportStreams = parser->isSet("xml-export-streams");
+        options.xmlExportStreamsAsText = parser->isSet("xml-export-streams-as-text");
+        options.xmlUseIndent = parser->isSet("xml-use-indent");
+        options.xmlAlwaysBinaryStrings = parser->isSet("xml-always-binary");
+    }
+
+    if (optionFlags.testFlag(Attachments))
+    {
+        options.attachmentsSaveNumber = parser->isSet("att-save-n") ? parser->value("att-save-n") : QString();
+        options.attachmentsSaveFileName = parser->isSet("att-save-file") ? parser->value("att-save-file") : QString();
+        options.attachmentsSaveAll = parser->isSet("att-save-all");
+        options.attachmentsOutputDirectory = parser->isSet("att-target-dir") ? parser->value("att-target-dir") : QString();
+        options.attachmentsTargetFile = parser->isSet("att-target-file") ? parser->value("att-target-file") : QString();
+    }
+
+    if (optionFlags.testFlag(ComputeHashes))
+    {
+        options.computeHashes = parser->isSet("compute-hashes");
+    }
+
+    if (optionFlags.testFlag(PageSelector))
+    {
+        options.pageSelectorFirstPage = parser->isSet("page-first") ? parser->value("page-first") : QString();
+        options.pageSelectorLastPage = parser->isSet("page-last") ? parser->value("page-last") : QString();
+        options.pageSelectorSelection = parser->isSet("page-select") ? parser->value("page-select") : QString();
+    }
+
+    if (optionFlags.testFlag(TextAnalysis))
+    {
+        QString algoritm = parser->value("text-analysis-alg");
+        if (algoritm == "auto")
+        {
+            options.textAnalysisAlgorithm = pdf::PDFDocumentTextFlowFactory::Algorithm::Auto;
+        }
+        else if (algoritm == "layout")
+        {
+            options.textAnalysisAlgorithm = pdf::PDFDocumentTextFlowFactory::Algorithm::Layout;
+        }
+        else if (algoritm == "content")
+        {
+            options.textAnalysisAlgorithm = pdf::PDFDocumentTextFlowFactory::Algorithm::Content;
+        }
+        else if (algoritm == "structure")
+        {
+            options.textAnalysisAlgorithm = pdf::PDFDocumentTextFlowFactory::Algorithm::Structure;
+        }
+        else if (!algoritm.isEmpty())
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown text layout analysis algorithm '%1'. Defaulting to automatic algorithm selection.").arg(algoritm), options.outputCodec);
+        }
+    }
+
+    if (optionFlags.testFlag(TextShow))
+    {
+        options.textShowPageNumbers = parser->isSet("text-show-page-numbers");
+        options.textShowStructTitles = parser->isSet("text-show-struct-title");
+        options.textShowStructLanguage = parser->isSet("text-show-struct-lang");
+        options.textShowStructAlternativeDescription = parser->isSet("text-show-struct-alt-desc");
+        options.textShowStructExpandedForm = parser->isSet("text-show-struct-expanded-form");
+        options.textShowStructActualText = parser->isSet("text-show-struct-act-text");
+        options.textShowStructPhoneme = parser->isSet("text-show-phoneme");
+    }
+
+    if (optionFlags.testFlag(VoiceSelector))
+    {
+        options.textVoiceName = parser->isSet("voice-name") ? parser->value("voice-name") : QString();
+        options.textVoiceGender = parser->isSet("voice-gender") ? parser->value("voice-gender") : QString();
+        options.textVoiceAge = parser->isSet("voice-age") ? parser->value("voice-age") : QString();
+        options.textVoiceLangCode = parser->isSet("voice-lang-code") ? parser->value("voice-lang-code") : QString();
+    }
+
+    if (optionFlags.testFlag(TextSpeech))
+    {
+        options.textSpeechAudioFormat = parser->value("audio-format");
+        if (options.textSpeechAudioFormat != "wav" && options.textSpeechAudioFormat != "mp3")
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown audio format '%1'. Defaulting to mp3 audio format.").arg(options.textSpeechAudioFormat), options.outputCodec);
+            options.textSpeechAudioFormat = "mp3";
+        }
+
+        options.textSpeechMarkPageNumbers = parser->isSet("mark-page-numbers");
+        options.textSpeechSayPageNumbers = parser->isSet("say-page-numbers");
+        options.textSpeechSayStructTitles = parser->isSet("say-struct-titles");
+        options.textSpeechSayStructAlternativeDescription = parser->isSet("say-struct-alt-desc");
+        options.textSpeechSayStructExpandedForm = parser->isSet("say-struct-exp-form");
+        options.textSpeechSayStructActualText = parser->isSet("say-struct-act-text");
+    }
+
+    if (optionFlags.testFlag(CharacterMaps))
+    {
+        options.showCharacterMapsForEmbeddedFonts = parser->isSet("character-maps");
+    }
+
+    if (optionFlags.testFlag(ImageWriterSettings))
+    {
+        // Image format
+        QByteArray imageWriterFormat = parser->value("image-format").toLatin1();
+        if (!options.imageWriterSettings.getFormats().contains(imageWriterFormat))
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Image format '%1' is not supported. Defaulting to png.").arg(QString::fromLatin1(imageWriterFormat)), options.outputCodec);
+            imageWriterFormat = "png";
+        }
+        Q_ASSERT(options.imageWriterSettings.getFormats().contains(imageWriterFormat));
+
+        options.imageWriterSettings.selectFormat(imageWriterFormat);
+
+        // Image subtype
+        if (parser->isSet("image-subtype"))
+        {
+            QByteArray imageWriterSubtype = parser->value("image-subtype").toLatin1();
+            if (options.imageWriterSettings.getSubtypes().contains(imageWriterSubtype))
+            {
+                options.imageWriterSettings.setCurrentSubtype(imageWriterSubtype);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Image format subtype '%1' is not supported.").arg(QString::fromLatin1(imageWriterSubtype)), options.outputCodec);
+            }
+        }
+
+        // Compression level
+        if (parser->isSet("image-compress-lvl"))
+        {
+            QString valueText = parser->value("image-compress-lvl");
+
+            bool ok = false;
+            int value = valueText.toInt(&ok);
+            if (ok)
+            {
+                if (options.imageWriterSettings.isOptionSupported(QImageIOHandler::CompressionRatio))
+                {
+                    options.imageWriterSettings.setCompression(value);
+                }
+                else
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Image compression for current format is not supported."), options.outputCodec);
+                }
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid compression level '%1'.").arg(valueText), options.outputCodec);
+            }
+        }
+
+        // Quality
+        if (parser->isSet("image-quality"))
+        {
+            QString valueText = parser->value("image-quality");
+
+            bool ok = false;
+            int value = valueText.toInt(&ok);
+            if (ok)
+            {
+                if (options.imageWriterSettings.isOptionSupported(QImageIOHandler::Quality))
+                {
+                    options.imageWriterSettings.setQuality(value);
+                }
+                else
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Image quality settings for current format is not supported."), options.outputCodec);
+                }
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid image quality '%1'.").arg(valueText), options.outputCodec);
+            }
+        }
+
+        options.imageWriterSettings.setOptimizedWrite(false);
+        options.imageWriterSettings.setProgressiveScanWrite(false);
+
+        if (parser->isSet("image-optimized-write"))
+        {
+            if (options.imageWriterSettings.isOptionSupported(QImageIOHandler::OptimizedWrite))
+            {
+                options.imageWriterSettings.setOptimizedWrite(true);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Optimized write is not supported."), options.outputCodec);
+            }
+        }
+
+        if (parser->isSet("image-progressive-scan-write"))
+        {
+            if (options.imageWriterSettings.isOptionSupported(QImageIOHandler::ProgressiveScanWrite))
+            {
+                options.imageWriterSettings.setProgressiveScanWrite(true);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Progressive scan write is not supported."), options.outputCodec);
+            }
+        }
+    }
+
+    if (optionFlags.testFlag(ImageExportSettingsFiles))
+    {
+        QFileInfo documentFileInfo(options.document);
+        QString outputDir = documentFileInfo.path();
+
+        if (parser->isSet("image-output-dir"))
+        {
+            outputDir = parser->value("image-output-dir");
+        }
+
+        options.imageExportSettings.setDirectory(outputDir);
+        options.imageExportSettings.setFileTemplate(parser->value("image-template-fn"));
+    }
+
+    if (optionFlags.testFlag(ImageExportSettingsResolution))
+    {
+        QString resMode = parser->value("image-res-mode").toLower();
+        if (resMode == "dpi")
+        {
+            options.imageExportSettings.setResolutionMode(pdf::PDFPageImageExportSettings::ResolutionMode::DPI);
+        }
+        else if (resMode == "pixel")
+        {
+            options.imageExportSettings.setResolutionMode(pdf::PDFPageImageExportSettings::ResolutionMode::Pixels);
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid image resolution mode '%1'. Defaulting to dpi.").arg(resMode), options.outputCodec);
+            options.imageExportSettings.setResolutionMode(pdf::PDFPageImageExportSettings::ResolutionMode::DPI);
+        }
+
+        if (parser->isSet("image-res-dpi"))
+        {
+            if (options.imageExportSettings.getResolutionMode() != pdf::PDFPageImageExportSettings::ResolutionMode::DPI)
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Cannot set dpi value, resolution mode must be dpi."), options.outputCodec);
+            }
+
+            bool ok = false;
+            int dpi = parser->value("image-res-dpi").toInt(&ok);
+            if (ok)
+            {
+                int boundedDpi = qBound(pdf::PDFPageImageExportSettings::getMinDPIResolution(), dpi, pdf::PDFPageImageExportSettings::getMaxDPIResolution());
+
+                if (boundedDpi != dpi)
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Dpi must be in range from %1 to %2. Defaulting to %3.").arg(pdf::PDFPageImageExportSettings::getMinDPIResolution()).arg(pdf::PDFPageImageExportSettings::getMaxDPIResolution()).arg(boundedDpi), options.outputCodec);
+                }
+
+                options.imageExportSettings.setDpiResolution(boundedDpi);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid image dpi value '%1'.").arg(parser->value("image-res-dpi")), options.outputCodec);
+            }
+        }
+
+        if (parser->isSet("image-res-pixel"))
+        {
+            if (options.imageExportSettings.getResolutionMode() != pdf::PDFPageImageExportSettings::ResolutionMode::Pixels)
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Cannot set pixel value, resolution mode must be pixel."), options.outputCodec);
+            }
+
+            bool ok = false;
+            int pixel = parser->value("image-res-pixel").toInt(&ok);
+            if (ok)
+            {
+                int boundedPixel = qBound(pdf::PDFPageImageExportSettings::getMinPixelResolution(), pixel, pdf::PDFPageImageExportSettings::getMaxPixelResolution());
+
+                if (boundedPixel != pixel)
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Pixel value must be in range from %1 to %2. Defaulting to %3.").arg(pdf::PDFPageImageExportSettings::getMinPixelResolution()).arg(pdf::PDFPageImageExportSettings::getMaxPixelResolution()).arg(boundedPixel), options.outputCodec);
+                }
+
+                options.imageExportSettings.setPixelResolution(boundedPixel);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid image pixel value '%1'.").arg(parser->value("image-res-pixel")), options.outputCodec);
+            }
+        }
+    }
+
+    if (optionFlags.testFlag(ColorManagementSystem))
+    {
+        pdf::PDFCMSManager cmsManager(nullptr);
+        options.cmsSettings = cmsManager.getDefaultSettings();
+
+        QString cms = parser->value("cms");
+        if (cms == "generic")
+        {
+            options.cmsSettings.system = pdf::PDFCMSSettings::System::Generic;
+        }
+        else if (cms == "lcms")
+        {
+            options.cmsSettings.system = pdf::PDFCMSSettings::System::LittleCMS2;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown color management system '%1'. Defaulting to lcms.").arg(cms), options.outputCodec);
+            options.cmsSettings.system = pdf::PDFCMSSettings::System::LittleCMS2;
+        }
+
+        QString accuracy = parser->value("cms-accuracy");
+        if (accuracy == "medium")
+        {
+            options.cmsSettings.accuracy = pdf::PDFCMSSettings::Accuracy::Medium;
+        }
+        else if (accuracy == "low")
+        {
+            options.cmsSettings.accuracy = pdf::PDFCMSSettings::Accuracy::Low;
+        }
+        else if (accuracy == "high")
+        {
+            options.cmsSettings.accuracy = pdf::PDFCMSSettings::Accuracy::High;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown color management system accuracy '%1'. Defaulting to medium.").arg(accuracy), options.outputCodec);
+            options.cmsSettings.accuracy = pdf::PDFCMSSettings::Accuracy::Medium;
+        }
+
+        QString colorAdaptationMethod = parser->value("cms-color-adaptation");
+        if (colorAdaptationMethod == "none")
+        {
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::None;
+        }
+        else if (colorAdaptationMethod == "xyzscaling")
+        {
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::XYZScaling;
+        }
+        else if (colorAdaptationMethod == "cat97")
+        {
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::CAT97;
+        }
+        else if (colorAdaptationMethod == "cat02")
+        {
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::CAT02;
+        }
+        else if (colorAdaptationMethod == "bradford")
+        {
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::Bradford;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown color adaptation method '%1'. Defaulting to bradford.").arg(colorAdaptationMethod), options.outputCodec);
+            options.cmsSettings.colorAdaptationXYZ = pdf::PDFCMSSettings::ColorAdaptationXYZ::Bradford;
+        }
+
+        QString intent = parser->value("cms-intent");
+        if (intent == "auto")
+        {
+            options.cmsSettings.intent = pdf::RenderingIntent::Auto;
+        }
+        else if (intent == "perceptual")
+        {
+            options.cmsSettings.intent = pdf::RenderingIntent::Perceptual;
+        }
+        else if (intent == "abs")
+        {
+            options.cmsSettings.intent = pdf::RenderingIntent::AbsoluteColorimetric;
+        }
+        else if (intent == "rel")
+        {
+            options.cmsSettings.intent = pdf::RenderingIntent::RelativeColorimetric;
+        }
+        else if (intent == "saturation")
+        {
+            options.cmsSettings.intent = pdf::RenderingIntent::Saturation;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown color management system rendering intent '%1'. Defaulting to auto.").arg(intent), options.outputCodec);
+            options.cmsSettings.intent = pdf::RenderingIntent::Auto;
+        }
+
+        if (parser->isSet("cms-black-compensated"))
+        {
+            options.cmsSettings.isBlackPointCompensationActive = parser->value("cms-black-compensated").toInt();
+        }
+
+        if (parser->isSet("cms-white-paper-trans"))
+        {
+            options.cmsSettings.isWhitePaperColorTransformed = parser->value("cms-white-paper-trans").toInt();
+        }
+
+        if (parser->isSet("cms-consider-output-intents"))
+        {
+            options.cmsSettings.isConsiderOutputIntent = parser->value("cms-consider-output-intents").toInt();
+        }
+
+        auto setProfile = [&parser, &options](QString settings, QString& profile)
+        {
+            if (parser->isSet(settings))
+            {
+                profile = parser->value(settings);
+            }
+        };
+
+        setProfile("cms-profile-output", options.cmsSettings.outputCS);
+        setProfile("cms-profile-gray", options.cmsSettings.deviceGray);
+        setProfile("cms-profile-rgb", options.cmsSettings.deviceRGB);
+        setProfile("cms-profile-cmyk", options.cmsSettings.deviceCMYK);
+        setProfile("cms-profile-dir", options.cmsSettings.profileDirectory);
+    }
+
+    if (optionFlags.testFlag(RenderFlags))
+    {
+        for (const PDFToolOptions::RenderFeatureInfo& info : PDFToolOptions::getRenderFeatures())
+        {
+            QString textValue = parser->value(info.option);
+
+            bool ok = false;
+            bool value = textValue.toInt(&ok);
+
+            if (ok)
+            {
+                options.renderFeatures.setFlag(info.feature, value);
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown bool value '%1'. Default value is used.").arg(textValue), options.outputCodec);
+            }
+        }
+
+        QString textValue = parser->value("render-software");
+        bool ok = false;
+        bool value = textValue.toInt(&ok);
+        if (ok)
+        {
+            options.renderUseSoftwareRendering = value;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown bool value '%1'. GPU rendering is used as default.").arg(textValue), options.outputCodec);
+        }
+
+        textValue = parser->value("render-msaa-samples");
+        options.renderMSAAsamples = textValue.toInt(&ok);
+        if (!ok)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown MSAA sample count '%1'. 4 samples are used as default.").arg(textValue), options.outputCodec);
+            options.renderMSAAsamples = 4;
+        }
+
+        textValue = parser->value("render-rasterizers");
+        options.renderRasterizerCount = textValue.toInt(&ok);
+        if (!ok)
+        {
+            options.renderRasterizerCount = pdf::PDFRasterizerPool::getDefaultRasterizerCount();
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Uknown rasterizer count '%1'. %2 rasterizers are used as default.").arg(textValue).arg(options.renderRasterizerCount), options.outputCodec);
+        }
+        int correctedRasterizerCount = pdf::PDFRasterizerPool::getCorrectedRasterizerCount(options.renderRasterizerCount);
+        if (correctedRasterizerCount != options.renderRasterizerCount)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid raterizer count: %1. Correcting to use %2 rasterizers.").arg(options.renderRasterizerCount).arg(correctedRasterizerCount), options.outputCodec);
+            options.renderRasterizerCount = correctedRasterizerCount;
+        }
+
+        options.renderShowPageStatistics = parser->isSet("render-show-page-stat");
+    }
+
+    if (optionFlags.testFlag(Unite))
+    {
+        options.uniteFiles = positionalArguments;
+    }
+
+    if (optionFlags.testFlag(Diff))
+    {
+        options.diffFiles = positionalArguments;
+    }
+
+    if (optionFlags.testFlag(Optimize))
+    {
+        options.optimizeFlags = pdf::PDFOptimizer::None;
+        for (const PDFToolOptions::OptimizeFeatureInfo& info : PDFToolOptions::getOptimizeFlagInfos())
+        {
+            if (parser->isSet(info.option))
+            {
+                options.optimizeFlags |= info.flag;
+            }
+        }
+
+        if (parser->isSet("opt-images"))
+        {
+            options.imageOptimizationSettings = pdf::PDFImageOptimizer::Settings::createDefault();
+            options.imageOptimizationSettings.enabled = true;
+
+            auto parseBool = [&parser](const char* option, bool defaultValue)
+            {
+                if (!parser->isSet(option))
+                {
+                    return defaultValue;
+                }
+                return parser->value(option).toInt() != 0;
+            };
+
+            auto parseMode = [&parser](const QString& value) -> pdf::PDFImageOptimizer::ColorMode
+            {
+                if (value == "auto")
+                {
+                    return pdf::PDFImageOptimizer::ColorMode::Auto;
+                }
+                if (value == "preserve")
+                {
+                    return pdf::PDFImageOptimizer::ColorMode::Preserve;
+                }
+                if (value == "color")
+                {
+                    return pdf::PDFImageOptimizer::ColorMode::Color;
+                }
+                if (value == "gray" || value == "grayscale")
+                {
+                    return pdf::PDFImageOptimizer::ColorMode::Grayscale;
+                }
+                if (value == "bitonal")
+                {
+                    return pdf::PDFImageOptimizer::ColorMode::Bitonal;
+                }
+                return pdf::PDFImageOptimizer::ColorMode::Auto;
+            };
+
+            auto parseAlgorithm = [](const QString& value) -> pdf::PDFImageOptimizer::CompressionAlgorithm
+            {
+                if (value == "auto")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::Auto;
+                }
+                if (value == "flate")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::Flate;
+                }
+                if (value == "jpeg")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::JPEG;
+                }
+                if (value == "jpx" || value == "jpeg2000")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::JPEG2000;
+                }
+                if (value == "runlength")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::RunLength;
+                }
+                if (value == "ccittg4")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::CCITTGroup4;
+                }
+                if (value == "jbig2")
+                {
+                    return pdf::PDFImageOptimizer::CompressionAlgorithm::JBIG2;
+                }
+                return pdf::PDFImageOptimizer::CompressionAlgorithm::Auto;
+            };
+
+            auto parseResample = [](const QString& value) -> pdf::PDFImage::ResampleFilter
+            {
+                if (value == "nearest")
+                {
+                    return pdf::PDFImage::ResampleFilter::Nearest;
+                }
+                if (value == "bilinear")
+                {
+                    return pdf::PDFImage::ResampleFilter::Bilinear;
+                }
+                if (value == "lanczos")
+                {
+                    return pdf::PDFImage::ResampleFilter::Lanczos;
+                }
+                return pdf::PDFImage::ResampleFilter::Bicubic;
+            };
+
+            QString mode = parser->value("opt-images-mode");
+            options.imageOptimizationSettings.autoMode = (mode != "custom");
+            options.imageOptimizationSettings.colorMode = parseMode(parser->value("opt-images-color-mode"));
+
+            QString goal = parser->value("opt-images-goal");
+            options.imageOptimizationSettings.goal = (goal == "size") ? pdf::PDFImageOptimizer::OptimizationGoal::MinimumSize
+                                                                      : pdf::PDFImageOptimizer::OptimizationGoal::PreferQuality;
+
+            options.imageOptimizationSettings.keepOriginalIfLarger = parseBool("opt-images-keep-original", true);
+            options.imageOptimizationSettings.preserveTransparency = parseBool("opt-images-preserve-alpha", true);
+
+            auto applyProfile = [&parser, &parseAlgorithm, &parseResample](pdf::PDFImageOptimizer::CompressionProfile& profile,
+                                                                           const char* algOption,
+                                                                           const char* dpiOption,
+                                                                           const char* qualityOption,
+                                                                           const char* rateOption,
+                                                                           const char* resampleOption,
+                                                                           const char* predictorOption)
+            {
+                if (parser->isSet(algOption))
+                {
+                    profile.algorithm = parseAlgorithm(parser->value(algOption));
+                }
+                if (parser->isSet(dpiOption))
+                {
+                    bool ok = false;
+                    int dpi = parser->value(dpiOption).toInt(&ok);
+                    if (ok)
+                    {
+                        profile.targetDpi = dpi;
+                    }
+                }
+                if (qualityOption && parser->isSet(qualityOption))
+                {
+                    bool ok = false;
+                    int quality = parser->value(qualityOption).toInt(&ok);
+                    if (ok)
+                    {
+                        profile.jpegQuality = qBound(0, quality, 100);
+                    }
+                }
+                if (rateOption && parser->isSet(rateOption))
+                {
+                    bool ok = false;
+                    float rate = parser->value(rateOption).toFloat(&ok);
+                    if (ok)
+                    {
+                        profile.jpeg2000Rate = rate;
+                    }
+                }
+                if (resampleOption && parser->isSet(resampleOption))
+                {
+                    profile.resampleFilter = parseResample(parser->value(resampleOption));
+                }
+                if (predictorOption && parser->isSet(predictorOption))
+                {
+                    profile.enablePngPredictor = parser->value(predictorOption).toInt() != 0;
+                }
+            };
+
+            applyProfile(options.imageOptimizationSettings.colorProfile,
+                         "opt-images-color-alg",
+                         "opt-images-color-dpi",
+                         "opt-images-color-jpeg-quality",
+                         "opt-images-color-jpx-rate",
+                         "opt-images-color-resample",
+                         "opt-images-color-png-predictor");
+
+            applyProfile(options.imageOptimizationSettings.grayProfile,
+                         "opt-images-gray-alg",
+                         "opt-images-gray-dpi",
+                         "opt-images-gray-jpeg-quality",
+                         "opt-images-gray-jpx-rate",
+                         "opt-images-gray-resample",
+                         "opt-images-gray-png-predictor");
+
+            applyProfile(options.imageOptimizationSettings.bitonalProfile,
+                         "opt-images-bitonal-alg",
+                         "opt-images-bitonal-dpi",
+                         nullptr,
+                         nullptr,
+                         "opt-images-bitonal-resample",
+                         "opt-images-bitonal-png-predictor");
+
+            if (parser->isSet("opt-images-bitonal-threshold"))
+            {
+                bool ok = false;
+                int threshold = parser->value("opt-images-bitonal-threshold").toInt(&ok);
+                if (ok)
+                {
+                    options.imageOptimizationSettings.bitonalProfile.monochromeThreshold = threshold;
+                }
+            }
+        }
+    }
+
+    if (optionFlags.testFlag(CertStore))
+    {
+        options.certStoreEnumerateSystemCertificates = parser->value("list-system-certs").toInt();
+        options.certStoreEnumerateUserCertificates = parser->value("list-user-certs").toInt();
+    }
+
+    if (optionFlags.testFlag(CertStoreInstall))
+    {
+        options.certificateStoreInstallCertificateFile = positionalArguments.isEmpty() ? QString() : positionalArguments.front();
+    }
+
+    if (optionFlags.testFlag(Encrypt))
+    {
+        QString encryptionAlgorithm = parser->value("enc-algorithm");
+        if (encryptionAlgorithm == "rc4")
+        {
+            options.encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::RC4;
+        }
+        else if (encryptionAlgorithm == "aes-128")
+        {
+            options.encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_128;
+        }
+        else if (encryptionAlgorithm == "aes-256")
+        {
+            options.encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
+        }
+        else
+        {
+            if (!encryptionAlgorithm.isEmpty())
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown encryption algorithm '%1'. Defaulting to AES-256 encryption.").arg(encryptionAlgorithm), options.outputCodec);
+            }
+
+            options.encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
+        }
+
+        QString encryptionContents = parser->value("enc-contents");
+        if (encryptionContents == "all")
+        {
+            options.encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
+        }
+        else if (encryptionContents == "all-except-metadata")
+        {
+            options.encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::AllExceptMetadata;
+        }
+        else if (encryptionContents == "only-embedded-files")
+        {
+            options.encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::EmbeddedFiles;
+        }
+        else
+        {
+            if (!encryptionContents.isEmpty())
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown encryption contents mode '%1'. Defaulting to encrypt all contents.").arg(encryptionContents), options.outputCodec);
+            }
+
+            options.encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
+        }
+
+        options.encryptionUserPassword = parser->value("enc-user-password");
+        options.encryptionOwnerPassword = parser->value("enc-owner-password");
+        options.encryptionPermissions = parser->value("enc-permissions").toUInt();
+    }
+
+    return options;
+}
+
+QString PDFToolAbstractApplication::convertDateTimeToString(const QDateTime& dateTime, PDFToolOptions::DateFormat dateFormat)
+{
+    switch (dateFormat)
+    {
+        case PDFToolOptions::LocaleShortDate:
+            return QLocale::system().toString(dateTime, QLocale::ShortFormat);
+        case PDFToolOptions::LocaleLongDate:
+            return QLocale::system().toString(dateTime, QLocale::LongFormat);
+        case PDFToolOptions::ISODate:
+            return dateTime.toString(Qt::ISODate);
+        case PDFToolOptions::RFC2822Date:
+            return dateTime.toString(Qt::RFC2822Date);
+        default:
+            break;
+    }
+
+    Q_ASSERT(false);
+    return QLocale::system().toString(dateTime, QLocale::ShortFormat);
+}
+
+bool PDFToolAbstractApplication::readDocument(const PDFToolOptions& options, pdf::PDFDocument& document, QByteArray* sourceData, bool authorizeOwnerOnly)
+{
+    bool isFirstPasswordAttempt = true;
+    auto passwordCallback = [&options, &isFirstPasswordAttempt](bool* ok) -> QString
+    {
+        *ok = isFirstPasswordAttempt;
+        isFirstPasswordAttempt = false;
+        return options.password;
+    };
+    pdf::PDFDocumentReader reader(nullptr, passwordCallback, options.permissiveReading, authorizeOwnerOnly);
+    document = reader.readFromFile(options.document);
+
+    switch (reader.getReadingResult())
+    {
+        case pdf::PDFDocumentReader::Result::OK:
+        {
+            if (sourceData)
+            {
+                *sourceData = reader.getSource();
+            }
+            break;
+        }
+
+        case pdf::PDFDocumentReader::Result::Cancelled:
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid password provided."), options.outputCodec);
+            return false;
+        }
+
+        case pdf::PDFDocumentReader::Result::Failed:
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Error occured during document reading. %1").arg(reader.getErrorMessage()), options.outputCodec);
+            return false;
+        }
+
+        default:
+        {
+            Q_ASSERT(false);
+            return false;
+        }
+    }
+
+    for (const QString& warning : reader.getWarnings())
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Warning: %1").arg(warning), options.outputCodec);
+    }
+
+    return true;
+}
+
+QList<QByteArray> PDFToolAbstractApplication::getAvailableEncodings()
+{
+    QList<QByteArray> encodings;
+    encodings << "utf8";
+    encodings << "latin1";
+    encodings << "system";
+    return encodings;
+}
+
+QByteArray PDFToolAbstractApplication::getDefaultEncoding()
+{
+    return getAvailableEncodings().front();
+}
+
+QStringConverter::Encoding PDFToolAbstractApplication::getEncoding(const QString& encodingName)
+{
+    if (encodingName == "utf8")
+    {
+        return QStringConverter::Utf8;
+    }
+
+    if (encodingName == "latin1")
+    {
+        return QStringConverter::Latin1;
+    }
+
+    if (encodingName == "system")
+    {
+        return QStringConverter::System;
+    }
+
+    return QStringConverter::System;
+}
+
+PDFToolAbstractApplication* PDFToolApplicationStorage::getApplicationByCommand(const QString& command)
+{
+    for (PDFToolAbstractApplication* application : getInstance()->m_applications)
+    {
+        if (application->getStandardString(PDFToolAbstractApplication::Command) == command)
+        {
+            return application;
+        }
+    }
+
+    return nullptr;
+}
+
+void PDFToolApplicationStorage::registerApplication(PDFToolAbstractApplication* application, bool isDefault)
+{
+    PDFToolApplicationStorage* storage = getInstance();
+    storage->m_applications.push_back(application);
+
+    if (isDefault)
+    {
+        storage->m_defaultApplication = application;
+    }
+}
+
+PDFToolAbstractApplication* PDFToolApplicationStorage::getDefaultApplication()
+{
+    return getInstance()->m_defaultApplication;
+}
+
+const std::vector<PDFToolAbstractApplication*>& PDFToolApplicationStorage::getApplications()
+{
+    return getInstance()->m_applications;
+}
+
+PDFToolApplicationStorage* PDFToolApplicationStorage::getInstance()
+{
+    static PDFToolApplicationStorage storage;
+    return &storage;
+}
+
+std::vector<pdf::PDFInteger> PDFToolOptions::getPageRange(pdf::PDFInteger pageCount, QString& errorMessage, bool zeroBased) const
+{
+    QStringList parts;
+
+    const bool hasFirst = !pageSelectorFirstPage.isEmpty();
+    const bool hasLast = !pageSelectorLastPage.isEmpty();
+    const bool hasSelection = !pageSelectorSelection.isEmpty();
+
+    if (hasFirst && hasLast)
+    {
+        parts << QString("%1-%2").arg(pageSelectorFirstPage, pageSelectorLastPage);
+    }
+    else if (hasFirst)
+    {
+        parts << QString("%1-").arg(pageSelectorFirstPage);
+    }
+    else if (hasLast)
+    {
+        parts << QString("-%1").arg(pageSelectorLastPage);
+    }
+
+    if (hasSelection)
+    {
+        parts << pageSelectorSelection;
+    }
+
+    if (parts.empty())
+    {
+        parts << "-";
+    }
+
+    QString partsString = parts.join(",");
+    pdf::PDFClosedIntervalSet result = pdf::PDFClosedIntervalSet::parse(1, pageCount, partsString, &errorMessage);
+    std::vector<pdf::PDFInteger> pageIndices = result.unfold();
+
+    if (zeroBased)
+    {
+        std::for_each(pageIndices.begin(), pageIndices.end(), [](auto& index) { --index; });
+    }
+
+    return pageIndices;
+}
+
+std::vector<PDFToolOptions::RenderFeatureInfo> PDFToolOptions::getRenderFeatures()
+{
+    return {
+        RenderFeatureInfo{ "render-antialiasing", "Antialiasing for lines, shapes, etc.", pdf::PDFRenderer::Antialiasing },
+        RenderFeatureInfo{ "render-text-antialiasing", "Antialiasing for text outlines.", pdf::PDFRenderer::TextAntialiasing },
+        RenderFeatureInfo{ "render-smooth-img", "Smooth image transformation (slower, but better quality images).", pdf::PDFRenderer::SmoothImages },
+        RenderFeatureInfo{ "render-ignore-opt-content", "Ignore optional content settings (draw everything).", pdf::PDFRenderer::IgnoreOptionalContent },
+        RenderFeatureInfo{ "render-clip-to-crop-box", "Clip page graphics to crop box.", pdf::PDFRenderer::ClipToCropBox },
+        RenderFeatureInfo{ "render-invert-colors", "Color conversion: invert all colors.", pdf::PDFRenderer::ColorAdjust_Invert },
+        RenderFeatureInfo{ "render-grayscale", "Color conversion: convert to grayscale", pdf::PDFRenderer::ColorAdjust_Grayscale },
+        RenderFeatureInfo{ "render-high-contrast", "Color conversion: high contrast colors", pdf::PDFRenderer::ColorAdjust_HighContrast },
+        RenderFeatureInfo{ "render-bitonal", "Color conversion: bitonal page image", pdf::PDFRenderer::ColorAdjust_Bitonal },
+        RenderFeatureInfo{ "render-custom-colors", "Color conversion: custom colors", pdf::PDFRenderer::ColorAdjust_CustomColors },
+        RenderFeatureInfo{ "render-display-annot", "Display annotations.", pdf::PDFRenderer::DisplayAnnotations }
+    };
+}
+
+std::vector<PDFToolOptions::OptimizeFeatureInfo> PDFToolOptions::getOptimizeFlagInfos()
+{
+    return {
+        OptimizeFeatureInfo{ "opt-deref-simple", "Dereference referenced simple objects (integers, bools, ...).", pdf::PDFOptimizer::DereferenceSimpleObjects },
+        OptimizeFeatureInfo{ "opt-remove-null", "Remove null objects from dictionary entries.", pdf::PDFOptimizer::RemoveNullObjects },
+        OptimizeFeatureInfo{ "opt-remove-unused", "Remove not referenced objects.", pdf::PDFOptimizer::RemoveUnusedObjects },
+        OptimizeFeatureInfo{ "opt-merge-identical", "Merge identical objects.", pdf::PDFOptimizer::MergeIdenticalObjects },
+        OptimizeFeatureInfo{ "opt-shrink-storage", "Shrink object storage by renumbering objects.", pdf::PDFOptimizer::ShrinkObjectStorage },
+        OptimizeFeatureInfo{ "opt-recompress-flate", "Recompress flate streams with maximal compression.", pdf::PDFOptimizer::RecompressFlateStreams },
+        OptimizeFeatureInfo{ "opt-all", "Use all optimization algorithms.", pdf::PDFOptimizer::All }
+    };
+}
+
+}   // pdftool
