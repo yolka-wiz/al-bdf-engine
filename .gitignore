@@ -33,3 +33,4 @@ docs/research/raw/
 vendor-upstream-pdf4qt/
 src/build/
 src/*.upstream.orig
+__pycache__/
