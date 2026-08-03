@@ -1,6 +1,6 @@
 # ADR-0002: No GUI in v1 — library + CLI only
 
-**Status:** proposed (2026-08-04)
+**Status:** accepted (2026-08-04)
 
 ## Context
 
