@@ -1,0 +1,140 @@
+// MIT License
+//
+// Copyright (c) 2018-2026 Jakub Melka and Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include <QtTest>
+
+#include "pdfdocument.h"
+#include "pdfdocumentreader.h"
+#include "pdfconstants.h"
+#include "pdfoptionalcontent.h"
+#include "pdfcms.h"
+#include "pdfmeshqualitysettings.h"
+#include "pdffont.h"
+#include "pdfrecognizetext.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
+/// Tests for the recognize-text page object recognition (index/bbox/text/charBoxes
+/// contract used by the recognize-text CLI command and consumed by delete-object).
+class RecognizeTextTest : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void test_page1_text_object_json();
+    void test_page2_objects();
+};
+
+void RecognizeTextTest::test_page1_text_object_json()
+{
+    pdf::PDFDocument document;
+    pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = true; return QString(); }, true, false);
+    document = reader.readFromFile(TEST_BASELINE_PDF);
+    QVERIFY2(document.getCatalog() != nullptr, "Failed to load the test-baseline.pdf fixture");
+    QCOMPARE(document.getCatalog()->getPageCount(), 2);
+
+    pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
+    pdf::PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(&document);
+    pdf::PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    pdf::PDFMeshQualitySettings meshQualitySettings;
+    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    pdf::PDFModifiedDocument md(&document, &optionalContentActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+
+    pdf::PDFRecognizeText recognizer(&document, &fontCache, cms.get(), &optionalContentActivity, &meshQualitySettings);
+
+    std::vector<pdf::PDFRecognizeText::ObjectInfo> objects;
+    for (pdf::PDFInteger page = 0; page < document.getCatalog()->getPageCount(); ++page)
+    {
+        std::vector<pdf::PDFRecognizeText::ObjectInfo> pageObjects = recognizer.recognize(page);
+        objects.insert(objects.end(), pageObjects.begin(), pageObjects.end());
+    }
+
+    // The generated JSON must parse and be structured per the spec.
+    QString json = pdf::PDFRecognizeText::toJson(objects);
+    QJsonParseError parseError;
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(json.toUtf8(), &parseError);
+    QCOMPARE(parseError.error, QJsonParseError::NoError);
+    QVERIFY(jsonDocument.isObject());
+    QVERIFY(jsonDocument.object().contains("pages"));
+    QCOMPARE(jsonDocument.object().value("pages").toArray().size(), 2);
+
+    // Page 1: the first content element is the text object (index 0, 0-based,
+    // same index space as the delete-object command).
+    QVERIFY2(objects.size() >= 4, qPrintable(QString("expected at least 4 objects, got %1").arg(objects.size())));
+    const pdf::PDFRecognizeText::ObjectInfo& first = objects.front();
+    QCOMPARE(first.page, 1);
+    QCOMPARE(first.index, 0);
+    QCOMPARE(first.type, QStringLiteral("text"));
+    QVERIFY2(first.text.contains(QStringLiteral("Hello")), qPrintable(first.text));
+    QVERIFY2(first.bbox.width() > 0.0 && first.bbox.height() > 0.0, "text object must have a nonzero bounding box");
+    QVERIFY(first.fontSize > 0.0);
+    QVERIFY(!first.font.isEmpty());
+    QVERIFY2(first.charBoxes.size() >= 5, qPrintable(QString("expected at least 5 character boxes, got %1").arg(first.charBoxes.size())));
+    for (const QRectF& charBox : first.charBoxes)
+    {
+        QVERIFY(charBox.width() > 0.0);
+        QVERIFY(charBox.height() > 0.0);
+    }
+
+    // Page 1: the second content element is the gray rectangle (path).
+    QCOMPARE(objects[1].page, 1);
+    QCOMPARE(objects[1].index, 1);
+    QCOMPARE(objects[1].type, QStringLiteral("path"));
+}
+
+void RecognizeTextTest::test_page2_objects()
+{
+    pdf::PDFDocument document;
+    pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = true; return QString(); }, true, false);
+    document = reader.readFromFile(TEST_BASELINE_PDF);
+    QVERIFY2(document.getCatalog() != nullptr, "Failed to load the test-baseline.pdf fixture");
+
+    pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
+    pdf::PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(&document);
+    pdf::PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    pdf::PDFMeshQualitySettings meshQualitySettings;
+    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    pdf::PDFModifiedDocument md(&document, &optionalContentActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+
+    pdf::PDFRecognizeText recognizer(&document, &fontCache, cms.get(), &optionalContentActivity, &meshQualitySettings);
+    std::vector<pdf::PDFRecognizeText::ObjectInfo> objects = recognizer.recognize(1);
+
+    QCOMPARE(objects.size(), size_t(2));
+    QCOMPARE(objects[0].page, 2);
+    QCOMPARE(objects[0].index, 0);
+    QCOMPARE(objects[0].type, QStringLiteral("text"));
+    QVERIFY(objects[0].text.contains(QStringLiteral("Second page")));
+    QVERIFY(objects[0].bbox.width() > 0.0);
+    QCOMPARE(objects[1].type, QStringLiteral("path"));
+}
+
+QTEST_MAIN(RecognizeTextTest)
+
+#include "tst_recognizetext.moc"

@@ -130,7 +130,7 @@ std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger
     // bounding boxes. Space characters are not emitted by the generator.
     std::vector<QRectF> pageCharBoxes;
     {
-        PDFTextLayoutGenerator layoutGenerator(PDFRenderer::getDefaultFeatures(),
+        PDFTextLayoutGenerator layoutGenerator(PDFRenderer::IgnoreOptionalContent,
                                                page,
                                                m_document,
                                                m_fontCache,
@@ -138,6 +138,9 @@ std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger
                                                m_optionalContentActivity,
                                                QTransform(),
                                                *m_meshQualitySettings);
+        // Must process the page contents first: performOutputCharacter() fills
+        // the layout storage; createTextLayout() only lays it out.
+        layoutGenerator.processContents();
         const PDFTextLayout layout = layoutGenerator.createTextLayout();
         const PDFTextBlocks& blocks = layout.getTextBlocks();
         for (const PDFTextBlock& block : blocks)
