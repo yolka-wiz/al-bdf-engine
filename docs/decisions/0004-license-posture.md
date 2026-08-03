@@ -1,6 +1,6 @@
 # ADR-0004: License posture — MIT fork + permissive deps only
 
-**Status:** proposed (2026-08-04)
+**Status:** accepted (2026-08-04)
 
 ## Context
 
