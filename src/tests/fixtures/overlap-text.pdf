@@ -1,0 +1,37 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 243  >>
+stream
+BT /F1 24 Tf 0.8 0.1 0.1 rg 72 700 Td (OVERLAPPING TEXT LINE ALPHA) Tj ET
+BT /F1 24 Tf 0.1 0.1 0.8 rg 72 700 Td (overlapping text line beta) Tj ET
+BT /F1 18 Tf 0.1 0.6 0.2 rg 0.866 0.5 -0.5 0.866 0 0 cm 72 620 Td (ROTATED OVERLAP GAMMA) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Font << /F1 3 0 R  >> >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources 5 0 R /Contents 4 0 R >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000479 00000 n 
+0000000523 00000 n 
+trailer << /Size 7 /Root 1 0 R >>
+startxref
+627
+%%EOF
