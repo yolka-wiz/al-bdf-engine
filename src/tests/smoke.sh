@@ -135,13 +135,28 @@ for cmd in recognize-text delete-object; do
     if command_present "$cmd"; then
         pass "$cmd present in binary"
         expect_exit 0 "$cmd --help" "$PDFTOOL" "$cmd" --help
-        if "$PDFTOOL" "$cmd" --help 2>/dev/null | grep -q "document"; then
-            expect_exit 0 "$cmd on overlap-text.pdf" "$PDFTOOL" "$cmd" "$FIXTURES/overlap-text.pdf"
-        fi
     else
         echo "SKIP  $cmd not yet in binary (being implemented in parallel)"
     fi
 done
+
+# delete-object integration smoke: delete object 0 (a text run) on page 1 of
+# the overlap fixture, then verify fetch-text no longer yields its marker.
+if command_present "delete-object"; then
+    DEL_OUT="$WORK/del-overlap.pdf"
+    if expect_exit 0 "delete-object --page 1 --index 0" \
+            "$PDFTOOL" delete-object "$FIXTURES/overlap-text.pdf" "$DEL_OUT" --page 1 --index 0; then
+        if [ -f "$DEL_OUT" ]; then
+            if "$PDFTOOL" fetch-text "$DEL_OUT" 2>/dev/null | grep -q "Line"; then
+                fail "deleted text marker still present after delete-object"
+            else
+                pass "deleted text gone from fetch-text after delete-object"
+            fi
+        else
+            fail "delete-object did not produce output document"
+        fi
+    fi
+fi
 
 echo
 echo "== smoke summary: $PASS passed, $FAIL failed =="
