@@ -48,19 +48,19 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 
 ### M0.5 — BASELINE: test the software we want to fork (core-agent) ← user directive
 **Goal: prove upstream PDF4QT builds and works BEFORE we change a single line of it.**
-- [ ] Build pristine PDF4QT (core lib + PdfTool CLI only, GUI stripped) on this container
-- [ ] Run upstream `UnitTests/` — record pass/fail baseline
-- [ ] CLI smoke: `fetch-text`, `render`, `info`, `unite` on a generated test PDF — record outputs
-- [ ] Golden-baseline: render a fixed corpus → PNGs, store as reference for regression
-- [ ] Register result in DB: task #2 (`--ref <sha>`), deps marked `tested=1`
+- [x] Build pristine PDF4QT (core lib + PdfTool CLI only, GUI stripped) on this container
+- [x] Run upstream `UnitTests/` — record pass/fail baseline
+- [x] CLI smoke: `fetch-text`, `render`, `info`, `unite` on a generated test PDF — record outputs
+- [x] Golden-baseline: render a fixed corpus → PNGs, store as reference for regression
+- [x] Register result in DB: task #2 (`--ref <sha>`), deps marked `tested=1`
 - **Exit:** baseline doc `docs/research/baseline-upstream.md` with commands + outputs;
   `ctest` green on pristine tree; any upstream failures listed (so we know they're NOT ours)
 
 ### M1 — Fork & vendor into `src/` (core-agent)
-- [ ] Copy vendored tree into `src/`, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad/plugins)
-- [ ] Add upstream git remote (user Q3: cherry-pick policy) — decided: keep for cherry-picks
-- [ ] Verify headless build: `QT_QPA_PLATFORM=offscreen` + `fetch-text` smoke
-- [ ] Confirm baseline outputs still match M0.5 (no behavior change from stripping)
+- [x] Copy vendored tree into `src/`, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad/plugins)
+- [x] Add upstream git remote (user Q3: cherry-pick policy) — decided: keep for cherry-picks
+- [x] Verify headless build: `QT_QPA_PLATFORM=offscreen` + `fetch-text` smoke
+- [x] Confirm baseline outputs still match M0.5 (no behavior change from stripping)
 - **Exit:** fork builds; baseline diff = empty; commit with evidence
 
 ### M2 — Text recognition + object deletion via CLI (core-agent, cli-agent)
