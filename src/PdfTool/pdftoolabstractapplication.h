@@ -171,6 +171,12 @@ struct PDFToolOptions
     pdf::PDFRedact::Options redactOptions = {};
     QString redactedDocument;
 
+    // For option 'DeleteObject'
+    QString deleteObjectPage;       ///< Page number (1-based) to edit
+    QString deleteObjectIndex;      ///< Object index on the page (0-based, recognize-text contract)
+    bool deleteObjectList = false;  ///< List objects instead of deleting
+    QString deleteObjectOutputDocument; ///< Output document filename
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -265,6 +271,7 @@ public:
         Encrypt                         = 0x00800000,       ///< Encryption settings
         Diff                            = 0x01000000,       ///< Diff settings (compare documents)
         Redact                          = 0x02000000,       ///< Settings for Redact tool
+        DeleteObject                    = 0x04000000,       ///< Settings for DeleteObject tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 

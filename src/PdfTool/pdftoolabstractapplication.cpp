@@ -195,6 +195,14 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("redact-copy-outline", "Copy source outline into the redacted document."));
     }
 
+    if (optionFlags.testFlag(DeleteObject))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("page", "Page number (1-based) whose object will be deleted.", "number"));
+        parser->addOption(QCommandLineOption("index", "Object index on the page (0-based, see recognize-text).", "number"));
+        parser->addOption(QCommandLineOption("list", "List objects on the page and exit."));
+    }
+
     if (optionFlags.testFlag(SignatureVerification))
     {
         parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
@@ -469,6 +477,14 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         {
             options.redactOptions |= pdf::PDFRedact::CopyOutline;
         }
+    }
+
+    if (optionFlags.testFlag(DeleteObject))
+    {
+        options.deleteObjectPage = parser->value("page");
+        options.deleteObjectIndex = parser->value("index");
+        options.deleteObjectList = parser->isSet("list");
+        options.deleteObjectOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
     }
 
     if (optionFlags.testFlag(Separate))
