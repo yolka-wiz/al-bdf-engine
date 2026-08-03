@@ -30,3 +30,4 @@ db/*.db-shm
 
 # Local research scratch
 docs/research/raw/
+vendor-upstream-pdf4qt/
