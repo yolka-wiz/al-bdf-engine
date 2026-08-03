@@ -254,6 +254,52 @@ def cmd_skill_vet(args):
     print(f"skill #{args.id} vetting -> {args.status}")
 
 
+def cmd_dep_add(args):
+    c = conn()
+    try:
+        cur = c.execute(
+            "INSERT INTO deps(name, version, license, source, purpose, vendored, tested, status, notes) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (args.name, args.version, args.license, args.source, args.purpose,
+             int(args.vendored), int(args.tested), args.status, args.notes),
+        )
+        c.commit()
+        print(f"dep '{args.name}' added (id {cur.lastrowid})")
+    except sqlite3.IntegrityError:
+        print(f"dep '{args.name}' already exists", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_dep_status(args):
+    c = conn()
+    fields = {"status": args.status}
+    if args.tested is not None:
+        fields["tested"] = int(args.tested)
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [args.id]
+    c.execute(f"UPDATE deps SET {sets} WHERE id=?", vals)
+    c.commit()
+    print(f"dep #{args.id} -> status={args.status}")
+
+
+def cmd_deps(args):
+    c = conn()
+    q = "SELECT * FROM deps"
+    if args.only:
+        q += " WHERE status = ?"
+        rows = c.execute(q, (args.only,)).fetchall()
+    else:
+        rows = c.execute(q).fetchall()
+    if not rows:
+        print("(no deps registered)")
+        return
+    for r in rows:
+        v = "V" if r["vendored"] else " "
+        t = "T" if r["tested"] else " "
+        print(f"#{r['id']:<3} [{v}{t}] {r['name']:<16} {r['version'] or '-':<12} "
+              f"{r['license'] or '-':<12} {cstatus(r['status']):<10} {r['purpose'] or ''}")
+
+
 def cmd_dump(args):
     os.system(f"sqlite3 '{DB_PATH}' .dump")
 
@@ -294,6 +340,15 @@ def main():
     sp = sub.add_parser("skill-add"); sp.add_argument("--name", required=True); sp.add_argument("--role", required=True)
     sp.add_argument("--source", required=True, choices=["clawhub", "github", "local"]); sp.add_argument("--notes")
     sp = sub.add_parser("skill-vet"); sp.add_argument("id", type=int); sp.add_argument("status", choices=["approved", "rejected"])
+
+    sp = sub.add_parser("dep-add")
+    sp.add_argument("--name", required=True); sp.add_argument("--version"); sp.add_argument("--license")
+    sp.add_argument("--source", default="github"); sp.add_argument("--purpose")
+    sp.add_argument("--vendored", action="store_true"); sp.add_argument("--tested", action="store_true")
+    sp.add_argument("--status", default="pending"); sp.add_argument("--notes")
+    sp = sub.add_parser("dep-status"); sp.add_argument("id", type=int); sp.add_argument("status", choices=["pending", "approved", "rejected"])
+    sp.add_argument("--tested", type=int, choices=[0, 1])
+    sp = sub.add_parser("deps"); sp.add_argument("--only", choices=["pending", "approved", "rejected"])
 
     sub.add_parser("dump")
 

@@ -1,96 +1,126 @@
-# pdfedit — Master Project Plan
+# pdfedit — Master Project Plan (v2, finalized 2026-08-04)
 
-> **For Hermes/orchestrator:** this is the roadmap. Track granular status in `db/pdfedit.db`
-> (`python3 scripts/db.py status`). Implementation is delegated to agent roles defined in
-> `agents/roles/`, executing per `AGENTS.md` and `docs/coding-standard.md`.
+> **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/pdfedit.db`
+> (`python3 scripts/db.py status`). Implementation is delegated to agent roles in
+> `agents/roles/`, executing per `AGENTS.md` + `docs/coding-standard.md`.
+>
+> **Execution constraint (user directive):** max **3 parallel subagents** at any time.
+> The orchestrator dispatches ≤3 `delegate_task` workers; anything beyond queues.
 
 **Goal:** a headless PDF editing **library + CLI** for Linux — fork of MIT PDF4QT with
 object-level deletion, add-text, and correct **RTL (Arabic/Persian/Hebrew) write + search**.
 
 **Architecture:** fork `Pdf4QtLibCore` + `PdfTool` (MIT) → extend the CLI with
 `delete-object` / `add-text` → add greenfield RTL pipeline (FriBidi + HarfBuzz + ToUnicode)
-→ deterministic golden-tested core. GUI explicitly out of scope for v1.
+→ deterministic golden-tested core. GUI explicitly out of scope for v1 (ADR-0002).
 
-**Tech stack:** C++20, Qt 6.8+, CMake; deps: FreeType, OpenJPEG, OpenSSL, ZLIB, TBB, blend2d
-(inherited), HarfBuzz (MIT), FriBidi (LGPL-2.1) (added).
+**Tech stack:** C++20, Qt 6.8+ (6.10.2 installed), CMake; deps registered in the DB
+(`scripts/db.py deps`): FreeType, OpenJPEG, LCMS2, OpenSSL, ZLIB, libjpeg-turbo, libpng,
+TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 
 ---
 
-## Milestones (each = a reviewable, testable increment)
+## Operating rules (non-negotiable)
 
-### M0 — Infrastructure (this repo) ✅ scaffolding done, seeds live
-- Repo `pdfedit/`, `AGENTS.md`, `docs/coding-standard.md`, `.clang-format`.
-- Tracking DB `db/pdfedit.db` + `scripts/db.py` (components/tasks/decisions/research/questions/skills + FTS5).
-- Agent role definitions (`agents/roles/`).
-- **Exit criteria:** `db.py status` shows all components; plan + standard committed.
+1. **Test before you build.** Every milestone starts by TESTING the existing software we
+   import (baseline), then ships with tests that prove the new behavior. No untested step.
+2. **≤3 parallel subagents.** Dispatch cap. Queue the rest. Never spawn 4+ workers.
+3. **Cherry-pick, don't rewrite.** Import upstream PDF4QT code via the vendored tree +
+   upstream remote; test what we import; register every imported lib in the DB (`dep-add`).
+4. **Steps have checkmarks.** Each milestone has explicit exit criteria (below). A milestone
+   is DONE only when its checkboxes are all ticked with evidence (test output + commit sha).
+5. **Every step is tested** — build, unit, golden, or CLI smoke. No "it compiles, ship it".
+6. **Register imports.** Every third-party lib lands in the `deps` register with license,
+   purpose, tested flag. Rejected = not allowed in the core.
 
-### M1 — Fork & baseline build (core-agent)
-**Goal: we can build the fork headlessly and run its existing CLI.**
-- Tasks #1–#2 in DB: vendor PDF4QT fork into `src/`, strip GUI apps, keep `Pdf4QtLibCore` +
-  `PdfTool` + `UnitTests`; verify `QT_QPA_PLATFORM=offscreen` build + `fetch-text` smoke test.
-- Add upstream remote for cherry-picking (pending user answer Q3).
-- Write ADR-0001 (fork decision) final status + ADR-0002 (no GUI).
-- **Exit criteria:** `cmake --build build -j` green; `./build/bin/pdfedit fetch-text sample.pdf`
-  prints text with no display.
+---
 
-### M2 — Text recognition + object deletion via CLI (core-agent)
-**Goal: "recognize text as objects, delete the object" — user's core requirement.**
-- Task #3: `delete-object` command — wire `PDFDocumentTextFlowEditor::removeItem` +
-  content-stream write-back; CLI takes page + object id / rect.
-- Task #5: deletion safety — image XObject refcounting, Form XObject nesting, inline images.
-- Expose text recognition output (JSON/XML via existing `pdfoutputformatter`): object list with
-  bbox, text, char boxes per page — feeds future GUI + tests.
-- **Exit criteria:** CLI can list objects, delete a text run/image, save; golden tests prove
-  the deleted text is gone from extraction and render unchanged elsewhere.
+## Milestones (each = reviewable, testable increment; checkboxes = exit criteria)
 
-### M3 — Add-text (LTR) via CLI (core-agent)
-**Goal: insert new text into a page.**
-- Task #4: `add-text` command — reuse `PDFTextLayoutGenerator` + content-stream builder;
-  font embedding path; position + size + color options.
-- **Exit criteria:** `add-text "hello" --page 1 --x .. --y .. --size 12` writes visible,
-  extractable text; golden test.
+### M0 — Infrastructure (DONE 2026-08-04)
+- [x] Repo `pdfedit/`: AGENTS.md, coding-standard, .clang-format, plan, ADRs 0001–0004
+- [x] Tracking DB + `scripts/db.py` (components/tasks/decisions/research/questions/skills/deps + FTS5)
+- [x] Agent roles (core/cli/rtl/test/research/orchestrator) + vendored Qt skills
+- [x] Research brief 001 delivered to Rosetta; 3 research subagents dispatched (PDF4QT deep dive,
+      RTL reference impls, skills+AGENTS.md conventions)
+- [x] Build env: cmake 4.2 + cmake 3.28/3.31 (blend2d workaround), Qt 6.10.2, apt mirror fixed
+- [x] Imported-libs register seeded (13 deps; blend2d build failure documented → vcpkg path)
+
+### M0.5 — BASELINE: test the software we want to fork (core-agent) ← user directive
+**Goal: prove upstream PDF4QT builds and works BEFORE we change a single line of it.**
+- [ ] Build pristine PDF4QT (core lib + PdfTool CLI only, GUI stripped) on this container
+- [ ] Run upstream `UnitTests/` — record pass/fail baseline
+- [ ] CLI smoke: `fetch-text`, `render`, `info`, `unite` on a generated test PDF — record outputs
+- [ ] Golden-baseline: render a fixed corpus → PNGs, store as reference for regression
+- [ ] Register result in DB: task #2 (`--ref <sha>`), deps marked `tested=1`
+- **Exit:** baseline doc `docs/research/baseline-upstream.md` with commands + outputs;
+  `ctest` green on pristine tree; any upstream failures listed (so we know they're NOT ours)
+
+### M1 — Fork & vendor into `src/` (core-agent)
+- [ ] Copy vendored tree into `src/`, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad/plugins)
+- [ ] Add upstream git remote (user Q3: cherry-pick policy) — decided: keep for cherry-picks
+- [ ] Verify headless build: `QT_QPA_PLATFORM=offscreen` + `fetch-text` smoke
+- [ ] Confirm baseline outputs still match M0.5 (no behavior change from stripping)
+- **Exit:** fork builds; baseline diff = empty; commit with evidence
+
+### M2 — Text recognition + object deletion via CLI (core-agent, cli-agent)
+- [ ] Text recognition output: page objects → JSON/XML with bbox, text, char boxes (reuse pdfoutputformatter)
+- [ ] `delete-object` command: wire `PDFDocumentTextFlowEditor::removeItem` + content-stream write-back
+- [ ] Deletion safety: image XObject refcount, Form XObject nesting, inline images (task #5)
+- [ ] Golden tests: deleted text gone from extraction; rest of page unchanged
+- **Exit:** CLI lists objects, deletes text run/image, saves; tests green
+
+### M3 — Add-text (LTR) via CLI (core-agent, cli-agent)
+- [ ] `add-text` command: reuse `PDFTextLayoutGenerator` + content-stream builder; font embed path
+- [ ] Golden test: inserted text visible + extractable
+- **Exit:** `add-text "hello" --page 1 --x .. --y ..` works; test green
 
 ### M4 — RTL write pipeline (rtl-agent) — the differentiator
-**Goal: correct Arabic/Persian/Hebrew text insertion.**
-- Task #6: add HarfBuzz + FriBidi deps.
-- Task #7: bidi (FriBidi) → per-run shaping (HarfBuzz) → visual-order `Tj` emission with
-  absolute `Tm` positioning; Type0/Identity-H font embedding; width arrays from advances.
-- Task #8: ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText`.
-- **Exit criteria:** `add-text --rtl "سلام دنیا"` renders connected, extractable via
-  `pdftotext`, copy-paste order correct; golden images for Arabic/Persian/Hebrew.
+- [ ] HarfBuzz + FriBidi deps in build (registered in DB)
+- [ ] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning)
+- [ ] Type0/Identity-H font embedding + `/W` advances
+- [ ] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText`
+- [ ] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew
+- **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order
 
 ### M5 — RTL search (rtl-agent)
-**Goal: find RTL text in arbitrary PDFs — beats every OSS incumbent (Okular bug 353300).**
-- Task #9: normalization (tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ).
-- Task #10: bidi inversion of extracted visual-order text; substring match with highlight geometry.
-- **Exit criteria:** search finds Persian/Arabic/Hebrew strings incl. ZWNJ/digit/lam-alef edge
-  cases in foreign PDFs and in our own add-text output.
+- [ ] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ
+- [ ] Bidi inversion of extracted visual-order text; substring match + highlight geometry
+- [ ] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases)
+- **Exit:** search finds RTL strings in foreign PDFs AND our own add-text output
 
-### M6 — Test hardening + CI (test-agent, parallel with M2–M5)
-- Task #11: golden-image harness (deterministic render diff).
-- Task #12: RTL corpus fixtures (ZWNJ, lam-alef, tashkeel, digits, mixed bidi).
-- Task #13: CI — offscreen `ctest` + ASAN/UBSAN job.
-- **Exit criteria:** CI green; corpus covers the §5 research pitfalls.
+### M6 — Test hardening + CI (test-agent, parallel from M2)
+- [ ] Golden-image harness (deterministic render diff)
+- [ ] RTL corpus fixtures committed
+- [ ] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate
+- **Exit:** CI green on bare container
 
 ### M7 — Polish & release (all agents)
-- CLI docs (`--help` complete, man page), `--deterministic-id`-style stable saves.
-- Performance smoke: 1000-page doc open/render/delete.
-- Flatpak/AppImage packaging only if requested later (GUI phase).
+- [ ] CLI docs (`--help` complete, man page), deterministic saves
+- [ ] Perf smoke: 1000-page doc open/render/delete
+- **Exit:** release candidate; version tag
 
 ---
 
-## Dependencies between milestones
+## Dependency graph
 
 ```
-M1 ──► M2 ──► M3 ──► M4 ──► M5
-                ▲       ▲
-M6 (tests) ─────┴───────┘ (parallel from M2 on)
+M0 ──► M0.5 ──► M1 ──► M2 ──► M3 ──► M4 ──► M5
+                            ▲        ▲
+M6 (tests) ─────────────────┴────────┘ (parallel from M2)
 ```
 
-M4 (RTL writer) depends on M3 (add-text LTR machinery). M5 (RTL search) depends on M2's
-text-recognition output + M4's ToUnicode/ActualText. M6 runs in parallel from M2.
+M0.5 is the new gate: we cannot touch upstream code until the baseline is recorded.
 
-## Key decisions (tracked as ADRs in `docs/decisions/`)
+## Execution cadence (per milestone)
+
+1. Orchestrator: mark milestone in_progress in DB; assign to role agent(s); ≤3 parallel.
+2. Each task: subagent reads AGENTS.md + role file + task; writes failing test first; implements;
+   runs test; commits with evidence; updates DB (`task-done --ref <sha>`).
+3. Orchestrator: spec-compliance review → code-quality review (qt-cpp-review skill + lint).
+4. Milestone exit criteria checked; ADRs updated; next milestone starts.
+
+## Key decisions (ADRs in `docs/decisions/`)
 
 | ADR | Decision | Status |
 |---|---|---|
@@ -103,21 +133,15 @@ text-recognition output + M4's ToUnicode/ActualText. M6 runs in parallel from M2
 
 | Risk | Mitigation |
 |---|---|
-| PDF4QT single-maintainer upstream drift | Keep upstream remote; cherry-pick; we own the fork (MIT) |
-| RTL pipeline bugs (subset GIDs, lam-alef, ZWNJ) | Golden corpus from M6; /ActualText belt-and-braces |
-| Fork learning curve for agents | Research stream (Rosetta) + AGENTS.md + ADRs |
-| Scope creep (GUI, OCR, edit-existing-text) | Explicitly out; DB questions track proposals |
-| License contamination | ADR-0004: no AGPL/GPL deps; vet every added dep |
+| blend2d build on this container (CMake recursion bugs) | vcpkg (in progress); documented in deps register #11 |
+| PDF4QT upstream drift | upstream remote + cherry-picks; baseline (M0.5) anchors behavior |
+| RTL pipeline bugs (subset GIDs, lam-alef, ZWNJ) | golden corpus (M6); /ActualText belt-and-braces |
+| ≤3 subagent cap slows parallel work | queue tasks; batch by dependency; tests written early |
+| Scope creep (GUI, OCR, edit-existing-text) | explicitly out; DB questions track proposals |
+| License contamination | ADR-0004 + deps register: every import vetted before approval |
 
-## Open questions (also in DB)
+## Open questions (DB `questions`)
 
-See `python3 scripts/db.py questions` — name, hosting, upstream-remote policy, context7 keys,
-CLI preservation policy, agent-role set. All asked to user; answers gate specific milestones.
-
-## How execution works
-
-1. Orchestrator (Yolka) picks the next milestone/task from the DB, reads the research notes.
-2. Dispatches a fresh subagent per task with full context (role definition + task + plan ref).
-3. Subagent follows `AGENTS.md`: TDD, small commits, DB evidence on completion.
-4. Spec-compliance + code-quality review passes (per `requesting-code-review`).
-5. Status + ADRs updated in DB. Proceed to next task.
+Name (ok=pdfedit), hosting (local for now), upstream remote policy (keep for cherry-picks),
+context7 key (received), CLI command preservation (keep ~30 + add new), roles (confirmed),
+skills install (approved), Rosetta timing (RUNNING now).

@@ -70,6 +70,21 @@ CREATE TABLE IF NOT EXISTS skills (
     added_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Imported libraries/deps register: every third-party lib we import or link
+CREATE TABLE IF NOT EXISTS deps (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    version     TEXT,
+    license     TEXT,
+    source      TEXT,                 -- github/vcpkg/apt/system
+    purpose     TEXT,                 -- what we use it for
+    vendored    INTEGER NOT NULL DEFAULT 0,   -- 1 = code copied into our tree
+    tested      INTEGER NOT NULL DEFAULT 0,   -- 1 = we ran its tests / smoke-tested
+    status      TEXT NOT NULL DEFAULT 'pending', -- pending|approved|rejected
+    notes       TEXT,
+    added_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- FTS5 search index over the searchable free-text fields
 CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     kind,       -- 'task'|'component'|'decision'|'research'|'question'|'skill'
