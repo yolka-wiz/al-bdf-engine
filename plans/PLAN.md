@@ -64,10 +64,10 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - **Exit:** fork builds; baseline diff = empty; commit with evidence
 
 ### M2 — Text recognition + object deletion via CLI (core-agent, cli-agent)
-- [ ] Text recognition output: page objects → JSON/XML with bbox, text, char boxes (reuse pdfoutputformatter)
-- [ ] `delete-object` command: wire `PDFDocumentTextFlowEditor::removeItem` + content-stream write-back
-- [ ] Deletion safety: image XObject refcount, Form XObject nesting, inline images (task #5)
-- [ ] Golden tests: deleted text gone from extraction; rest of page unchanged
+- [x] Text recognition output: page objects → JSON/XML with bbox, text, char boxes (reuse pdfoutputformatter)
+- [x] `delete-object` command: wire `PDFDocumentTextFlowEditor::removeItem` + content-stream write-back
+- [x] Deletion safety: image XObject refcount, Form XObject nesting, inline images (task #5)
+- [x] Golden tests: deleted text gone from extraction; rest of page unchanged
 - **Exit:** CLI lists objects, deletes text run/image, saves; tests green
 
 ### M3 — Add-text (LTR) via CLI (core-agent, cli-agent)
