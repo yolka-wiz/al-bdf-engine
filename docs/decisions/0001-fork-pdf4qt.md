@@ -1,6 +1,6 @@
 # ADR-0001: Fork PDF4QT (MIT) as the base library + CLI
 
-**Status:** proposed (2026-08-04)
+**Status:** accepted (2026-08-04)
 
 ## Context
 
