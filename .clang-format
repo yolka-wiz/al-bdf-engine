@@ -1,0 +1,30 @@
+# pdfedit .clang-format — matches PDF4QT conventions (LLVM base, 4-space, 120 cols)
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+Standard: c++20
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: true
+NamespaceIndentation: None
+PointerAlignment: Left
+DerivePointerAlignment: false
+SpaceAfterTemplateKeyword: true
+SpacesInAngles: Never
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: Align

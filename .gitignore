@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+build-*/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.exe
+*.dll
+
+# IDEs / editors
+.idea/
+.vscode/
+*.user
+*.swp
+*.swo
+.DS_Store
+
+# Test artifacts
+tests/golden/out/
+*.log
+
+# Database (tracking DB is committed as schema + seed, not the live file)
+db/pdfedit.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+
+# Local research scratch
+docs/research/raw/
