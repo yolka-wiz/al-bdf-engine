@@ -162,6 +162,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfblpainter.cpp
     sources/pdfpagecontenteditorprocessor.h
     sources/pdfpagecontenteditorprocessor.cpp
+    sources/pdfrecognizetext.h
+    sources/pdfrecognizetext.cpp
     sources/pdfpagecontenteditorcontentstreambuilder.h
     sources/pdfpagecontenteditorcontentstreambuilder.cpp
     sources/pdfeditorfallbackfont.h
