@@ -541,6 +541,8 @@ void PDFPageContentEditorContentStreamBuilder::writeEditedElement(const PDFEdite
     state.setCurrentTransformationMatrix(element->getTransform());
 
     QTextStream stream(&m_outputContent, QDataStream::WriteOnly | QDataStream::Append);
+    stream.setRealNumberNotation(QTextStream::FixedNotation);
+    stream.setRealNumberPrecision(8);
     writeStateDifference(stream, state);
 
     const QPainterPath& clipPath = element->getClipPath();
