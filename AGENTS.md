@@ -81,3 +81,18 @@ Full standard in `docs/coding-standard.md`. Non-negotiable highlights:
 - Check the DB, the plan, the ADRs, and the upstream PDF4QT source in that order.
 - Ask the orchestrator before: changing public API shape, adding a dependency,
   changing the license posture, or diverging from the fork strategy.
+
+## 8. Quick map of AGENT.md guides
+
+Per-folder onboarding guides supplement this file. Load the one for whatever
+you are touching:
+
+| Guide | Purpose |
+|---|---|
+| `src/AGENT.md` | Source tree layout, build (CMake+vcpkg), RTL pipeline location, custom CLI tools, exit-code contract, pitfalls |
+| `src/Pdf4QtLibCore/AGENT.md` | The core PDF library: naming, subsystems, registering new sources, ABI macro, documented RTL quirks |
+| `src/PdfTool/AGENT.md` | How to add a CLI command, static registration, output formatter + exit-code contracts |
+| `src/UnitTests/AGENT.md` | How to add a unit/integration test, the QProcess `runTool` helper, compile definitions |
+| `src/tests/AGENT.md` | Fixtures, fonts (OFL only), golden images, smoke.sh |
+| `db/AGENT.md` | Using the tracking DB: commands, evidence-gated task completion, FTS5 search, gitignore discipline |
+| `docs/AGENT.md` | Writing docs: layout, ADR vs research vs coding-standard, man page, RELEASES.md, context7 vendoring |
