@@ -62,7 +62,8 @@ void SearchTextTest::initTestCase()
     m_hebrewFont = QString::fromUtf8(TEST_FONT_HEBREW);
 }
 
-SearchTextTest::ToolResult SearchTextTest::runTool(const QString& toolPath, const QStringList& arguments, const QString& workDir) const
+SearchTextTest::ToolResult
+SearchTextTest::runTool(const QString& toolPath, const QStringList& arguments, const QString& workDir) const
 {
     QProcess process;
     process.setWorkingDirectory(workDir);
@@ -92,26 +93,30 @@ void SearchTextTest::test_hebrewSearch()
     QVERIFY(tmpDir.isValid());
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/he.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), QString::fromUtf8("שלום עולם"),
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_hebrewFont,
-        QStringLiteral("--lang"), QStringLiteral("he")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("שלום עולם"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_hebrewFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("he")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult searchResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        QString::fromUtf8("שלום")
-    }, tmpDir.path());
+    ToolResult searchResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, QString::fromUtf8("שלום")}, tmpDir.path());
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("1\n")),
              "Hebrew word must be found (count=1)");
@@ -124,27 +129,31 @@ void SearchTextTest::test_persianDigits()
     QVERIFY(tmpDir.isValid());
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/digits.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), QString::fromUtf8("۱۲۳"),
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_persianFont,
-        QStringLiteral("--lang"), QStringLiteral("fa")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("۱۲۳"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_persianFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("fa")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
     // Western digits must match Persian digits via digit unification.
-    ToolResult searchResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        QStringLiteral("123")
-    }, tmpDir.path());
+    ToolResult searchResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, QStringLiteral("123")}, tmpDir.path());
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("1\n")),
              "western '123' must find Persian '۱۲۳'");
@@ -161,26 +170,29 @@ void SearchTextTest::test_zwnjInsensitive()
     const QString withoutZwnj = QString::fromUtf8("میخواهم");
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/zwnj.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), withZwnj,
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_persianFont,
-        QStringLiteral("--lang"), QStringLiteral("fa")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    withZwnj,
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_persianFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("fa")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult searchResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        withoutZwnj
-    }, tmpDir.path());
+    ToolResult searchResult = runTool(toolPath, {QStringLiteral("search-text"), inputPath, withoutZwnj}, tmpDir.path());
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("1\n")),
              "query without ZWNJ must find text with ZWNJ");
@@ -197,26 +209,30 @@ void SearchTextTest::test_tashkeelInsensitive()
     const QString withoutTashkeel = QString::fromUtf8("محمد");
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/tashkeel.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), withTashkeel,
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_arabicFont,
-        QStringLiteral("--lang"), QStringLiteral("ar")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    withTashkeel,
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_arabicFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("ar")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult searchResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        withoutTashkeel
-    }, tmpDir.path());
+    ToolResult searchResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, withoutTashkeel}, tmpDir.path());
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("1\n")),
              "query without tashkeel must find text with tashkeel");
@@ -229,35 +245,36 @@ void SearchTextTest::test_mixedBidi()
     QVERIFY(tmpDir.isValid());
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/mixed.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), QString::fromUtf8("Hello سلام دنیا"),
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_persianFont,
-        QStringLiteral("--lang"), QStringLiteral("fa")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("Hello سلام دنیا"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_persianFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("fa")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult ltrResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        QStringLiteral("Hello")
-    }, tmpDir.path());
+    ToolResult ltrResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, QStringLiteral("Hello")}, tmpDir.path());
     QCOMPARE(ltrResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(ltrResult.stdoutData).contains(QStringLiteral("1\n")),
              "LTR part of mixed text must be found");
 
-    ToolResult rtlResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        QString::fromUtf8("دنیا")
-    }, tmpDir.path());
+    ToolResult rtlResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, QString::fromUtf8("دنیا")}, tmpDir.path());
     QCOMPARE(rtlResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(rtlResult.stdoutData).contains(QStringLiteral("1\n")),
              "RTL part of mixed text must be found");
@@ -270,27 +287,31 @@ void SearchTextTest::test_noFalsePositive()
     QVERIFY(tmpDir.isValid());
 
     const QString inputPath = tmpDir.path() + QStringLiteral("/he.pdf");
-    ToolResult addResult = runTool(toolPath, {
-        QStringLiteral("add-text"),
-        m_blankPdf,
-        inputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--x"), QStringLiteral("72"),
-        QStringLiteral("--y"), QStringLiteral("700"),
-        QStringLiteral("--text"), QString::fromUtf8("שלום עולם"),
-        QStringLiteral("--size"), QStringLiteral("24"),
-        QStringLiteral("--rtl"),
-        QStringLiteral("--font"), m_hebrewFont,
-        QStringLiteral("--lang"), QStringLiteral("he")
-    }, tmpDir.path());
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("שלום עולם"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_hebrewFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("he")},
+                                   tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
     // "world" in English must NOT match Hebrew.
-    ToolResult searchResult = runTool(toolPath, {
-        QStringLiteral("search-text"),
-        inputPath,
-        QStringLiteral("world")
-    }, tmpDir.path());
+    ToolResult searchResult =
+        runTool(toolPath, {QStringLiteral("search-text"), inputPath, QStringLiteral("world")}, tmpDir.path());
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("0\n")),
              "non-matching query must report 0 matches");

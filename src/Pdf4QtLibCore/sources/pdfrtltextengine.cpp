@@ -27,8 +27,8 @@
 
 #include <fribidi.h>
 
-#include <hb.h>
 #include <hb-ot.h>
+#include <hb.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -66,7 +66,7 @@ Utf16Buffer toUtf16Buffer(const QString& text)
 /// Maps a HarfBuzz script tag to a human name (for the font descriptor).
 QByteArray scriptToTagString(hb_script_t script)
 {
-    char tag[5] = { 0, 0, 0, 0, 0 };
+    char tag[5] = {0, 0, 0, 0, 0};
     hb_tag_to_string(script, tag);
     return QByteArray(tag, 4);
 }
@@ -90,14 +90,17 @@ FontMetrics readFontMetrics(const QByteArray& fontData)
     {
         return metrics;
     }
-    if (FT_New_Memory_Face(library, reinterpret_cast<const FT_Byte*>(fontData.constData()), FT_Long(fontData.size()), 0, &face) != 0 || !face)
+    if (FT_New_Memory_Face(
+            library, reinterpret_cast<const FT_Byte*>(fontData.constData()), FT_Long(fontData.size()), 0, &face) != 0 ||
+        !face)
     {
         FT_Done_FreeType(library);
         return metrics;
     }
 
     metrics.upem = face->units_per_EM > 0 ? PDFInteger(face->units_per_EM) : 1000;
-    metrics.bbox = QRectF(face->bbox.xMin, face->bbox.yMin, face->bbox.xMax - face->bbox.xMin, face->bbox.yMax - face->bbox.yMin);
+    metrics.bbox =
+        QRectF(face->bbox.xMin, face->bbox.yMin, face->bbox.xMax - face->bbox.xMin, face->bbox.yMax - face->bbox.yMin);
     metrics.ascent = face->ascender;
     metrics.descent = face->descender;
     metrics.ok = true;
@@ -107,7 +110,7 @@ FontMetrics readFontMetrics(const QByteArray& fontData)
     return metrics;
 }
 
-}   // namespace
+} // namespace
 
 PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, const QByteArray& fontKey)
 {
@@ -123,7 +126,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         return result;
     }
 
-    hb_blob_t* blob = hb_blob_create(settings.fontData.constData(), unsigned(settings.fontData.size()), HB_MEMORY_MODE_READONLY, nullptr, nullptr);
+    hb_blob_t* blob = hb_blob_create(
+        settings.fontData.constData(), unsigned(settings.fontData.size()), HB_MEMORY_MODE_READONLY, nullptr, nullptr);
     hb_face_t* face = hb_face_create(blob, 0);
     hb_font_t* hbFont = hb_font_create(face);
     hb_ot_font_set_funcs(hbFont);
@@ -153,8 +157,13 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     }
 
     FriBidiLevel maxLevel = 0;
-    if (!fribidi_log2vis(logical.data(), FriBidiStrIndex(logical.size()), &baseDirection, visual.data(),
-                         positionsLToV.data(), positionsVToL.data(), levels.data()))
+    if (!fribidi_log2vis(logical.data(),
+                         FriBidiStrIndex(logical.size()),
+                         &baseDirection,
+                         visual.data(),
+                         positionsLToV.data(),
+                         positionsVToL.data(),
+                         levels.data()))
     {
         result.errors << QStringLiteral("FriBidi failed.");
         hb_font_destroy(hbFont);
@@ -181,7 +190,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         {
             ++j;
         }
-        runs.push_back(Run{ i, j, rtl });
+        runs.push_back(Run{i, j, rtl});
         i = j;
     }
 
@@ -194,14 +203,15 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     // contexts (e.g. a fatha mark over two different base letters) maps to
     // its own ToUnicode entry. The GID for each code is recorded in
     // codeToGid and emitted as an explicit /CIDToGIDMap array.
-    PDFInteger nextCode = 1;                      // code 0 = .notdef
-    std::vector<PDFInteger> codeToGid;            // index = code, value = GID
-    std::map<PDFInteger, QByteArray> glyphToUnicode;  // code -> UTF-16BE (logical cluster)
-    std::map<PDFInteger, PDFReal> glyphToWidth;       // code -> hmtx advance (font units)
+    PDFInteger nextCode = 1;                         // code 0 = .notdef
+    std::vector<PDFInteger> codeToGid;               // index = code, value = GID
+    std::map<PDFInteger, QByteArray> glyphToUnicode; // code -> UTF-16BE (logical cluster)
+    std::map<PDFInteger, PDFReal> glyphToWidth;      // code -> hmtx advance (font units)
 
     // Script selection: Arabic script for fa/ar/ur, Hebrew for he, else guess.
     hb_script_t script = HB_SCRIPT_INVALID;
-    if (settings.language == QLatin1String("fa") || settings.language == QLatin1String("ar") || settings.language == QLatin1String("ur"))
+    if (settings.language == QLatin1String("fa") || settings.language == QLatin1String("ar") ||
+        settings.language == QLatin1String("ur"))
     {
         script = HB_SCRIPT_ARABIC;
     }
@@ -242,8 +252,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         // base letter, which is required for tashkeel-tolerant search.
         hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
 
-        hb_buffer_add_utf16(buffer, textBuffer.units.data(), int(textBuffer.units.size()),
-                            int(run.begin), int(run.end - run.begin));
+        hb_buffer_add_utf16(
+            buffer, textBuffer.units.data(), int(textBuffer.units.size()), int(run.begin), int(run.end - run.begin));
         hb_shape(hbFont, buffer, nullptr, 0);
 
         unsigned glyphCount = 0;
@@ -285,9 +295,9 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             // run.begin again — charBegin is cluster itself. (Bug fixed in M5:
             // mixed LTR+RTL runs had run.begin > 0 and produced <0000> entries.)
             QByteArray unicode;
-            const bool sharesClusterWithLeftNeighbour = run.isRTL
-                ? (g > 0 && glyphInfo[g - 1].cluster == cluster)
-                : (g + 1 < glyphCount && glyphInfo[g + 1].cluster == cluster);
+            const bool sharesClusterWithLeftNeighbour =
+                run.isRTL ? (g > 0 && glyphInfo[g - 1].cluster == cluster)
+                          : (g + 1 < glyphCount && glyphInfo[g + 1].cluster == cluster);
             if (sharesClusterWithLeftNeighbour)
             {
                 // Decomposed mark: reuse the base's cluster text.
@@ -296,9 +306,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             }
             else
             {
-                unsigned nextCluster = run.isRTL
-                    ? (g > 0 ? glyphInfo[g - 1].cluster : unsigned(run.end))
-                    : (g + 1 < glyphCount ? glyphInfo[g + 1].cluster : unsigned(run.end));
+                unsigned nextCluster = run.isRTL ? (g > 0 ? glyphInfo[g - 1].cluster : unsigned(run.end))
+                                                 : (g + 1 < glyphCount ? glyphInfo[g + 1].cluster : unsigned(run.end));
                 const size_t charBegin = size_t(cluster);
                 const size_t charEnd = std::min(size_t(nextCluster), run.end);
                 for (size_t ci = charBegin; ci < charEnd; ++ci)
@@ -416,7 +425,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
                     actualText.append(char(0xFF & lo));
                 }
             }
-            content += QStringLiteral("/Span << /ActualText <%1> >> BDC\n").arg(QString::fromLatin1(actualText.toHex().toUpper()));
+            content += QStringLiteral("/Span << /ActualText <%1> >> BDC\n")
+                           .arg(QString::fromLatin1(actualText.toHex().toUpper()));
             result.hasRTL = true;
         }
 
@@ -433,10 +443,9 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         // keeps the run intact and the glyph at the baseline. (Absolute
         // mark positioning is a known v1 limitation.)
         QString currentHex;
-        QStringList spacingItems;   // "<hex>" strings and numeric adjustments
+        QStringList spacingItems; // "<hex>" strings and numeric adjustments
         PDFReal posX = runX;
-        const auto flushHex = [&spacingItems, &currentHex]()
-        {
+        const auto flushHex = [&spacingItems, &currentHex]() {
             if (!currentHex.isEmpty())
             {
                 spacingItems << QStringLiteral("<%1>").arg(currentHex);
@@ -487,7 +496,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     // 6. Build the Type0 font dictionary with the embedded font program.
     // ------------------------------------------------------------------
     PDFObjectFactory factory;
-    factory.beginDictionary();                                  // Type0
+    factory.beginDictionary(); // Type0
     factory.beginDictionaryItem("Type");
     factory << PDFObject::createName("Font");
     factory.endDictionaryItem();
@@ -538,7 +547,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     factory << PDFObject::createName((settings.fontFamily + QStringLiteral("-Identity")).toLatin1());
     factory.endDictionaryItem();
     factory.beginDictionaryItem("Flags");
-    factory << PDFObject::createInteger(4);  // Symbolic
+    factory << PDFObject::createInteger(4); // Symbolic
     factory.endDictionaryItem();
     factory.beginDictionaryItem("FontBBox");
     factory.beginArray();
@@ -569,7 +578,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         PDFDictionary fontFileDict;
         fontFileDict.setEntry(PDFInplaceOrMemoryString("Length"), PDFObject::createInteger(compressedFont.size()));
         fontFileDict.setEntry(PDFInplaceOrMemoryString("Filter"), PDFObject::createName("FlateDecode"));
-        factory << PDFObject::createStream(std::make_shared<PDFStream>(std::move(fontFileDict), QByteArray(compressedFont)));
+        factory << PDFObject::createStream(
+            std::make_shared<PDFStream>(std::move(fontFileDict), QByteArray(compressedFont)));
     }
     factory.endDictionaryItem();
     factory.endDictionary();
@@ -597,7 +607,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     // it was assigned from.
     factory.beginDictionaryItem("CIDToGIDMap");
     factory.beginArray();
-    factory << PDFObject::createInteger(0);  // code 0 = .notdef
+    factory << PDFObject::createInteger(0); // code 0 = .notdef
     for (const PDFInteger gid : codeToGid)
     {
         factory << PDFObject::createInteger(gid);
@@ -622,8 +632,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     factory.endDictionary();
 
     result.fontDictionary = PDFDictionary(std::vector<PDFDictionary::DictionaryEntry>{
-        std::make_pair(PDFInplaceOrMemoryString(fontKey), factory.takeObject())
-    });
+        std::make_pair(PDFInplaceOrMemoryString(fontKey), factory.takeObject())});
 
     return result;
 }
@@ -646,8 +655,8 @@ QByteArray PDFRTLTextEngine::createToUnicodeCMap(const std::vector<QPair<PDFInte
             continue;
         }
         bfchar += QStringLiteral("<%1> <%2>\n")
-                          .arg(code, 4, 16, QLatin1Char('0'))
-                          .arg(QString::fromLatin1(unicode.toHex().toUpper()));
+                      .arg(code, 4, 16, QLatin1Char('0'))
+                      .arg(QString::fromLatin1(unicode.toHex().toUpper()));
         ++count;
     }
     cmap += QStringLiteral("%1 beginbfchar\n%2endbfchar\n").arg(count).arg(bfchar);
@@ -655,4 +664,4 @@ QByteArray PDFRTLTextEngine::createToUnicodeCMap(const std::vector<QPair<PDFInte
     return cmap.toUtf8();
 }
 
-}   // namespace pdf
+} // namespace pdf

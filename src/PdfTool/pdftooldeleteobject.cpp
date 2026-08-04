@@ -43,18 +43,18 @@ QString PDFToolDeleteObject::getStandardString(StandardString standardString) co
 {
     switch (standardString)
     {
-        case Command:
-            return "delete-object";
+    case Command:
+        return "delete-object";
 
-        case Name:
-            return PDFToolTranslationContext::tr("Delete object");
+    case Name:
+        return PDFToolTranslationContext::tr("Delete object");
 
-        case Description:
-            return PDFToolTranslationContext::tr("Delete a whole content object (text run, image, path) from a page.");
+    case Description:
+        return PDFToolTranslationContext::tr("Delete a whole content object (text run, image, path) from a page.");
 
-        default:
-            Q_ASSERT(false);
-            break;
+    default:
+        Q_ASSERT(false);
+        break;
     }
 
     return QString();
@@ -84,15 +84,16 @@ void listObject(PDFOutputFormatter& formatter, size_t index, const pdf::PDFEdite
 
     formatter.beginTableRow(QStringLiteral("object-%1").arg(index), int(index));
     formatter.writeTableColumn("type", type);
-    formatter.writeTableColumn("bbox", QStringLiteral("%1 %2 %3 %4")
-                                         .arg(element->getBoundingBox().x())
-                                         .arg(element->getBoundingBox().y())
-                                         .arg(element->getBoundingBox().width())
-                                         .arg(element->getBoundingBox().height()));
+    formatter.writeTableColumn("bbox",
+                               QStringLiteral("%1 %2 %3 %4")
+                                   .arg(element->getBoundingBox().x())
+                                   .arg(element->getBoundingBox().y())
+                                   .arg(element->getBoundingBox().width())
+                                   .arg(element->getBoundingBox().height()));
     formatter.writeTableColumn("text", text);
     formatter.endTableRow();
 }
-}   // namespace
+} // namespace
 
 int PDFToolDeleteObject::execute(const PDFToolOptions& options)
 {
@@ -106,14 +107,16 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     // The second positional argument is the output document.
     if (options.deleteObjectOutputDocument.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Output document filename must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Output document filename must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
     const QString outputDocument = options.deleteObjectOutputDocument;
 
     if (options.deleteObjectPage.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Page number (--page) must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Page number (--page) must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -121,7 +124,8 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     const pdf::PDFInteger pageNumber = options.deleteObjectPage.toInt(&pageOk);
     if (!pageOk || pageNumber < 1 || pageNumber > pdf::PDFInteger(document.getCatalog()->getPageCount()))
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page number '%1'.").arg(options.deleteObjectPage), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page number '%1'.").arg(options.deleteObjectPage),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -145,7 +149,8 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
 
     // Parse the page content into the edited element list. The element order
     // is the content stream order = the index space of recognize-text.
-    pdf::PDFPageContentEditorProcessor processor(page, &document, &fontCache, cms.data(), &optionalContentActivity, QTransform(), meshQualitySettings);
+    pdf::PDFPageContentEditorProcessor processor(
+        page, &document, &fontCache, cms.data(), &optionalContentActivity, QTransform(), meshQualitySettings);
     processor.processContents();
 
     const pdf::PDFEditedPageContent& editedContent = processor.getEditedPageContent();
@@ -177,7 +182,8 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
 
     if (options.deleteObjectIndex.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Object index (--index) must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Object index (--index) must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -186,7 +192,9 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     if (!indexOk || deleteIndex >= elementCount)
     {
         PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid object index '%1' (page has %2 objects).")
-                                       .arg(options.deleteObjectIndex).arg(elementCount), options.outputCodec);
+                                   .arg(options.deleteObjectIndex)
+                                   .arg(elementCount),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -208,7 +216,8 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     if (!contentStreamBuilder.getErrors().isEmpty())
     {
         PDFConsole::writeError(PDFToolTranslationContext::tr("Content stream serialization failed: %1")
-                                       .arg(contentStreamBuilder.getErrors().join(QStringLiteral(", "))), options.outputCodec);
+                                   .arg(contentStreamBuilder.getErrors().join(QStringLiteral(", "))),
+                               options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
@@ -235,9 +244,12 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(contentStreamBuilder.getOutputContent());
 
     pdf::PDFDictionary contentDictionary;
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"), pdf::PDFObject::createInteger(compressedData.size()));
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"), pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-    pdf::PDFObject contentObject = pdf::PDFObject::createStream(std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
+    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
+                               pdf::PDFObject::createInteger(compressedData.size()));
+    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
+                               pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
+    pdf::PDFObject contentObject = pdf::PDFObject::createStream(
+        std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
 
     pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
 
@@ -274,14 +286,16 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
 
     factory.endDictionary();
 
-    pageObject = pdf::PDFObjectManipulator::merge(pageObject, factory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
+    pageObject = pdf::PDFObjectManipulator::merge(
+        pageObject, factory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
     builder->setObject(page->getPageReference(), std::move(pageObject));
 
     // Apply the modification and save.
     modifier.markPageContentsChanged();
     if (!modifier.finalize())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                               options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
@@ -289,14 +303,16 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     pdf::PDFOperationResult writeResult = writer.write(outputDocument, modifier.getDocument().data(), true);
     if (!writeResult)
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to write document: %1")
-                                       .arg(writeResult.getErrorMessage()), options.outputCodec);
+        PDFConsole::writeError(
+            PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
+            options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
     PDFOutputFormatter formatter(options.outputStyle);
     formatter.beginDocument("delete-object", PDFToolTranslationContext::tr("Delete object"));
-    formatter.writeText("deleted", PDFToolTranslationContext::tr("Deleted object %1 on page %2.").arg(deleteIndex).arg(pageNumber));
+    formatter.writeText(
+        "deleted", PDFToolTranslationContext::tr("Deleted object %1 on page %2.").arg(deleteIndex).arg(pageNumber));
     formatter.endDocument();
     PDFConsole::writeText(formatter.getString(), options.outputCodec);
 
@@ -308,4 +324,4 @@ PDFToolAbstractApplication::Options PDFToolDeleteObject::getOptionsFlags() const
     return ConsoleFormat | OpenDocument | DeleteObject;
 }
 
-}   // namespace pdftool
+} // namespace pdftool

@@ -41,4 +41,4 @@ public:
     virtual Options getOptionsFlags() const override;
 };
 
-}   // namespace pdftool
+} // namespace pdftool
