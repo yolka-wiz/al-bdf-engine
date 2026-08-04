@@ -52,6 +52,8 @@ add_executable(PdfTool
     pdftoolremoveexternallinks.h
     pdftoolrecognizetext.cpp
     pdftoolrecognizetext.h
+    pdftoolsearchtext.cpp
+    pdftoolsearchtext.h
     pdftoolseparate.cpp 
     pdftoolstatistics.cpp 
     pdftoolunite.cpp 
