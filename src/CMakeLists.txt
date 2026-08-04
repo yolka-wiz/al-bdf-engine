@@ -33,6 +33,12 @@ find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(blend2d CONFIG REQUIRED)
 
+# RTL pipeline deps (M4): HarfBuzz (MIT) + FriBidi (LGPL-2.1+) via vcpkg.
+# harfbuzz ships a CMake config; FriBidi only ships pkg-config.
+find_package(harfbuzz CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FRIBIDI REQUIRED IMPORTED_TARGET fribidi)
+
 if(VCPKG_TOOLCHAIN)
     find_package(lcms2 REQUIRED)
     set(LCMS2_LIBRARIES lcms2::lcms2 CACHE INTERNAL "LCMS2 libraries")

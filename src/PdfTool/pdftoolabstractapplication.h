@@ -184,6 +184,9 @@ struct PDFToolOptions
     QString addText;                ///< Text to add
     QString addTextFontSize;        ///< Font size
     QString addTextOutputDocument;  ///< Output document filename
+    bool addTextRTL = false;        ///< Use the RTL pipeline (HarfBuzz/FriBidi)
+    QString addTextFont;            ///< TTF font file for RTL text
+    QString addTextLanguage;        ///< Language tag: fa|ar|he|ur
 
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
