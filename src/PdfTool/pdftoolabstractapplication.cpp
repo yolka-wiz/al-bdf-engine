@@ -203,6 +203,16 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("list", "List objects on the page and exit."));
     }
 
+    if (optionFlags.testFlag(AddText))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("page", "Page number (1-based) to which the text is added.", "number"));
+        parser->addOption(QCommandLineOption("x", "X position of the text baseline in PDF points.", "number"));
+        parser->addOption(QCommandLineOption("y", "Y position of the text baseline in PDF points.", "number"));
+        parser->addOption(QCommandLineOption("text", "Text to add.", "text"));
+        parser->addOption(QCommandLineOption("size", "Font size in points (default 12).", "number"));
+    }
+
     if (optionFlags.testFlag(SignatureVerification))
     {
         parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
@@ -485,6 +495,16 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.deleteObjectIndex = parser->value("index");
         options.deleteObjectList = parser->isSet("list");
         options.deleteObjectOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(AddText))
+    {
+        options.addTextPage = parser->value("page");
+        options.addTextX = parser->value("x");
+        options.addTextY = parser->value("y");
+        options.addText = parser->value("text");
+        options.addTextFontSize = parser->value("size");
+        options.addTextOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
     }
 
     if (optionFlags.testFlag(Separate))

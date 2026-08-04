@@ -172,8 +172,28 @@ std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger
             {
                 info.type = QStringLiteral("text");
 
+                // Build the plain text from the item characters (getItemsAsText
+                // returns the internal XML markup, not suitable for output).
                 const PDFEditedPageContentElementText* textElement = element->asText();
-                info.text = textElement->getItemsAsText();
+                for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
+                {
+                    if (!item.isText)
+                    {
+                        continue;
+                    }
+                    for (const TextSequenceItem& textItem : item.textSequence.items)
+                    {
+                        if (!textItem.character.isNull())
+                        {
+                            info.text.append(textItem.character);
+                        }
+                        else if (textItem.isAdvance() && textItem.advance > 0.0)
+                        {
+                            // A positive advance with no character is a space.
+                            info.text.append(QChar::fromLatin1(' '));
+                        }
+                    }
+                }
 
                 // Font and font size are captured in the per-item graphic states.
                 for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
