@@ -100,6 +100,21 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - [x] Perf smoke: 1000-page doc open/render/delete — info 0.03s, fetch 0.04s, render 0.03s, search 0.04s (1000 matches), delete 0.02s
 - [x] **Exit:** release candidate; version tag — **0.1.0** (`b2f4a93`)
 
+### M8 — Forms & signatures (feature/forms-signatures, merged `974ba35`)
+- [x] `form-list` — enumerate AcroForm fields (name, type, value, page, rect, readonly) — `480b7f8`
+- [x] `form-fill` — set field values (text/button/choice), regenerate appearance, write new doc — `64a1b70`
+- [x] `sign` — PKCS#7 detached digital signature (invisible or visible widget), PAdES byte-range flow — `d38c76f`
+- [x] `verify-signatures` (upstream tool) validates signed docs; one-byte tamper → `Signature: Error` — tested
+- [x] `UnitTestsFormSignature` — form-list/form-fill/sign/verify/tamper round-trip — `75677bf`; suite **11/11**
+- [x] ADR-0006, README section, DB synced — `8299eda`
+- [x] **Exit:** forms+signatures scriptable headlessly; CI all green on merged main
+
+### M8.1 — Real-world compatibility sweep (compat agents, merged `974ba35`)
+- [x] `fix(add-text)`: content-stream floats in FixedNotation (precision 8) — strict parsers reject scientific notation — `3920a43`
+- [x] S#1 field observation documented (dense-page RTL phrase split is flow geometry, not add-text defect)
+- [x] CI format gate exempts upstream-derived content-stream builder
+- [x] **Exit:** 11-file corpus (testing-temp) exercised; agent-a interrupted before committing (work lost), agent-b's fix merged
+
 ---
 
 ## Dependency graph

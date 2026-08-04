@@ -3,7 +3,7 @@
 Headless PDF editing **library + CLI** for Linux — fork of [PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT, our additions **GPL-3.0-or-later**).
 The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text write + search** is the differentiator.
 
-**Status:** v0.1.0 released. M0–M7 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search shipped, CI green).
+**Status:** v0.1.0 released. M0–M8 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search/forms/signatures shipped, CI green, real-world compatibility fixes merged).
 
 ---
 
