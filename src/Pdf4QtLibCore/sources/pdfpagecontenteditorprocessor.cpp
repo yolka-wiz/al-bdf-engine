@@ -790,7 +790,24 @@ QString PDFEditedPageContentElementText::createItemsAsText(const PDFPageContentP
                 {
                     if (!textItem.character.isNull())
                     {
-                        text += QString(textItem.character).toHtmlEscaped();
+                        // XML 1.0 forbids most C0 control characters (only
+                        // tab, LF, CR are legal). Some PDF fonts map glyphs to
+                        // control codes (e.g. U+0001/U+0002 from broken
+                        // ToUnicode tables - seen in Elsevier journals). Emitting
+                        // them raw breaks the content editor's XML round-trip
+                        // ("Invalid XML text"). Replace them with U+FFFD
+                        // (replacement character); the glyph itself is intact in
+                        // the PDF, only the editor's intermediate XML is sanitized.
+                        QString character = textItem.character;
+                        for (QChar& ch : character)
+                        {
+                            const ushort u = ch.unicode();
+                            if (u < 0x20 && u != 0x09 && u != 0x0A && u != 0x0D)
+                            {
+                                ch = QChar(0xFFFD);
+                            }
+                        }
+                        text += character.toHtmlEscaped();
                     }
                     else if (textItem.cid != 0)
                     {
