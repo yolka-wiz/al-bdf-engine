@@ -83,6 +83,24 @@ From `plans/PLAN.md` / the DB / the product brief:
 - **D#3** — The `src/CMakeLists.txt.upstream.orig` reference file is noise; consider pruning once fork is stable.
 - **D#4** — PDF4QT upstream renames to PDF4QT-qt6 + new naming; our fork pinned to 1.6.0.0 API. Track upstream for security fixes via the git remote.
 
+### Compatibility sweep results (testing-temp corpus, 2026-08-04)
+
+Two parallel agents ran the full 7-step battery (info / fetch-text /
+recognize-text / search-text / add-text LTR+RTL / delete-object / render) over
+the 11-file `testing-temp` corpus (Persian forms, English papers, scanned
+docs, 309-page and 100-page books).
+
+- **All 11 files pass every step.** No crashes, no corrupt output, all
+  add/delete outputs reopen cleanly.
+- **Both agents independently found the same P5 fix** (scientific-notation
+  floats, `3920a43`) — cross-validated.
+- Scanned PDFs (PASSIVE.pdf) correctly report no text (OCR out of scope).
+- `search-text` on foreign PDFs works with logical Persian queries; 0-match
+  results were traced to test-query typos (ک vs گ) or empty-AcroForm docs,
+  not engine bugs.
+- The 318.pdf / 2025-2.pdf / Book1 edge cases (P4, R#1, P2) that surfaced in
+  earlier field testing remain the canonical real-world regressions.
+
 ### Quality backlog
 
 - Perf smoke is manual (`scripts-tmp/m7-perf.sh`); promote to a tracked benchmark.
