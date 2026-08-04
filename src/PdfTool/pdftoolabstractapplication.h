@@ -193,6 +193,11 @@ struct PDFToolOptions
     bool searchTextCaseSensitive = false; ///< Case-sensitive matching
     bool searchTextNoNormalize = false;   ///< Disable RTL normalization
 
+    // For option 'FormFill'
+    QStringList formFillFields;     ///< Field fully qualified names (paired with values)
+    QStringList formFillValues;     ///< Values for the fields
+    QString formFillOutputDocument; ///< Output document filename
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents =
@@ -291,6 +296,7 @@ public:
         DeleteObject = 0x04000000,                  ///< Settings for DeleteObject tool
         AddText = 0x08000000,                       ///< Settings for AddText tool
         SearchText = 0x10000000,                    ///< Settings for SearchText tool
+        FormFill = 0x20000000,                      ///< Settings for FormFill tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 
