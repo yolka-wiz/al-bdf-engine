@@ -1,0 +1,173 @@
+// MIT License
+//
+// Copyright (c) 2018-2026 Jakub Melka and Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include "pdftextsearchengine.h"
+
+#include "pdfdocument.h"
+#include "pdfdocumenttextflow.h"
+
+#include <fribidi.h>
+
+namespace pdf
+{
+
+std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDocument* document,
+                                                                    const QString& query,
+                                                                    PDFInteger pageFirst,
+                                                                    PDFInteger pageLast)
+{
+    return search(document, query, pageFirst, pageLast, Options());
+}
+
+std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDocument* document,
+                                                                    const QString& query,
+                                                                    PDFInteger pageFirst,
+                                                                    PDFInteger pageLast,
+                                                                    const Options& options)
+{
+    std::vector<Match> matches;
+
+    if (!document || query.isEmpty())
+    {
+        return matches;
+    }
+
+    // 1. Normalize the query (logical order), then invert it to visual order
+    //    so it matches the visual-order extracted text. fribidi_log2vis also
+    //    SHAPES Arabic into presentation forms (FEE2/...), so normalize once
+    //    more after inversion (NFKC folds presentation forms back to base).
+    const QString normalizedQuery = PDFRTLTextNormalizer::normalize(query, options.normalizer);
+    const QString visualQuery = PDFRTLTextNormalizer::normalize(invertToVisual(normalizedQuery), options.normalizer);
+    if (visualQuery.isEmpty())
+    {
+        return matches;
+    }
+
+    // 2. Extract text flow per page (visual order, per-char rects).
+    PDFDocumentTextFlowFactory factory;
+    std::vector<PDFInteger> pageIndices;
+    for (PDFInteger page = pageFirst; page <= pageLast; ++page)
+    {
+        pageIndices.push_back(page);
+    }
+    const PDFDocumentTextFlow flow = factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
+
+    for (size_t itemIndex = 0; itemIndex < flow.getSize(); ++itemIndex)
+    {
+        const PDFDocumentTextFlow::Item& item = *flow.getItem(itemIndex);
+        if (!item.flags.testFlag(PDFDocumentTextFlow::Text) || item.text.isEmpty())
+        {
+            continue;
+        }
+
+        // 3. Normalize the item, keeping the original-index map for geometry.
+        std::vector<int> charMap;
+        const QString normalizedItem = PDFRTLTextNormalizer::normalize(item.text, options.normalizer, &charMap);
+
+        // 4. Substring match (repeated, to find all occurrences).
+        int from = 0;
+        while (true)
+        {
+            const int matchIndex = normalizedItem.indexOf(visualQuery, from, options.caseSensitivity());
+            if (matchIndex < 0)
+            {
+                break;
+            }
+
+            Match match;
+            match.pageIndex = item.pageIndex;
+            match.itemIndex = itemIndex;
+            match.normalizedQueryIndex = matchIndex;
+
+            // Map normalized range [matchIndex, matchIndex + len) back to
+            // original character rects.
+            const int queryLen = visualQuery.size();
+            const int originalBegin = (matchIndex < static_cast<int>(charMap.size())) ? charMap.at(matchIndex) : 0;
+            const int originalEnd = (matchIndex + queryLen - 1 < static_cast<int>(charMap.size())) ? charMap.at(matchIndex + queryLen - 1) : item.text.size() - 1;
+            if (originalBegin >= 0 && originalEnd >= originalBegin && originalEnd < item.text.size())
+            {
+                match.matchedText = item.text.mid(originalBegin, originalEnd - originalBegin + 1);
+
+                if (!item.characterBoundingRects.empty())
+                {
+                    QRectF unionRect;
+                    for (int i = originalBegin; i <= originalEnd && i < static_cast<int>(item.characterBoundingRects.size()); ++i)
+                    {
+                        unionRect = unionRect.united(item.characterBoundingRects.at(i));
+                    }
+                    match.boundingRect = unionRect;
+                }
+                else
+                {
+                    match.boundingRect = item.boundingRect;
+                }
+            }
+
+            matches.push_back(match);
+            from = matchIndex + 1;
+        }
+    }
+
+    return matches;
+}
+
+QString PDFTextSearchEngine::invertToVisual(const QString& query) const
+{
+    if (query.isEmpty())
+    {
+        return QString();
+    }
+
+    // FriBidi operates on FriBidiChar (uint32). Convert from UTF-16.
+    const std::vector<char16_t> units(query.utf16(), query.utf16() + query.size());
+    std::vector<FriBidiChar> logical(units.size());
+    for (size_t i = 0; i < units.size(); ++i)
+    {
+        logical[i] = static_cast<FriBidiChar>(units[i]);
+    }
+
+    std::vector<FriBidiChar> visual(units.size());
+    std::vector<FriBidiStrIndex> positionsLToV(units.size());
+    std::vector<FriBidiStrIndex> positionsVToL(units.size());
+    std::vector<FriBidiLevel> levels(units.size());
+
+    // Auto-detect base direction from the query content (RTL if any strong
+    // RTL char is present; FriBidi's FRIBIDI_PAR_ON resolves that).
+    FriBidiParType baseDir = FRIBIDI_PAR_ON;
+    FriBidiLevel maxLevel = fribidi_log2vis(logical.data(), static_cast<FriBidiStrIndex>(logical.size()),
+                                            &baseDir, visual.data(),
+                                            positionsLToV.data(), positionsVToL.data(), levels.data());
+    if (maxLevel == 0)
+    {
+        return query;
+    }
+
+    QString result;
+    result.reserve(static_cast<int>(visual.size()));
+    for (const FriBidiChar c : visual)
+    {
+        result.append(QChar(static_cast<ushort>(c)));
+    }
+    return result;
+}
+
+}   // namespace pdf

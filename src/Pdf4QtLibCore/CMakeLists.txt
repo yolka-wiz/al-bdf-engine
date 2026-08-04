@@ -166,6 +166,10 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfrecognizetext.cpp
     sources/pdfrtltextengine.h
     sources/pdfrtltextengine.cpp
+    sources/pdfrtltextnormalizer.h
+    sources/pdfrtltextnormalizer.cpp
+    sources/pdftextsearchengine.h
+    sources/pdftextsearchengine.cpp
     sources/pdfpagecontenteditorcontentstreambuilder.h
     sources/pdfpagecontenteditorcontentstreambuilder.cpp
     sources/pdfeditorfallbackfont.h

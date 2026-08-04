@@ -189,8 +189,15 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     // 3. Shape each run with HarfBuzz.
     // ------------------------------------------------------------------
     std::vector<ShapedRun> shapedRuns;
-    std::map<PDFInteger, QByteArray> glyphToUnicode;  // GID -> UTF-16BE (logical cluster)
-    std::map<PDFInteger, PDFReal> glyphToWidth;       // GID -> hmtx advance (font units)
+    // Per-INSTANCE code assignment (NOT GID-as-code): each glyph occurrence
+    // gets a unique sequential code, so the same GID used in different
+    // contexts (e.g. a fatha mark over two different base letters) maps to
+    // its own ToUnicode entry. The GID for each code is recorded in
+    // codeToGid and emitted as an explicit /CIDToGIDMap array.
+    PDFInteger nextCode = 1;                      // code 0 = .notdef
+    std::vector<PDFInteger> codeToGid;            // index = code, value = GID
+    std::map<PDFInteger, QByteArray> glyphToUnicode;  // code -> UTF-16BE (logical cluster)
+    std::map<PDFInteger, PDFReal> glyphToWidth;       // code -> hmtx advance (font units)
 
     // Script selection: Arabic script for fa/ar/ur, Hebrew for he, else guess.
     hb_script_t script = HB_SCRIPT_INVALID;
@@ -228,9 +235,12 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         {
             hb_buffer_set_language(buffer, language);
         }
-        // cluster_level = 1 (MONOTONE_GRAPHEMES): a glyph's cluster is the
-        // first input char index — clean ToUnicode mapping (fpdf2 pattern).
-        hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
+        // cluster_level = 2 (MONOTONE_CHARACTERS): every INPUT CHARACTER gets its
+        // own monotone cluster value, so a combining mark (fatha etc.) carries the
+        // cluster of ITS OWN char index, not its base's. This lets the ToUnicode
+        // mapping give the mark its own code point (064E/064F...) instead of the
+        // base letter, which is required for tashkeel-tolerant search.
+        hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
 
         hb_buffer_add_utf16(buffer, textBuffer.units.data(), int(textBuffer.units.size()),
                             int(run.begin), int(run.end - run.begin));
@@ -249,9 +259,10 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             const hb_codepoint_t gid = glyphInfo[g].codepoint;
             const unsigned cluster = glyphInfo[g].cluster;
 
-            // The code in Identity-H is the GID itself (full-font embedding;
-            // no subset renumbering, so /CIDToGIDMap /Identity is exact).
-            const PDFInteger code = PDFInteger(gid);
+            // Unique per-instance code; the GID is stored for the
+            // /CIDToGIDMap array (code -> gid).
+            const PDFInteger code = nextCode++;
+            codeToGid.push_back(PDFInteger(gid));
 
             // /W advance: hmtx advance (1000/upem) — nominal, not shaped.
             const PDFReal hmtxAdvance = hb_font_get_glyph_h_advance(hbFont, gid);
@@ -267,6 +278,12 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             // Glyphs that share a cluster with their visual-left neighbour (a
             // base letter decomposed into base + combining mark, e.g. Arabic
             // yeh = base + dots) map to the SAME unicode as that neighbour.
+            //
+            // NOTE: clusters are ABSOLUTE indices into the full logical text
+            // because hb_buffer_add_utf16 was called with item_offset=run.begin
+            // (HarfBuzz offsets cluster values by item_offset). Do NOT add
+            // run.begin again — charBegin is cluster itself. (Bug fixed in M5:
+            // mixed LTR+RTL runs had run.begin > 0 and produced <0000> entries.)
             QByteArray unicode;
             const bool sharesClusterWithLeftNeighbour = run.isRTL
                 ? (g > 0 && glyphInfo[g - 1].cluster == cluster)
@@ -280,10 +297,10 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             else
             {
                 unsigned nextCluster = run.isRTL
-                    ? (g > 0 ? glyphInfo[g - 1].cluster : unsigned(run.end - run.begin))
-                    : (g + 1 < glyphCount ? glyphInfo[g + 1].cluster : unsigned(run.end - run.begin));
-                const size_t charBegin = size_t(run.begin) + cluster;
-                const size_t charEnd = std::min(size_t(run.begin) + nextCluster, run.end);
+                    ? (g > 0 ? glyphInfo[g - 1].cluster : unsigned(run.end))
+                    : (g + 1 < glyphCount ? glyphInfo[g + 1].cluster : unsigned(run.end));
+                const size_t charBegin = size_t(cluster);
+                const size_t charEnd = std::min(size_t(nextCluster), run.end);
                 for (size_t ci = charBegin; ci < charEnd; ++ci)
                 {
                     const char32_t cp = char32_t(textBuffer.units[ci]);
@@ -406,34 +423,54 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         // Absolute position of the run's left edge.
         content += QStringLiteral("1 0 0 1 %1 %2 Tm\n").arg(runX, 0, 'f', 2).arg(settings.y, 0, 'f', 2);
 
-        // Emit glyphs. Accumulate hex codes into one Tj; when a glyph has
-        // GPOS offsets (marks, kerning), flush and reposition (fpdf2's
-        // force_positioning pattern).
-        QString hexAccum;
+        // Emit glyphs as a single TJ array. Kerning / mark positioning from
+        // GPOS (xOffset) is folded into a numeric spacing adjustment between
+        // strings — PDF's native mechanism — instead of splitting the run
+        // into several Tj+repositioned Tm segments. Splitting would break
+        // text extraction (PDF4QT inserts a space at Tm boundaries). Vertical
+        // mark offsets (yOffset) cannot be expressed as TJ spacing; marks are
+        // rare in v1 scope (Arabic diacritics), so a negative-y advance item
+        // keeps the run intact and the glyph at the baseline. (Absolute
+        // mark positioning is a known v1 limitation.)
+        QString currentHex;
+        QStringList spacingItems;   // "<hex>" strings and numeric adjustments
         PDFReal posX = runX;
-        const auto flush = [&content, &hexAccum]()
+        const auto flushHex = [&spacingItems, &currentHex]()
         {
-            if (!hexAccum.isEmpty())
+            if (!currentHex.isEmpty())
             {
-                content += QStringLiteral("<%1> Tj\n").arg(hexAccum);
-                hexAccum.clear();
+                spacingItems << QStringLiteral("<%1>").arg(currentHex);
+                currentHex.clear();
             }
         };
 
         for (const ShapedGlyph& glyph : run.glyphs)
         {
-            const bool needsPositioning = !qFuzzyIsNull(glyph.xOffset) || !qFuzzyIsNull(glyph.yOffset);
-            if (needsPositioning)
+            // Fold horizontal offset into the advance: TJ number is
+            // (offset * 1000 / upem) * (1000 / size / 1000) adjusted —
+            // PDF spec: adjustment = -(tx) * 1000 / (fontSize * hscale),
+            // where tx is the desired displacement delta in text space.
+            // Zero-advance glyphs (combining marks) emit INLINE with no
+            // adjustment: a numeric item would create a pen gap that
+            // PDF4QT's text flow heuristics convert into a phantom space
+            // (gap > 1.2 * previous-advance). The mark paints over its
+            // base at the current position — correct extraction, and
+            // absolute mark positioning is a documented v1 limitation.
+            if (!qFuzzyIsNull(glyph.xOffset) && !qFuzzyIsNull(glyph.xAdvance))
             {
-                flush();
-                const PDFReal gx = runX + (posX - runX) + glyph.xOffset * settings.fontSize / PDFReal(metrics.upem);
-                const PDFReal gy = settings.y + glyph.yOffset * settings.fontSize / PDFReal(metrics.upem);
-                content += QStringLiteral("1 0 0 1 %1 %2 Tm\n").arg(gx, 0, 'f', 2).arg(gy, 0, 'f', 2);
+                flushHex();
+                const PDFReal adjustment = -glyph.xOffset * 1000.0 / PDFReal(metrics.upem);
+                spacingItems << QString::number(adjustment, 'f', 2);
             }
-            hexAccum += QStringLiteral("%1").arg(glyph.code, 4, 16, QLatin1Char('0')).toUpper();
+            // Vertical mark offsets are not expressible as TJ spacing in v1;
+            // zero-width marks stay at the baseline (documented limitation).
+
+            currentHex += QStringLiteral("%1").arg(glyph.code, 4, 16, QLatin1Char('0')).toUpper();
             posX += glyph.xAdvance * settings.fontSize / PDFReal(metrics.upem);
         }
-        flush();
+        flushHex();
+
+        content += QStringLiteral("[%1] TJ\n").arg(spacingItems.join(QLatin1Char(' ')));
 
         if (run.isRTL)
         {
@@ -555,9 +592,17 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     factory.endArray();
     factory.endDictionaryItem();
 
-    // /CIDToGIDMap: Identity (code == GID with full embedding).
+    // /CIDToGIDMap: explicit array (code -> gid). Per-instance codes mean
+    // /Identity would be wrong; the array maps each unique code to the GID
+    // it was assigned from.
     factory.beginDictionaryItem("CIDToGIDMap");
-    factory << PDFObject::createName("Identity");
+    factory.beginArray();
+    factory << PDFObject::createInteger(0);  // code 0 = .notdef
+    for (const PDFInteger gid : codeToGid)
+    {
+        factory << PDFObject::createInteger(gid);
+    }
+    factory.endArray();
     factory.endDictionaryItem();
     factory.endDictionary();
     factory.endArray();
