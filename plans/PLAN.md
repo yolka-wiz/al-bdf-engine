@@ -96,9 +96,9 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - [x] **Exit:** CI green on bare container — `ci/run-ci.sh` all-green incl. ASAN 10/10
 
 ### M7 — Polish & release (all agents)
-- [ ] CLI docs (`--help` complete, man page), deterministic saves
-- [ ] Perf smoke: 1000-page doc open/render/delete
-- **Exit:** release candidate; version tag
+- [x] CLI docs (`--help` complete, man page), deterministic saves — `717d1d4` (README + `docs/PdfTool.1`)
+- [x] Perf smoke: 1000-page doc open/render/delete — info 0.03s, fetch 0.04s, render 0.03s, search 0.04s (1000 matches), delete 0.02s
+- [x] **Exit:** release candidate; version tag — **0.1.0** (`b2f4a93`)
 
 ---
 
