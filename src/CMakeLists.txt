@@ -6,7 +6,7 @@ set(PDFEDIT_VERSION 0.1.0)
 set(PDF4QT_VERSION 1.6.0.0)   # kept for upstream compatibility in vendored CMake
 project(pdfedit VERSION ${PDFEDIT_VERSION} LANGUAGES CXX)
 
-add_compile_definitions(PDF4QT_PROJECT_VERSION="${PDF4QT_VERSION}")
+add_compile_definitions(PDF4QT_PROJECT_VERSION="${PDFEDIT_VERSION}")
 add_compile_definitions(QT_NO_EMIT)
 
 set(CMAKE_CXX_STANDARD 20)
