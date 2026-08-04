@@ -42,6 +42,8 @@ add_executable(PdfTool
     pdftoolformlist.h
     pdftoolformfill.cpp
     pdftoolformfill.h
+    pdftoolsign.cpp
+    pdftoolsign.h
     pdftoolinfo.cpp
     pdftoolinfofonts.cpp 
     pdftoolinfoinks.cpp 
