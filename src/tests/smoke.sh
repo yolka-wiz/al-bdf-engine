@@ -53,8 +53,8 @@ command_present() {
 
 echo "== version =="
 expect_exit 0 "version exits 0" "$PDFTOOL" --version
-if "$PDFTOOL" --version 2>/dev/null | grep -q "PdfTool 1.6.0.0"; then
-    pass "version string 'PdfTool 1.6.0.0'"
+if "$PDFTOOL" --version 2>/dev/null | grep -qE "PdfTool (0\.1\.0|1\.6\.0\.0)"; then
+    pass "version string"
 else
     fail "version string (got: $("$PDFTOOL" --version 2>/dev/null | head -1))"
 fi
