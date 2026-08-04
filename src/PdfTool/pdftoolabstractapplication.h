@@ -23,21 +23,21 @@
 #ifndef PDFTOOLABSTRACTAPPLICATION_H
 #define PDFTOOLABSTRACTAPPLICATION_H
 
-#include "pdfglobal.h"
-#include "pdfoutputformatter.h"
+#include "pdfcms.h"
 #include "pdfdocument.h"
 #include "pdfdocumenttextflow.h"
-#include "pdfrenderer.h"
-#include "pdfcms.h"
-#include "pdfoptimizer.h"
+#include "pdfglobal.h"
 #include "pdfimageoptimizer.h"
+#include "pdfoptimizer.h"
+#include "pdfoutputformatter.h"
 #include "pdfredact.h"
+#include "pdfrenderer.h"
 
-#include <QtGlobal>
-#include <QString>
-#include <QDateTime>
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QString>
 #include <QStringConverter>
+#include <QtGlobal>
 
 #include <vector>
 
@@ -172,30 +172,31 @@ struct PDFToolOptions
     QString redactedDocument;
 
     // For option 'DeleteObject'
-    QString deleteObjectPage;       ///< Page number (1-based) to edit
-    QString deleteObjectIndex;      ///< Object index on the page (0-based, recognize-text contract)
-    bool deleteObjectList = false;  ///< List objects instead of deleting
+    QString deleteObjectPage;           ///< Page number (1-based) to edit
+    QString deleteObjectIndex;          ///< Object index on the page (0-based, recognize-text contract)
+    bool deleteObjectList = false;      ///< List objects instead of deleting
     QString deleteObjectOutputDocument; ///< Output document filename
 
     // For option 'AddText'
-    QString addTextPage;            ///< Page number (1-based)
-    QString addTextX;               ///< X position in PDF points
-    QString addTextY;               ///< Y position in PDF points
-    QString addText;                ///< Text to add
-    QString addTextFontSize;        ///< Font size
-    QString addTextOutputDocument;  ///< Output document filename
-    bool addTextRTL = false;        ///< Use the RTL pipeline (HarfBuzz/FriBidi)
-    QString addTextFont;            ///< TTF font file for RTL text
-    QString addTextLanguage;        ///< Language tag: fa|ar|he|ur
+    QString addTextPage;           ///< Page number (1-based)
+    QString addTextX;              ///< X position in PDF points
+    QString addTextY;              ///< Y position in PDF points
+    QString addText;               ///< Text to add
+    QString addTextFontSize;       ///< Font size
+    QString addTextOutputDocument; ///< Output document filename
+    bool addTextRTL = false;       ///< Use the RTL pipeline (HarfBuzz/FriBidi)
+    QString addTextFont;           ///< TTF font file for RTL text
+    QString addTextLanguage;       ///< Language tag: fa|ar|he|ur
 
     // For option 'SearchText'
     QString searchTextQuery;              ///< Query string (logical order)
-    bool searchTextCaseSensitive = false;  ///< Case-sensitive matching
-    bool searchTextNoNormalize = false;    ///< Disable RTL normalization
+    bool searchTextCaseSensitive = false; ///< Case-sensitive matching
+    bool searchTextNoNormalize = false;   ///< Disable RTL normalization
 
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
-    pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
+    pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents =
+        pdf::PDFSecurityHandlerFactory::EncryptContents::All;
     QString encryptionUserPassword;
     QString encryptionOwnerPassword;
     uint32_t encryptionPermissions = 0;
@@ -254,42 +255,42 @@ public:
 
     enum StandardString
     {
-        Command,        ///< Command, by which is this application invoked
-        Name,           ///< Name of application
-        Description     ///< Description (what this application does)
+        Command,    ///< Command, by which is this application invoked
+        Name,       ///< Name of application
+        Description ///< Description (what this application does)
     };
 
     enum Option
     {
-        ConsoleFormat                   = 0x00000001,       ///< Set format of console output (text, xml or html)
-        OpenDocument                    = 0x00000002,       ///< Flags for document reading
-        SignatureVerification           = 0x00000004,       ///< Flags for signature verification,
-        XmlExport                       = 0x00000008,       ///< Flags for xml export
-        Attachments                     = 0x00000010,       ///< Flags for attachments manipulating
-        DateFormat                      = 0x00000020,       ///< Date format
-        ComputeHashes                   = 0x00000040,       ///< Compute hashes
-        PageSelector                    = 0x00000080,       ///< Select page range (or all pages)
-        TextAnalysis                    = 0x00000100,       ///< Text analysis options
-        TextShow                        = 0x00000200,       ///< Text extract and show options
-        VoiceSelector                   = 0x00000400,       ///< Select voice from SAPI
-        TextSpeech                      = 0x00000800,       ///< Text speech options
-        CharacterMaps                   = 0x00001000,       ///< Character maps for embedded fonts
-        ImageWriterSettings             = 0x00002000,       ///< Settings for writing images (for example, format, etc.)
-        ImageExportSettingsFiles        = 0x00004000,       ///< Settings for exporting page images to files
-        ImageExportSettingsResolution   = 0x00008000,       ///< Settings for resolution of exported images
-        ColorManagementSystem           = 0x00010000,       ///< Color management system settings
-        RenderFlags                     = 0x00020000,       ///< Render flags for page image rasterizer
-        Separate                        = 0x00040000,       ///< Settings for Separate tool
-        Unite                           = 0x00080000,       ///< Settings for Unite tool
-        Optimize                        = 0x00100000,       ///< Settings for Optimize tool
-        CertStore                       = 0x00200000,       ///< Settings for certificate store tool
-        CertStoreInstall                = 0x00400000,       ///< Settings for certificate store install certificate tool
-        Encrypt                         = 0x00800000,       ///< Encryption settings
-        Diff                            = 0x01000000,       ///< Diff settings (compare documents)
-        Redact                          = 0x02000000,       ///< Settings for Redact tool
-        DeleteObject                    = 0x04000000,       ///< Settings for DeleteObject tool
-        AddText                         = 0x08000000,       ///< Settings for AddText tool
-        SearchText                      = 0x10000000,       ///< Settings for SearchText tool
+        ConsoleFormat = 0x00000001,                 ///< Set format of console output (text, xml or html)
+        OpenDocument = 0x00000002,                  ///< Flags for document reading
+        SignatureVerification = 0x00000004,         ///< Flags for signature verification,
+        XmlExport = 0x00000008,                     ///< Flags for xml export
+        Attachments = 0x00000010,                   ///< Flags for attachments manipulating
+        DateFormat = 0x00000020,                    ///< Date format
+        ComputeHashes = 0x00000040,                 ///< Compute hashes
+        PageSelector = 0x00000080,                  ///< Select page range (or all pages)
+        TextAnalysis = 0x00000100,                  ///< Text analysis options
+        TextShow = 0x00000200,                      ///< Text extract and show options
+        VoiceSelector = 0x00000400,                 ///< Select voice from SAPI
+        TextSpeech = 0x00000800,                    ///< Text speech options
+        CharacterMaps = 0x00001000,                 ///< Character maps for embedded fonts
+        ImageWriterSettings = 0x00002000,           ///< Settings for writing images (for example, format, etc.)
+        ImageExportSettingsFiles = 0x00004000,      ///< Settings for exporting page images to files
+        ImageExportSettingsResolution = 0x00008000, ///< Settings for resolution of exported images
+        ColorManagementSystem = 0x00010000,         ///< Color management system settings
+        RenderFlags = 0x00020000,                   ///< Render flags for page image rasterizer
+        Separate = 0x00040000,                      ///< Settings for Separate tool
+        Unite = 0x00080000,                         ///< Settings for Unite tool
+        Optimize = 0x00100000,                      ///< Settings for Optimize tool
+        CertStore = 0x00200000,                     ///< Settings for certificate store tool
+        CertStoreInstall = 0x00400000,              ///< Settings for certificate store install certificate tool
+        Encrypt = 0x00800000,                       ///< Encryption settings
+        Diff = 0x01000000,                          ///< Diff settings (compare documents)
+        Redact = 0x02000000,                        ///< Settings for Redact tool
+        DeleteObject = 0x04000000,                  ///< Settings for DeleteObject tool
+        AddText = 0x08000000,                       ///< Settings for AddText tool
+        SearchText = 0x10000000,                    ///< Settings for SearchText tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 
@@ -310,7 +311,10 @@ protected:
     /// \param document Document
     /// \param[out] sourceData Pointer, to which source data are stored
     /// \param authorizeOwnerOnly Require to authorize as owner
-    bool readDocument(const PDFToolOptions& options, pdf::PDFDocument& document, QByteArray* sourceData, bool authorizeOwnerOnly);
+    bool readDocument(const PDFToolOptions& options,
+                      pdf::PDFDocument& document,
+                      QByteArray* sourceData,
+                      bool authorizeOwnerOnly);
 
     /// Returns a list of available encodings
     static QList<QByteArray> getAvailableEncodings();
@@ -327,7 +331,6 @@ protected:
 class PDFToolApplicationStorage
 {
 public:
-
     /// Returns application by command. If application for given command is not found,
     /// then nullptr is returned.
     /// \param command Command
@@ -355,7 +358,7 @@ private:
     PDFToolAbstractApplication* m_defaultApplication = nullptr;
 };
 
-}   // namespace pdftool
+} // namespace pdftool
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(pdftool::PDFToolAbstractApplication::Options)
 

@@ -22,14 +22,14 @@
 
 #include "pdfrecognizetext.h"
 
+#include "pdfcms.h"
 #include "pdfdocument.h"
 #include "pdffont.h"
-#include "pdfcms.h"
-#include "pdfoptionalcontent.h"
 #include "pdfmeshqualitysettings.h"
+#include "pdfoptionalcontent.h"
 #include "pdfpagecontenteditorprocessor.h"
-#include "pdftextlayoutgenerator.h"
 #include "pdfrenderer.h"
+#include "pdftextlayoutgenerator.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -80,20 +80,16 @@ QString getFontName(const PDFPageContentProcessorState& state)
 
     return QString();
 }
-}   // namespace
+} // namespace
 
 PDFRecognizeText::PDFRecognizeText(const PDFDocument* document,
                                    const PDFFontCache* fontCache,
                                    const PDFCMS* cms,
                                    const PDFOptionalContentActivity* optionalContentActivity,
-                                   const PDFMeshQualitySettings* meshQualitySettings) :
-    m_document(document),
-    m_fontCache(fontCache),
-    m_cms(cms),
-    m_optionalContentActivity(optionalContentActivity),
-    m_meshQualitySettings(meshQualitySettings)
-{
-}
+                                   const PDFMeshQualitySettings* meshQualitySettings)
+    : m_document(document), m_fontCache(fontCache), m_cms(cms), m_optionalContentActivity(optionalContentActivity),
+      m_meshQualitySettings(meshQualitySettings)
+{}
 
 std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger pageIndex) const
 {
@@ -113,13 +109,8 @@ std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger
     // Parse the page content into the edited page content element list. The
     // element order (and thus the emitted indices) is the content stream
     // order, which is the index space shared with the delete-object command.
-    PDFPageContentEditorProcessor processor(page,
-                                            m_document,
-                                            m_fontCache,
-                                            m_cms,
-                                            m_optionalContentActivity,
-                                            QTransform(),
-                                            *m_meshQualitySettings);
+    PDFPageContentEditorProcessor processor(
+        page, m_document, m_fontCache, m_cms, m_optionalContentActivity, QTransform(), *m_meshQualitySettings);
     processor.processContents();
 
     const PDFEditedPageContent& content = processor.getEditedPageContent();
@@ -168,71 +159,70 @@ std::vector<PDFRecognizeText::ObjectInfo> PDFRecognizeText::recognize(PDFInteger
 
         switch (element->getType())
         {
-            case PDFEditedPageContentElement::Type::Text:
+        case PDFEditedPageContentElement::Type::Text: {
+            info.type = QStringLiteral("text");
+
+            // Build the plain text from the item characters (getItemsAsText
+            // returns the internal XML markup, not suitable for output).
+            const PDFEditedPageContentElementText* textElement = element->asText();
+            for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
             {
-                info.type = QStringLiteral("text");
-
-                // Build the plain text from the item characters (getItemsAsText
-                // returns the internal XML markup, not suitable for output).
-                const PDFEditedPageContentElementText* textElement = element->asText();
-                for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
+                if (!item.isText)
                 {
-                    if (!item.isText)
+                    continue;
+                }
+                for (const TextSequenceItem& textItem : item.textSequence.items)
+                {
+                    if (!textItem.character.isNull())
                     {
-                        continue;
+                        info.text.append(textItem.character);
                     }
-                    for (const TextSequenceItem& textItem : item.textSequence.items)
+                    else if (textItem.isAdvance() && textItem.advance > 0.0)
                     {
-                        if (!textItem.character.isNull())
-                        {
-                            info.text.append(textItem.character);
-                        }
-                        else if (textItem.isAdvance() && textItem.advance > 0.0)
-                        {
-                            // A positive advance with no character is a space.
-                            info.text.append(QChar::fromLatin1(' '));
-                        }
+                        // A positive advance with no character is a space.
+                        info.text.append(QChar::fromLatin1(' '));
                     }
                 }
-
-                // Font and font size are captured in the per-item graphic states.
-                for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
-                {
-                    if (item.state.getTextFont())
-                    {
-                        info.font = getFontName(item.state);
-                        info.fontSize = item.state.getTextFontSize();
-                        break;
-                    }
-                }
-
-                // Assign page characters to this element by geometric
-                // containment in the element bounding box.
-                if (!info.bbox.isEmpty())
-                {
-                    const QRectF expandedBBox = info.bbox.adjusted(-1.0, -1.0, 1.0, 1.0);
-                    for (const QRectF& charBox : pageCharBoxes)
-                    {
-                        if (expandedBBox.contains(charBox.center()))
-                        {
-                            info.charBoxes.push_back(charBox);
-                        }
-                    }
-                }
-                break;
             }
 
-            case PDFEditedPageContentElement::Type::Image:
-                info.type = QStringLiteral("image");
-                break;
+            // Font and font size are captured in the per-item graphic states.
+            for (const PDFEditedPageContentElementText::Item& item : textElement->getItems())
+            {
+                if (item.state.getTextFont())
+                {
+                    info.font = getFontName(item.state);
+                    info.fontSize = item.state.getTextFontSize();
+                    break;
+                }
+            }
 
-            case PDFEditedPageContentElement::Type::Path:
-                info.type = QStringLiteral("path");
-                break;
+            // Assign page characters to this element by geometric
+            // containment in the element bounding box.
+            if (!info.bbox.isEmpty())
+            {
+                const QRectF expandedBBox = info.bbox.adjusted(-1.0, -1.0, 1.0, 1.0);
+                for (const QRectF& charBox : pageCharBoxes)
+                {
+                    if (expandedBBox.contains(charBox.center()))
+                    {
+                        info.charBoxes.push_back(charBox);
+                    }
+                }
+            }
+            break;
+        }
 
-            default:
-                Q_ASSERT(false);
-                break;
+        case PDFEditedPageContentElement::Type::Image:
+            info.type = QStringLiteral("image");
+            break;
+
+        case PDFEditedPageContentElement::Type::Path:
+            info.type = QStringLiteral("path");
+            break;
+
+        default:
+            Q_ASSERT(false);
+            break;
         }
 
         result.push_back(std::move(info));
@@ -248,8 +238,7 @@ QString PDFRecognizeText::toJson(const std::vector<ObjectInfo>& objects)
     QJsonArray currentObjects;
     int currentPage = 0;
 
-    auto flushPage = [&pagesArray, &currentObjects, &currentPage]()
-    {
+    auto flushPage = [&pagesArray, &currentObjects, &currentPage]() {
         if (!currentObjects.isEmpty())
         {
             QJsonObject pageObject;
@@ -303,4 +292,4 @@ QString PDFRecognizeText::toJson(const std::vector<ObjectInfo>& objects)
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
 }
 
-}   // namespace pdf
+} // namespace pdf

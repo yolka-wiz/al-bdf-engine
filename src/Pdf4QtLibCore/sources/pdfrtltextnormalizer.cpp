@@ -33,7 +33,7 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, std::vector<int>* c
 }
 
 QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& options, std::vector<int>* charMap)
-{    // Step 1: NFKC — canonical composition AND compatibility folding, which
+{ // Step 1: NFKC — canonical composition AND compatibility folding, which
     // maps Arabic presentation forms (U+FB50..U+FDFF, U+FE70..U+FEFF) and the
     // lam-alef ligature (U+FEFB..U+FEFE) back to their base letter sequences.
     const QString composed = text.normalized(QString::NormalizationForm_KC);
@@ -69,14 +69,15 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
         // presentation ligature (FEFB) into this two-char sequence, and PDF
         // ToUnicode maps often degrade the ligature to lam alone, so searching
         // "لا" must also match extracted "ل".
-        if (options.collapseLamAlef && cp == 0x0644 && i + 1 < composed.size() && composed.at(i + 1).unicode() == 0x0627)
+        if (options.collapseLamAlef && cp == 0x0644 && i + 1 < composed.size() &&
+            composed.at(i + 1).unicode() == 0x0627)
         {
             result.append(QChar(0x0644));
             if (charMap)
             {
-                charMap->push_back(i + 1);  // last original char of the pair
+                charMap->push_back(i + 1); // last original char of the pair
             }
-            ++i;  // consume the alef
+            ++i; // consume the alef
             continue;
         }
 
@@ -86,29 +87,29 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
         {
             switch (cp)
             {
-                case 0x064A:  // Arabic yeh -> Persian yeh
-                    unified = 0x06CC;
-                    break;
-                case 0x0643:  // Arabic keheh -> Persian keheh
-                    unified = 0x06A9;
-                    break;
-                case 0x0623:  // alef with hamza above
-                case 0x0625:  // alef with hamza below
-                case 0x0622:  // alef with madda
-                case 0x0671:  // alef wasla
-                    unified = 0x0627;
-                    break;
-                case 0x0629:  // teh marbuta -> heh
-                    unified = 0x0647;
-                    break;
-                case 0x0649:  // alef maksura -> yeh
-                    unified = 0x06CC;
-                    break;
-                case 0x06C0:  // heh with yeh above -> heh
-                    unified = 0x0647;
-                    break;
-                default:
-                    break;
+            case 0x064A: // Arabic yeh -> Persian yeh
+                unified = 0x06CC;
+                break;
+            case 0x0643: // Arabic keheh -> Persian keheh
+                unified = 0x06A9;
+                break;
+            case 0x0623: // alef with hamza above
+            case 0x0625: // alef with hamza below
+            case 0x0622: // alef with madda
+            case 0x0671: // alef wasla
+                unified = 0x0627;
+                break;
+            case 0x0629: // teh marbuta -> heh
+                unified = 0x0647;
+                break;
+            case 0x0649: // alef maksura -> yeh
+                unified = 0x06CC;
+                break;
+            case 0x06C0: // heh with yeh above -> heh
+                unified = 0x0647;
+                break;
+            default:
+                break;
             }
         }
 
@@ -140,4 +141,4 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
     return result;
 }
 
-}   // namespace pdf
+} // namespace pdf

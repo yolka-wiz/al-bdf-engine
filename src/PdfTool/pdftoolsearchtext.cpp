@@ -35,18 +35,18 @@ QString PDFToolSearchText::getStandardString(StandardString standardString) cons
 {
     switch (standardString)
     {
-        case Command:
-            return "search-text";
+    case Command:
+        return "search-text";
 
-        case Name:
-            return PDFToolTranslationContext::tr("Search text");
+    case Name:
+        return PDFToolTranslationContext::tr("Search text");
 
-        case Description:
-            return PDFToolTranslationContext::tr("Search for text in the document (RTL-aware, with bounding rectangles).");
+    case Description:
+        return PDFToolTranslationContext::tr("Search for text in the document (RTL-aware, with bounding rectangles).");
 
-        default:
-            Q_ASSERT(false);
-            break;
+    default:
+        Q_ASSERT(false);
+        break;
     }
 
     return QString();
@@ -85,22 +85,19 @@ int PDFToolSearchText::execute(const PDFToolOptions& options)
     }
 
     QString errorMessage;
-    const std::vector<pdf::PDFInteger> pages = options.getPageRange(
-        pdf::PDFInteger(document.getCatalog()->getPageCount()), errorMessage, true);
+    const std::vector<pdf::PDFInteger> pages =
+        options.getPageRange(pdf::PDFInteger(document.getCatalog()->getPageCount()), errorMessage, true);
     if (!errorMessage.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page range: %1").arg(errorMessage), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page range: %1").arg(errorMessage),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
     const pdf::PDFInteger pageFirst = pages.empty() ? 0 : pages.front();
     const pdf::PDFInteger pageLast = pages.empty() ? 0 : pages.back();
 
-    const std::vector<pdf::PDFTextSearchEngine::Match> matches = engine.search(
-        &document,
-        options.searchTextQuery,
-        pageFirst,
-        pageLast,
-        searchOptions);
+    const std::vector<pdf::PDFTextSearchEngine::Match> matches =
+        engine.search(&document, options.searchTextQuery, pageFirst, pageLast, searchOptions);
 
     PDFOutputFormatter formatter(options.outputStyle);
     formatter.beginDocument("search-results", PDFToolTranslationContext::tr("Search results"));
@@ -124,11 +121,12 @@ int PDFToolSearchText::execute(const PDFToolOptions& options)
         formatter.beginTableRow("match");
         formatter.writeTableColumn("page", QString::number(match.pageIndex + 1));
         formatter.writeTableColumn("item", QString::number(static_cast<qlonglong>(match.itemIndex)));
-        formatter.writeTableColumn("bbox", QStringLiteral("%1 %2 %3 %4")
-                                             .arg(match.boundingRect.x())
-                                             .arg(match.boundingRect.y())
-                                             .arg(match.boundingRect.width())
-                                             .arg(match.boundingRect.height()));
+        formatter.writeTableColumn("bbox",
+                                   QStringLiteral("%1 %2 %3 %4")
+                                       .arg(match.boundingRect.x())
+                                       .arg(match.boundingRect.y())
+                                       .arg(match.boundingRect.width())
+                                       .arg(match.boundingRect.height()));
         formatter.writeTableColumn("text", match.matchedText);
         formatter.endTableRow();
     }
@@ -139,4 +137,4 @@ int PDFToolSearchText::execute(const PDFToolOptions& options)
     return ExitSuccess;
 }
 
-}   // namespace pdftool
+} // namespace pdftool

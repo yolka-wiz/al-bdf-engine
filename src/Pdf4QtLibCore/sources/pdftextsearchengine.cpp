@@ -69,7 +69,8 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDoc
     {
         pageIndices.push_back(page);
     }
-    const PDFDocumentTextFlow flow = factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
+    const PDFDocumentTextFlow flow =
+        factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
 
     for (size_t itemIndex = 0; itemIndex < flow.getSize(); ++itemIndex)
     {
@@ -102,7 +103,9 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDoc
             // original character rects.
             const int queryLen = visualQuery.size();
             const int originalBegin = (matchIndex < static_cast<int>(charMap.size())) ? charMap.at(matchIndex) : 0;
-            const int originalEnd = (matchIndex + queryLen - 1 < static_cast<int>(charMap.size())) ? charMap.at(matchIndex + queryLen - 1) : item.text.size() - 1;
+            const int originalEnd = (matchIndex + queryLen - 1 < static_cast<int>(charMap.size()))
+                                        ? charMap.at(matchIndex + queryLen - 1)
+                                        : item.text.size() - 1;
             if (originalBegin >= 0 && originalEnd >= originalBegin && originalEnd < item.text.size())
             {
                 match.matchedText = item.text.mid(originalBegin, originalEnd - originalBegin + 1);
@@ -110,7 +113,9 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDoc
                 if (!item.characterBoundingRects.empty())
                 {
                     QRectF unionRect;
-                    for (int i = originalBegin; i <= originalEnd && i < static_cast<int>(item.characterBoundingRects.size()); ++i)
+                    for (int i = originalBegin;
+                         i <= originalEnd && i < static_cast<int>(item.characterBoundingRects.size());
+                         ++i)
                     {
                         unionRect = unionRect.united(item.characterBoundingRects.at(i));
                     }
@@ -153,9 +158,13 @@ QString PDFTextSearchEngine::invertToVisual(const QString& query) const
     // Auto-detect base direction from the query content (RTL if any strong
     // RTL char is present; FriBidi's FRIBIDI_PAR_ON resolves that).
     FriBidiParType baseDir = FRIBIDI_PAR_ON;
-    FriBidiLevel maxLevel = fribidi_log2vis(logical.data(), static_cast<FriBidiStrIndex>(logical.size()),
-                                            &baseDir, visual.data(),
-                                            positionsLToV.data(), positionsVToL.data(), levels.data());
+    FriBidiLevel maxLevel = fribidi_log2vis(logical.data(),
+                                            static_cast<FriBidiStrIndex>(logical.size()),
+                                            &baseDir,
+                                            visual.data(),
+                                            positionsLToV.data(),
+                                            positionsVToL.data(),
+                                            levels.data());
     if (maxLevel == 0)
     {
         return query;
@@ -170,4 +179,4 @@ QString PDFTextSearchEngine::invertToVisual(const QString& query) const
     return result;
 }
 
-}   // namespace pdf
+} // namespace pdf

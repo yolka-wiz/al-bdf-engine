@@ -117,23 +117,25 @@ void GoldenTest::golden()
     process.setProcessEnvironment(env);
     process.setProcessChannelMode(QProcess::SeparateChannels);
 
-    const QStringList arguments = {
-        QStringLiteral("render"),
-        fixturePath,
-        QStringLiteral("--page-first"), QStringLiteral("1"),
-        QStringLiteral("--page-last"), QString::number(pageCount),
-        QStringLiteral("--image-format"), QStringLiteral("png"),
-        QStringLiteral("--image-res-dpi"), QStringLiteral("72"),
-        QStringLiteral("--image-output-dir"), tmpDir.path()
-    };
+    const QStringList arguments = {QStringLiteral("render"),
+                                   fixturePath,
+                                   QStringLiteral("--page-first"),
+                                   QStringLiteral("1"),
+                                   QStringLiteral("--page-last"),
+                                   QString::number(pageCount),
+                                   QStringLiteral("--image-format"),
+                                   QStringLiteral("png"),
+                                   QStringLiteral("--image-res-dpi"),
+                                   QStringLiteral("72"),
+                                   QStringLiteral("--image-output-dir"),
+                                   tmpDir.path()};
 
     process.start(toolPath, arguments);
     QVERIFY2(process.waitForStarted(), "PdfTool render did not start");
     QVERIFY2(process.waitForFinished(180000), "PdfTool render timed out");
     const QString stderrText = QString::fromUtf8(process.readAllStandardError());
     QVERIFY2(process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0,
-             qPrintable(QStringLiteral("PdfTool render failed (exit %1): %2")
-                        .arg(process.exitCode()).arg(stderrText)));
+             qPrintable(QStringLiteral("PdfTool render failed (exit %1): %2").arg(process.exitCode()).arg(stderrText)));
 
     for (int page = 1; page <= pageCount; ++page)
     {
@@ -142,9 +144,11 @@ void GoldenTest::golden()
 
         QVERIFY2(QFile::exists(renderedPath),
                  qPrintable(QStringLiteral("Rendered page missing: %1").arg(renderedPath)));
-        QVERIFY2(QFile::exists(goldenPath),
-                 qPrintable(QStringLiteral("Golden missing: %1 (regenerate via src/tests/scripts/ generators + render, then commit)")
-                            .arg(goldenPath)));
+        QVERIFY2(
+            QFile::exists(goldenPath),
+            qPrintable(QStringLiteral(
+                           "Golden missing: %1 (regenerate via src/tests/scripts/ generators + render, then commit)")
+                           .arg(goldenPath)));
 
         bool renderOk = false;
         bool goldenOk = false;
@@ -155,20 +159,25 @@ void GoldenTest::golden()
 
         // Also verify the render is a valid PNG with the expected page size.
         QImage image(renderedPath);
-        QVERIFY2(!image.isNull(), qPrintable(QStringLiteral("Rendered file is not a decodable PNG: %1").arg(renderedPath)));
+        QVERIFY2(!image.isNull(),
+                 qPrintable(QStringLiteral("Rendered file is not a decodable PNG: %1").arg(renderedPath)));
 
         qInfo().noquote() << QStringLiteral("[golden] %1 page %2  sha256 %3  %4x%5")
-                                 .arg(fixtureName).arg(page).arg(QString::fromLatin1(renderHash))
-                                 .arg(image.width()).arg(image.height());
+                                 .arg(fixtureName)
+                                 .arg(page)
+                                 .arg(QString::fromLatin1(renderHash))
+                                 .arg(image.width())
+                                 .arg(image.height());
 
         QVERIFY2(renderHash == goldenHash,
                  qPrintable(QStringLiteral("GOLDEN MISMATCH for %1 page %2:\n"
                                            "  rendered: %3 (%4)\n"
                                            "  golden:   %5 (%6)\n"
                                            "Do NOT update the golden - investigate the render diff.")
-                            .arg(fixtureName).arg(page)
-                            .arg(QString::fromLatin1(renderHash), renderedPath)
-                            .arg(QString::fromLatin1(goldenHash), goldenPath)));
+                                .arg(fixtureName)
+                                .arg(page)
+                                .arg(QString::fromLatin1(renderHash), renderedPath)
+                                .arg(QString::fromLatin1(goldenHash), goldenPath)));
     }
 }
 
@@ -180,21 +189,21 @@ void GoldenTest::fixtureRegistryConsistency()
     const QStringList goldenFiles = goldenDir.entryList(QStringList() << QStringLiteral("*_Image_*.png"), QDir::Files);
     QVERIFY(!goldenFiles.isEmpty());
 
-    const QStringList fixtures = {
-        QStringLiteral("test-baseline.pdf"),
-        QStringLiteral("multipage.pdf"),
-        QStringLiteral("image-doc.pdf"),
-        QStringLiteral("overlap-text.pdf")
-    };
+    const QStringList fixtures = {QStringLiteral("test-baseline.pdf"),
+                                  QStringLiteral("multipage.pdf"),
+                                  QStringLiteral("image-doc.pdf"),
+                                  QStringLiteral("overlap-text.pdf")};
 
     int expectedGoldenCount = 0;
     for (const QString& fixture : fixtures)
     {
         const QString stem = fixture.left(fixture.size() - 4);
         const QString fixturePath = testsDir() + QStringLiteral("/fixtures/") + fixture;
-        QVERIFY2(QFile::exists(fixturePath), qPrintable(QStringLiteral("Registered fixture missing: %1").arg(fixturePath)));
+        QVERIFY2(QFile::exists(fixturePath),
+                 qPrintable(QStringLiteral("Registered fixture missing: %1").arg(fixturePath)));
 
-        const int count = goldenDir.entryList(QStringList() << stem + QStringLiteral("_Image_*.png"), QDir::Files).size();
+        const int count =
+            goldenDir.entryList(QStringList() << stem + QStringLiteral("_Image_*.png"), QDir::Files).size();
         QVERIFY2(count > 0, qPrintable(QStringLiteral("No goldens for fixture %1").arg(fixture)));
         expectedGoldenCount += count;
     }

@@ -22,13 +22,13 @@
 
 #include <QtTest>
 
+#include "pdfcms.h"
+#include "pdfconstants.h"
 #include "pdfdocument.h"
 #include "pdfdocumentreader.h"
-#include "pdfconstants.h"
-#include "pdfoptionalcontent.h"
-#include "pdfcms.h"
-#include "pdfmeshqualitysettings.h"
 #include "pdffont.h"
+#include "pdfmeshqualitysettings.h"
+#include "pdfoptionalcontent.h"
 #include "pdfrecognizetext.h"
 
 #include <QJsonArray>
@@ -49,7 +49,14 @@ private slots:
 void RecognizeTextTest::test_page1_text_object_json()
 {
     pdf::PDFDocument document;
-    pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = true; return QString(); }, true, false);
+    pdf::PDFDocumentReader reader(
+        nullptr,
+        [](bool* ok) {
+            *ok = true;
+            return QString();
+        },
+        true,
+        false);
     document = reader.readFromFile(TEST_BASELINE_PDF);
     QVERIFY2(document.getCatalog() != nullptr, "Failed to load the test-baseline.pdf fixture");
     QCOMPARE(document.getCatalog()->getPageCount(), 2);
@@ -93,7 +100,8 @@ void RecognizeTextTest::test_page1_text_object_json()
     QVERIFY2(first.bbox.width() > 0.0 && first.bbox.height() > 0.0, "text object must have a nonzero bounding box");
     QVERIFY(first.fontSize > 0.0);
     QVERIFY(!first.font.isEmpty());
-    QVERIFY2(first.charBoxes.size() >= 5, qPrintable(QString("expected at least 5 character boxes, got %1").arg(first.charBoxes.size())));
+    QVERIFY2(first.charBoxes.size() >= 5,
+             qPrintable(QString("expected at least 5 character boxes, got %1").arg(first.charBoxes.size())));
     for (const QRectF& charBox : first.charBoxes)
     {
         QVERIFY(charBox.width() > 0.0);
@@ -109,7 +117,14 @@ void RecognizeTextTest::test_page1_text_object_json()
 void RecognizeTextTest::test_page2_objects()
 {
     pdf::PDFDocument document;
-    pdf::PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = true; return QString(); }, true, false);
+    pdf::PDFDocumentReader reader(
+        nullptr,
+        [](bool* ok) {
+            *ok = true;
+            return QString();
+        },
+        true,
+        false);
     document = reader.readFromFile(TEST_BASELINE_PDF);
     QVERIFY2(document.getCatalog() != nullptr, "Failed to load the test-baseline.pdf fixture");
 

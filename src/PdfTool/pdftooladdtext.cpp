@@ -47,18 +47,18 @@ QString PDFToolAddText::getStandardString(StandardString standardString) const
 {
     switch (standardString)
     {
-        case Command:
-            return "add-text";
+    case Command:
+        return "add-text";
 
-        case Name:
-            return PDFToolTranslationContext::tr("Add text");
+    case Name:
+        return PDFToolTranslationContext::tr("Add text");
 
-        case Description:
-            return PDFToolTranslationContext::tr("Add a text label to a page of the document.");
+    case Description:
+        return PDFToolTranslationContext::tr("Add a text label to a page of the document.");
 
-        default:
-            Q_ASSERT(false);
-            break;
+    default:
+        Q_ASSERT(false);
+        break;
     }
 
     return QString();
@@ -96,7 +96,7 @@ pdf::PDFFontPointer createTextFont(const pdf::PDFDocument& document,
     pdf::PDFFontPointer font = fontCache.getFont(fontObject, fontKey);
     return font;
 }
-}   // namespace
+} // namespace
 
 int PDFToolAddText::execute(const PDFToolOptions& options)
 {
@@ -109,17 +109,20 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
 
     if (options.addTextOutputDocument.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Output document filename must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Output document filename must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
     if (options.addTextPage.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Page number (--page) must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Page number (--page) must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
     if (options.addText.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Text to add (--text) must be specified."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Text to add (--text) must be specified."),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -127,7 +130,8 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     const pdf::PDFInteger pageNumber = options.addTextPage.toInt(&pageOk);
     if (!pageOk || pageNumber < 1 || pageNumber > pdf::PDFInteger(document.getCatalog()->getPageCount()))
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page number '%1'.").arg(options.addTextPage), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page number '%1'.").arg(options.addTextPage),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
     const pdf::PDFInteger pageIndex = pageNumber - 1;
@@ -179,13 +183,16 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     {
         if (options.addTextFont.isEmpty())
         {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("RTL text requires --font <ttf-file>."), options.outputCodec);
+            PDFConsole::writeError(PDFToolTranslationContext::tr("RTL text requires --font <ttf-file>."),
+                                   options.outputCodec);
             return ErrorInvalidArguments;
         }
         QFile fontFile(options.addTextFont);
         if (!fontFile.open(QIODevice::ReadOnly))
         {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("Cannot open font file '%1'.").arg(options.addTextFont), options.outputCodec);
+            PDFConsole::writeError(
+                PDFToolTranslationContext::tr("Cannot open font file '%1'.").arg(options.addTextFont),
+                options.outputCodec);
             return ErrorInvalidArguments;
         }
         const QByteArray fontData = fontFile.readAll();
@@ -205,7 +212,8 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
         if (!rtlResult.errors.isEmpty())
         {
             PDFConsole::writeError(PDFToolTranslationContext::tr("RTL text shaping failed: %1")
-                                           .arg(rtlResult.errors.join(QStringLiteral(", "))), options.outputCodec);
+                                       .arg(rtlResult.errors.join(QStringLiteral(", "))),
+                                   options.outputCodec);
             return ErrorFailedWriteToFile;
         }
 
@@ -220,9 +228,12 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
         filters.appendItem(pdf::PDFObject::createName("FlateDecode"));
         const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(rtlResult.contentFragment);
         pdf::PDFDictionary contentDictionary;
-        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"), pdf::PDFObject::createInteger(compressedData.size()));
-        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"), pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-        pdf::PDFObject contentObject = pdf::PDFObject::createStream(std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
+        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
+                                   pdf::PDFObject::createInteger(compressedData.size()));
+        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
+                                   pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
+        pdf::PDFObject contentObject = pdf::PDFObject::createStream(
+            std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
 
         // Merge the font into the page Resources (KEEPING the existing font
         // entries — the RTL font gets its own key F2 so original text with F1
@@ -295,29 +306,37 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
 
         pageFactory.endDictionary();
 
-        pageObject = pdf::PDFObjectManipulator::merge(pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
+        pageObject = pdf::PDFObjectManipulator::merge(
+            pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
         builder->setObject(page->getPageReference(), std::move(pageObject));
 
         modifier.markPageContentsChanged();
         if (!modifier.finalize())
         {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."), options.outputCodec);
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                                   options.outputCodec);
             return ErrorFailedWriteToFile;
         }
 
         pdf::PDFDocumentWriter writer(nullptr);
-        pdf::PDFOperationResult writeResult = writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
+        pdf::PDFOperationResult writeResult =
+            writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
         if (!writeResult)
         {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to write document: %1")
-                                           .arg(writeResult.getErrorMessage()), options.outputCodec);
+            PDFConsole::writeError(
+                PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
+                options.outputCodec);
             return ErrorFailedWriteToFile;
         }
 
         PDFOutputFormatter formatter(options.outputStyle);
         formatter.beginDocument("add-text", PDFToolTranslationContext::tr("Add text"));
-        formatter.writeText("added", PDFToolTranslationContext::tr("Added RTL text '%1' to page %2 at (%3, %4).")
-                                       .arg(options.addText).arg(pageNumber).arg(x).arg(y));
+        formatter.writeText("added",
+                            PDFToolTranslationContext::tr("Added RTL text '%1' to page %2 at (%3, %4).")
+                                .arg(options.addText)
+                                .arg(pageNumber)
+                                .arg(x)
+                                .arg(y));
         formatter.endDocument();
         PDFConsole::writeText(formatter.getString(), options.outputCodec);
 
@@ -328,7 +347,8 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     // LTR path (default): standard Helvetica, no embedding.
     // ------------------------------------------------------------------
     // Parse the page content into edited elements, keep them all.
-    pdf::PDFPageContentEditorProcessor processor(page, &document, &fontCache, cms.data(), &optionalContentActivity, QTransform(), meshQualitySettings);
+    pdf::PDFPageContentEditorProcessor processor(
+        page, &document, &fontCache, cms.data(), &optionalContentActivity, QTransform(), meshQualitySettings);
     processor.processContents();
     pdf::PDFEditedPageContent editedContent = processor.takeEditedPageContent();
 
@@ -350,9 +370,9 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     state.setTextFontSize(fontSize);
 
     QString itemsAsText = QStringLiteral("<tf font=\"%1\" size=\"%2\"/>%3")
-                                  .arg(QString::fromLatin1(font->getFontId()))
-                                  .arg(fontSize)
-                                  .arg(QString(options.addText).toHtmlEscaped());
+                              .arg(QString::fromLatin1(font->getFontId()))
+                              .arg(fontSize)
+                              .arg(QString(options.addText).toHtmlEscaped());
 
     // A single text item carrying the characters. The items are used by
     // recognize-text to extract plain text; the hand-built XML (above) drives
@@ -368,8 +388,9 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     }
     item.state = state;
 
-    std::vector<pdf::PDFEditedPageContentElementText::Item> items = { item };
-    pdf::PDFEditedPageContentElementText textElement(state, std::move(items), QPainterPath(), QTransform(), itemsAsText);
+    std::vector<pdf::PDFEditedPageContentElementText::Item> items = {item};
+    pdf::PDFEditedPageContentElementText textElement(
+        state, std::move(items), QPainterPath(), QTransform(), itemsAsText);
     textElement.setItemsAsText(itemsAsText);
 
     // The element transform positions the text at (x, y) in page space; the
@@ -396,7 +417,8 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     if (!contentStreamBuilder.getErrors().isEmpty())
     {
         PDFConsole::writeError(PDFToolTranslationContext::tr("Content stream serialization failed: %1")
-                                       .arg(contentStreamBuilder.getErrors().join(QStringLiteral(", "))), options.outputCodec);
+                                   .arg(contentStreamBuilder.getErrors().join(QStringLiteral(", "))),
+                               options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
@@ -416,9 +438,12 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(contentStreamBuilder.getOutputContent());
 
     pdf::PDFDictionary contentDictionary;
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"), pdf::PDFObject::createInteger(compressedData.size()));
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"), pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-    pdf::PDFObject contentObject = pdf::PDFObject::createStream(std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
+    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
+                               pdf::PDFObject::createInteger(compressedData.size()));
+    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
+                               pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
+    pdf::PDFObject contentObject = pdf::PDFObject::createStream(
+        std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
 
     pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
 
@@ -455,29 +480,37 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
 
     pageFactory.endDictionary();
 
-    pageObject = pdf::PDFObjectManipulator::merge(pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
+    pageObject = pdf::PDFObjectManipulator::merge(
+        pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
     builder->setObject(page->getPageReference(), std::move(pageObject));
 
     modifier.markPageContentsChanged();
     if (!modifier.finalize())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                               options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
     pdf::PDFDocumentWriter writer(nullptr);
-    pdf::PDFOperationResult writeResult = writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
+    pdf::PDFOperationResult writeResult =
+        writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
     if (!writeResult)
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to write document: %1")
-                                       .arg(writeResult.getErrorMessage()), options.outputCodec);
+        PDFConsole::writeError(
+            PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
+            options.outputCodec);
         return ErrorFailedWriteToFile;
     }
 
     PDFOutputFormatter formatter(options.outputStyle);
     formatter.beginDocument("add-text", PDFToolTranslationContext::tr("Add text"));
-    formatter.writeText("added", PDFToolTranslationContext::tr("Added text '%1' to page %2 at (%3, %4).")
-                                   .arg(options.addText).arg(pageNumber).arg(x).arg(y));
+    formatter.writeText("added",
+                        PDFToolTranslationContext::tr("Added text '%1' to page %2 at (%3, %4).")
+                            .arg(options.addText)
+                            .arg(pageNumber)
+                            .arg(x)
+                            .arg(y));
     formatter.endDocument();
     PDFConsole::writeText(formatter.getString(), options.outputCodec);
 
@@ -489,4 +522,4 @@ PDFToolAbstractApplication::Options PDFToolAddText::getOptionsFlags() const
     return ConsoleFormat | OpenDocument | AddText;
 }
 
-}   // namespace pdftool
+} // namespace pdftool

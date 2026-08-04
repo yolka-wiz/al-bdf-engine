@@ -25,8 +25,8 @@
 
 #include "pdfglobal.h"
 
-#include <QString>
 #include <QRectF>
+#include <QString>
 
 #include <vector>
 
@@ -92,6 +92,6 @@ private:
     const PDFMeshQualitySettings* m_meshQualitySettings;
 };
 
-}   // namespace pdf
+} // namespace pdf
 
 #endif // PDFRECOGNIZETEXT_H

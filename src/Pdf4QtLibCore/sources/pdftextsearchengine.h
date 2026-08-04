@@ -25,8 +25,8 @@
 #include "pdfobject.h"
 #include "pdfrtltextnormalizer.h"
 
-#include <QString>
 #include <QRectF>
+#include <QString>
 #include <vector>
 
 namespace pdf
@@ -52,11 +52,11 @@ class PDF4QTLIBCORESHARED_EXPORT PDFTextSearchEngine
 public:
     struct Match
     {
-        PDFInteger pageIndex = 0;      ///< 0-based page
-        size_t itemIndex = 0;          ///< text-flow item index on the page
-        QString matchedText;           ///< original (un-normalized) text
-        QRectF boundingRect;           ///< union of matched char rects (page coords)
-        int normalizedQueryIndex = 0;  ///< position in the visual query string
+        PDFInteger pageIndex = 0;     ///< 0-based page
+        size_t itemIndex = 0;         ///< text-flow item index on the page
+        QString matchedText;          ///< original (un-normalized) text
+        QRectF boundingRect;          ///< union of matched char rects (page coords)
+        int normalizedQueryIndex = 0; ///< position in the visual query string
     };
 
     struct Options
@@ -77,14 +77,12 @@ public:
                               const Options& options);
 
     /// Search with default options.
-    std::vector<Match> search(const PDFDocument* document,
-                              const QString& query,
-                              PDFInteger pageFirst,
-                              PDFInteger pageLast);
+    std::vector<Match>
+    search(const PDFDocument* document, const QString& query, PDFInteger pageFirst, PDFInteger pageLast);
 
 private:
     /// Invert a logical query to visual order using FriBidi.
     QString invertToVisual(const QString& query) const;
 };
 
-}   // namespace pdf
+} // namespace pdf
