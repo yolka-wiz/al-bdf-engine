@@ -1,6 +1,6 @@
 # pdfedit
 
-Headless PDF editing **library + CLI** for Linux — fork of [PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT).
+Headless PDF editing **library + CLI** for Linux — fork of [PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT, our additions **GPL-3.0-or-later**).
 The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text write + search** is the differentiator.
 
 **Status:** v0.1.0 released. M0–M7 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search shipped, CI green).
@@ -207,4 +207,8 @@ Every task you touch must exist in the DB. **Closing a task requires `--ref <com
 
 ## License
 
-MIT (inherited from PDF4QT). Deps (permissive only — ADR-0004): Qt (LGPL), FreeType (FTL), OpenJPEG (MIT), OpenSSL (Apache-2.0), ZLIB, HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamically linked). RTL fonts are OFL.
+**GPL-3.0-or-later** (see `LICENSE` and ADR-0005). Our authored code is GPL-3.0-or-later;
+vendored upstream PDF4QT portions keep their MIT headers (MIT is GPLv3-compatible).
+Deps (all GPLv3-compatible — ADR-0005): Qt (LGPL-3, dynamic), FreeType (FTL), OpenJPEG
+(MIT), OpenSSL (Apache-2.0), ZLIB, HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamic), blend2d
+(Zlib), TBB (Apache-2.0). RTL fonts are OFL.

@@ -85,10 +85,14 @@ When in doubt, follow the surrounding PDF4QT code style; this standard codifies 
 ## 9. Dependencies & licensing
 
 - Adding a dependency requires an ADR entry + user/orchestrator approval (see `AGENTS.md`).
-- Core deps stay permissive: Qt (LGPL), FreeType (FTL), OpenJPEG (MIT), OpenSSL (Apache),
-  ZLIB, HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamic linking).
-- NO AGPL/GPL libraries in the core. NO new deps "just in case" (YAGNI).
-- Every new file carries the MIT license header.
+- **Project license: GPL-3.0-or-later** (ADR-0005, supersedes ADR-0004). Every new file
+  carries the GPL-3.0-or-later header (`SPDX-License-Identifier: GPL-3.0-or-later`).
+  Vendored upstream PDF4QT files keep their MIT headers (MIT is GPLv3-compatible).
+- All linked deps must be GPLv3-compatible: Qt (LGPL-3, dynamic), FreeType (FTL),
+  OpenJPEG (MIT), OpenSSL (Apache-2.0 — GPLv3-compatible, **not** GPLv2), ZLIB,
+  HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamic linking), TBB (Apache-2.0), blend2d (Zlib).
+- NO GPLv2-incompatible deps (i.e. no Apache-2.0 under a GPLv2 license — hence GPLv3).
+  NO new deps "just in case" (YAGNI).
 
 ## 10. Agent-specific rules
 

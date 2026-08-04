@@ -66,7 +66,9 @@ Full standard in `docs/coding-standard.md`. Non-negotiable highlights:
 - `clang-format` must be clean: `clang-format --dry-run --Werror` on every touched file.
 - No `using namespace std;`. No exceptions across API boundaries without docs.
 - Public API in headers gets Doxygen comments.
-- License header (MIT, "Copyright (c) 2026 pdfedit contributors") on every new file.
+- License header on every new file: `SPDX-License-Identifier: GPL-3.0-or-later` +
+  the standard GPLv3 notice, "Copyright (c) 2026 pdfedit contributors". The project is
+  GPL-3.0-or-later (ADR-0005); upstream PDF4QT portions keep MIT.
 
 ## 6. Git workflow
 
