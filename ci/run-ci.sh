@@ -31,8 +31,14 @@ step() { echo; echo "=== $1 ==="; }
 
 # The list of files WE authored (everything changed since the fork base).
 # Vendored upstream files are intentionally NOT formatted (cherry-pick hygiene).
+# Upstream-derived files we only MODIFIED (created in the M1 fork import) are
+# excluded too — their original formatting is upstream's, and reformatting the
+# whole file would destroy cherry-pick diffs. We keep our own added lines styled
+# to match the surrounding code instead.
 AUTHORED_FILES="$(
-    cd "$REPO_DIR" && git diff --name-only 4f46302..HEAD -- '*.cpp' '*.h'
+    cd "$REPO_DIR" && git diff --name-only 4f46302..HEAD -- '*.cpp' '*.h' \
+        | grep -vE '^src/PdfTool/pdftoolabstractapplication\.(cpp|h)$' \
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$'
 )"
 
 step "1/4 configure + build (Release)"
