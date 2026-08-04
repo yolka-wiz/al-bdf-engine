@@ -188,6 +188,11 @@ struct PDFToolOptions
     QString addTextFont;            ///< TTF font file for RTL text
     QString addTextLanguage;        ///< Language tag: fa|ar|he|ur
 
+    // For option 'SearchText'
+    QString searchTextQuery;              ///< Query string (logical order)
+    bool searchTextCaseSensitive = false;  ///< Case-sensitive matching
+    bool searchTextNoNormalize = false;    ///< Disable RTL normalization
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -284,6 +289,7 @@ public:
         Redact                          = 0x02000000,       ///< Settings for Redact tool
         DeleteObject                    = 0x04000000,       ///< Settings for DeleteObject tool
         AddText                         = 0x08000000,       ///< Settings for AddText tool
+        SearchText                      = 0x10000000,       ///< Settings for SearchText tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 

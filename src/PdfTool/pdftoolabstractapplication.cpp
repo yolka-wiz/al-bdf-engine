@@ -216,6 +216,13 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("lang", "Language tag for RTL text: fa, ar, he, ur.", "tag"));
     }
 
+    if (optionFlags.testFlag(SearchText))
+    {
+        parser->addPositionalArgument("query", "Text to search for (logical order).");
+        parser->addOption(QCommandLineOption("case-sensitive", "Case-sensitive matching."));
+        parser->addOption(QCommandLineOption("no-normalize", "Disable RTL normalization (tashkeel, digits, Persian/Arabic unification)."));
+    }
+
     if (optionFlags.testFlag(SignatureVerification))
     {
         parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
@@ -511,6 +518,13 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.addTextRTL = parser->isSet("rtl");
         options.addTextFont = parser->value("font");
         options.addTextLanguage = parser->value("lang");
+    }
+
+    if (optionFlags.testFlag(SearchText))
+    {
+        options.searchTextQuery = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+        options.searchTextCaseSensitive = parser->isSet("case-sensitive");
+        options.searchTextNoNormalize = parser->isSet("no-normalize");
     }
 
     if (optionFlags.testFlag(Separate))
