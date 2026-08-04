@@ -39,7 +39,7 @@ an agent must know them before "fixing" extraction and breaking search.
 | # | Problem | Root cause | Impact | Workaround today |
 |---|---|---|---|---|
 | P1 | Ligatures degrade in extraction | `ToUnicode` CMap destinations are one UTF-16 unit; a lam-alef ligature maps to its first letter | `fetch-text` shows `ل` where the visual glyph is `لا` | `/ActualText` carries exact logical text; search works because the normalizer collapses lam-alef |
-| P2 | Decomposed marks duplicate base letter | Arabic yeh (U+064A) decomposes into base + dot; both glyphs share the base's cluster | extraction shows `علييكم` (double ي) for `عليكم` | Accepted trade-off (matches fpdf2); `/ActualText` is exact |
+| P2 | Decomposed marks duplicate base letter | Arabic yeh (U+064A) decomposes into base + dot; both glyphs share the base's cluster | extraction shows `علييكم` (double ي) for `عليكم`; full-phrase search of words ending in ی failed on tagged PDFs | **Fixed for search** `3660b84`: normalizer collapses `یی`/`ی ی`/`ی <space> <letter>` (phantom-space from zero-width duplicate); `/ActualText` still exact |
 | P3 | Vertical mark offsets dropped | TJ spacing can't express y-offset; zero-width marks emit inline at baseline | diacritics render at baseline, not above the letter | Documented v1 limitation; needs GPOS-to-Tm or anchor machinery to fix |
 | P4 | Foreign PDFs with broken ToUnicode (glyphs → C0 control chars U+0001/U+0002) break add-text/delete-object | content editor serializes content streams through XML; QXmlStreamReader rejects control chars → "Invalid XML text" | pages 1/2/10 of Elsevier 2025-2.pdf failed add-text | Fixed `0ba70c1`: sanitize invalid XML chars (→ U+FFFD) in `createItemsAsText`; glyphs intact in PDF |
 
