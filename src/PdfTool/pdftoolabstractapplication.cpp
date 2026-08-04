@@ -212,6 +212,14 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("redact-copy-outline", "Copy source outline into the redacted document."));
     }
 
+    if (optionFlags.testFlag(FormFill))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("field", "Field fully qualified name to set (repeatable).", "name"));
+        parser->addOption(
+            QCommandLineOption("value", "Value for the field (repeatable, paired with --field).", "value"));
+    }
+
     if (optionFlags.testFlag(DeleteObject))
     {
         parser->addPositionalArgument("outputdocument", "Output document filename.");
@@ -633,6 +641,13 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.deleteObjectIndex = parser->value("index");
         options.deleteObjectList = parser->isSet("list");
         options.deleteObjectOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(FormFill))
+    {
+        options.formFillFields = parser->values("field");
+        options.formFillValues = parser->values("value");
+        options.formFillOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
     }
 
     if (optionFlags.testFlag(AddText))
