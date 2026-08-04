@@ -35,9 +35,12 @@ add_executable(PdfTool
     pdftooladdtext.cpp
     pdftooladdtext.h
     pdftoolencrypt.cpp 
-    pdftoolfetchimages.cpp 
-    pdftoolfetchtext.cpp 
-    pdftoolinfo.cpp 
+    pdftoolfetchimages.cpp
+    pdftoolfetchtext.cpp
+    pdftoolfetchtext.h
+    pdftoolformlist.cpp
+    pdftoolformlist.h
+    pdftoolinfo.cpp
     pdftoolinfofonts.cpp 
     pdftoolinfoinks.cpp 
     pdftoolinfojavascript.cpp 
