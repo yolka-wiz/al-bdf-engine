@@ -206,7 +206,66 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
         rtlSettings.fontData = fontData;
         rtlSettings.fontFamily = QFileInfo(options.addTextFont).completeBaseName();
 
-        const QByteArray fontKey = "F2";
+        QByteArray fontKey = "F2";
+
+        // The RTL font must not collide with an existing font resource key on
+        // the target page (real-world PDFs use F1/F2/F3/... arbitrarily, and
+        // the page Resources may be an INDIRECT reference, e.g. "29 0 R").
+        // Resolve the page's Font resources and pick the first free F<N> key.
+        // We must resolve through the document object table — page resources
+        // are frequently indirect references in real-world PDFs.
+        {
+            const pdf::PDFObject& pageObject = document.getObjectByReference(page->getPageReference());
+            if (const pdf::PDFDictionary* pageDict = pageObject.getDictionary())
+            {
+                const pdf::PDFObject& resourcesObject = pageDict->get("Resources");
+                const pdf::PDFDictionary* resourcesDict = nullptr;
+                if (resourcesObject.isDictionary())
+                {
+                    resourcesDict = resourcesObject.getDictionary();
+                }
+                else if (resourcesObject.isReference())
+                {
+                    resourcesDict = document.getObjectByReference(resourcesObject.getReference()).getDictionary();
+                }
+
+                if (resourcesDict)
+                {
+                    const pdf::PDFObject& fontsObject = resourcesDict->get("Font");
+                    const pdf::PDFDictionary* fontsDict = nullptr;
+                    if (fontsObject.isDictionary())
+                    {
+                        fontsDict = fontsObject.getDictionary();
+                    }
+                    else if (fontsObject.isReference())
+                    {
+                        fontsDict = document.getObjectByReference(fontsObject.getReference()).getDictionary();
+                    }
+
+                    if (fontsDict)
+                    {
+                        for (int n = 2; n < 64; ++n)
+                        {
+                            const QByteArray candidate = "F" + QByteArray::number(n);
+                            bool used = false;
+                            for (size_t i = 0; i < fontsDict->getCount(); ++i)
+                            {
+                                if (fontsDict->getKey(i).getString() == candidate)
+                                {
+                                    used = true;
+                                    break;
+                                }
+                            }
+                            if (!used)
+                            {
+                                fontKey = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         pdf::PDFRTLTextEngine::Result rtlResult = pdf::PDFRTLTextEngine::create(rtlSettings, fontKey);
         if (!rtlResult.errors.isEmpty())
         {
@@ -244,18 +303,39 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
         pageFactory.beginDictionaryItem("Resources");
         pageFactory.beginDictionary();
 
-        // Existing font dictionary, if any.
+        // Existing font dictionary, if any. The page Resources may be an
+        // INDIRECT reference in real-world PDFs (e.g. "29 0 R") — resolve it
+        // through the builder's object table so existing fonts are preserved.
         pdf::PDFDictionary mergedFontDict = fontDictionary;
         if (const pdf::PDFDictionary* pageDict = pageObject.getDictionary())
         {
             const pdf::PDFObject& resourcesObject = pageDict->get("Resources");
+            const pdf::PDFDictionary* resourcesDict = nullptr;
             if (resourcesObject.isDictionary())
             {
-                const pdf::PDFDictionary* resourcesDict = resourcesObject.getDictionary();
+                resourcesDict = resourcesObject.getDictionary();
+            }
+            else if (resourcesObject.isReference())
+            {
+                resourcesDict = builder->getObjectByReference(resourcesObject.getReference()).getDictionary();
+            }
+
+            if (resourcesDict)
+            {
                 const pdf::PDFObject& existingFontsObject = resourcesDict->get("Font");
+                const pdf::PDFDictionary* existingFontsDict = nullptr;
                 if (existingFontsObject.isDictionary())
                 {
-                    const pdf::PDFDictionary* existingFontsDict = existingFontsObject.getDictionary();
+                    existingFontsDict = existingFontsObject.getDictionary();
+                }
+                else if (existingFontsObject.isReference())
+                {
+                    existingFontsDict =
+                        builder->getObjectByReference(existingFontsObject.getReference()).getDictionary();
+                }
+
+                if (existingFontsDict)
+                {
                     for (size_t i = 0; i < existingFontsDict->getCount(); ++i)
                     {
                         const QByteArray key = existingFontsDict->getKey(i).getString();
