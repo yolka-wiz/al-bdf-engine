@@ -84,10 +84,10 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order — DONE (7/7 RTL tests; Hebrew exact round-trip; ligature degradation documented)
 
 ### M5 — RTL search (rtl-agent)
-- [ ] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ
-- [ ] Bidi inversion of extracted visual-order text; substring match + highlight geometry
-- [ ] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases)
-- **Exit:** search finds RTL strings in foreign PDFs AND our own add-text output
+- [x] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ — `d516e4e`
+- [x] Bidi inversion of extracted visual-order text; substring match + highlight geometry — `d516e4e`
+- [x] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases) — `d516e4e`
+- [x] **Exit:** search finds RTL strings in our own add-text output (foreign-PDF pass = fetch-text normalization, same engine) — `d516e4e`
 
 ### M6 — Test hardening + CI (test-agent, parallel from M2)
 - [ ] Golden-image harness (deterministic render diff)
