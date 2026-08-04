@@ -1,0 +1,187 @@
+.TH PDFTOOL 1 "2026-08-04" "pdfedit 0.1.0" "User Commands"
+.SH NAME
+PdfTool \- work with PDF documents via command line
+.SH SYNOPSIS
+.B PdfTool
+[\fIoptions\fR] \fIcommand\fR [\fIarguments\fR]
+.SH DESCRIPTION
+.B PdfTool
+is the command-line interface of the pdfedit headless PDF editing library
+(a fork of PDF4QT). It can inspect, render, edit, and manipulate PDF
+documents without a GUI. It ships with RTL (Arabic/Persian/Hebrew) text
+writing and search support - features not present in upstream PDF4QT.
+.SH OPTIONS
+.TP
+.B \-\-console-format <format>
+Console output format: \fBtext\fR (default), \fBxml\fR, or \fBhtml\fR.
+.TP
+.B \-\-text-codec <codec>
+Codec for redirected output: \fButf8\fR (default), \fBlatin1\fR, \fBsystem\fR.
+Use UTF-8 for XML output.
+.TP
+.B \-h, \-\-help
+Show command-line help.
+.TP
+.B \-\-help-all
+Show help including generic Qt options.
+.TP
+.B \-v, \-\-version
+Show version information.
+.SH COMMANDS
+Run
+.B PdfTool help
+for the full list. This page documents the pdfedit-specific commands in
+detail; the inherited PDF4QT commands (render, fetch-text, info, unite,
+separate, redact, encrypt, decrypt, optimize, xml, statistics, ...) keep
+their upstream behavior.
+.SS add-text
+Add a text label to a page.
+.PP
+.B PdfTool add-text
+.I in.pdf out.pdf
+.B \-\-page
+.I N
+.B \-\-x
+.I X
+.B \-\-y
+.I Y
+.B \-\-text
+.I "STRING"
+.RB [ \-\-size
+.IR SIZE ]
+.RB [ \-\-rtl
+.RB [ \-\-font
+.I FONT.TTF
+.RB " \-\-lang " fa | ar | he | ur ]]
+.TP
+.B \-\-page
+Page number (1-based).
+.TP
+.B \-\-x, \-\-y
+Baseline position in PDF points (origin bottom-left of the page).
+.TP
+.B \-\-text
+Text to add. For \fB\-\-rtl\fR this is the LOGICAL string (as typed).
+.TP
+.B \-\-size
+Font size in points (default 12).
+.TP
+.B \-\-rtl
+Use the RTL pipeline: FriBidi directional runs, HarfBuzz shaping, and a
+fully embedded Type0/Identity-H TrueType font with ToUnicode CMap and
+/ActualText marked content. Requires \fB\-\-font\fR and \fB\-\-lang\fR.
+.TP
+.B \-\-font
+TTF font file for RTL text (e.g. Vazirmatn, Noto Naskh Arabic, Noto Sans
+Hebrew — all OFL-licensed).
+.TP
+.B \-\-lang
+Language tag: \fBfa\fR, \fB ar\fR, \fBhe\fR, \fBur\fR. Selects script and
+bidi base direction.
+.SS recognize-text
+Recognize page content objects (text, image, path) and print them with
+bounding boxes. The printed index is the address space used by
+\fBdelete-object\fR.
+.PP
+.B PdfTool recognize-text
+.I in.pdf
+.SS delete-object
+Delete a whole content object from a page.
+.PP
+.B PdfTool delete-object
+.I in.pdf out.pdf
+.B \-\-page
+.I N
+.B \-\-index
+.I K
+.RB [ \-\-list ]
+.TP
+.B \-\-page
+Page number (1-based).
+.TP
+.B \-\-index
+0-based object index on the page (see \fBrecognize-text\fR).
+.TP
+.B \-\-list
+List objects on the page and exit without modifying anything.
+.SS search-text
+Search for text in the document, RTL-aware, reporting bounding rectangles.
+.PP
+.B PdfTool search-text
+.I in.pdf
+.I "QUERY"
+.RB [ \-\-page\-first
+.IR N ]
+.RB [ \-\-page\-last
+.IR N ]
+.RB [ \-\-case\-sensitive ]
+.RB [ \-\-no\-normalize ]
+.TP
+.I QUERY
+The text to find, in LOGICAL order (as a human would type it).
+.TP
+.B \-\-page\-first, \-\-page\-last
+Page range (1-based; default: all pages).
+.TP
+.B \-\-case\-sensitive
+Match case exactly (default: case-insensitive).
+.TP
+.B \-\-no\-normalize
+Disable RTL normalization. Default normalization: NFKC folding of Arabic
+presentation forms and the lam-alef ligature, stripping of tashkeel and
+ZWNJ/ZWJ, Persian<->Arabic letter unification (e.g. yeh, keheh, alef
+variants, teh marbuta), and Persian/Arabic-Indic digit unification
+(so \fB123\fR matches \fB۱۲۳\fR).
+.PP
+PDF content streams store text in VISUAL order; the engine inverts the
+logical query to visual order (FriBidi) before matching, then maps matched
+characters back to their bounding rects. Output: a table of page, item,
+bounding box (x y w h, PDF points), and matched text.
+.SH RTL BEHAVIOR
+.PP
+RTL text added with \fBadd-text \-\-rtl\fR extracts in visual order via
+\fBfetch-text\fR (PDF stores glyphs visually); full logical fidelity is
+carried in the /ActualText marked content. Known limitations:
+.TP
+\(bu
+ToUnicode CMap destinations are limited to one UTF-16 code unit, so
+ligatures (e.g. lam-alef) degrade to their first letter in extraction.
+Search still finds them thanks to normalization.
+.TP
+\(bu
+Decomposed marks (e.g. Arabic yeh with dots) duplicate their base letter
+in extraction.
+.TP
+\(bu
+Vertical mark offsets (diacritic positioning above the base) are dropped
+in v1 rendering; glyphs render at the baseline.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 7
+Invalid arguments.
+Other non-zero codes indicate document read/write or processing errors.
+.SH EXAMPLES
+.PP
+Add a Persian label and search for it:
+.PP
+.nf
+PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 \\
+       --text "سلام دنیا" --size 24 --rtl \\
+       --font /usr/share/fonts/truetype/vazirmatn/Vazirmatn-Regular.ttf --lang fa
+PdfTool search-text out.pdf "سلام"
+.fi
+.PP
+Delete the second object on page 1:
+.PP
+.nf
+PdfTool recognize-text in.pdf
+PdfTool delete-object in.pdf out.pdf --page 1 --index 1
+.fi
+.SH SEE ALSO
+.BR qpdf (1),
+.BR pdftotext (1)
+.SH AUTHOR
+pdfedit project — a fork of PDF4QT (MIT) by Jakub Melka and contributors.
