@@ -193,6 +193,19 @@ struct PDFToolOptions
     bool searchTextCaseSensitive = false; ///< Case-sensitive matching
     bool searchTextNoNormalize = false;   ///< Disable RTL normalization
 
+    // For option 'FormFill'
+    QStringList formFillFields;     ///< Field fully qualified names (paired with values)
+    QStringList formFillValues;     ///< Values for the fields
+    QString formFillOutputDocument; ///< Output document filename
+
+    // For option 'Sign'
+    QString signCertificateFile;        ///< PKCS#12 certificate file (.p12/.pfx)
+    QString signPassword;               ///< Private key password
+    QString signReason;                 ///< Reason for signing (optional)
+    QString signContactInfo;            ///< Contact info (optional)
+    QString signPage;                   ///< Page for a visible signature (optional; default: invisible)
+    QString signX, signY, signW, signH; ///< Visible signature widget rect
+    QString signOutputDocument;         ///< Output document filename
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents =
@@ -291,6 +304,8 @@ public:
         DeleteObject = 0x04000000,                  ///< Settings for DeleteObject tool
         AddText = 0x08000000,                       ///< Settings for AddText tool
         SearchText = 0x10000000,                    ///< Settings for SearchText tool
+        FormFill = 0x20000000,                      ///< Settings for FormFill tool
+        Sign = 0x40000000,                          ///< Settings for Sign tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 
