@@ -76,12 +76,12 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - **Exit:** `add-text "hello" --page 1 --x .. --y ..` works; test green
 
 ### M4 — RTL write pipeline (rtl-agent) — the differentiator
-- [ ] HarfBuzz + FriBidi deps in build (registered in DB)
-- [ ] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning)
-- [ ] Type0/Identity-H font embedding + `/W` advances
-- [ ] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText`
-- [ ] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew
-- **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order
+- [x] HarfBuzz + FriBidi deps in build (registered in DB) — `ca6313c`
+- [x] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning) — `ca6313c`
+- [x] Type0/Identity-H font embedding + `/W` advances — `ca6313c`
+- [x] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText` — `ca6313c`
+- [x] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew — `ca6313c`
+- **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order — DONE (7/7 RTL tests; Hebrew exact round-trip; ligature degradation documented)
 
 ### M5 — RTL search (rtl-agent)
 - [ ] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ
