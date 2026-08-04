@@ -1,0 +1,30 @@
+# Keep the Docker build context small and clean.
+# The repo is mounted at runtime (-v), so nothing here is needed at build time.
+
+# Build artifacts
+src/build/
+src/build-asan/
+build/
+build-*/
+cmake-build-*/
+
+# Version control
+.git/
+.gitignore
+
+# Vendored/third-party (reference only, gitignored already)
+vendor-upstream-pdf4qt/
+
+# Tracking DB (runtime state, rebuilt from schema + seed)
+db/pdfedit.db
+
+# Local scratch
+scripts-tmp/
+docs/research/raw/
+*.log
+
+# IDE / OS noise
+.DS_Store
+.idea/
+.vscode/
+__pycache__/

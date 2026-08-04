@@ -1,43 +1,161 @@
 # pdfedit
 
-Headless PDF editing library + CLI for Linux. The reader/editor core behind a future GUI.
+Headless PDF editing **library + CLI** for Linux — fork of [PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT).
+The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text write + search** is the differentiator.
 
-**Status:** M0–M6 shipped — fork proven, recognize/delete/add-text/RTL-write/RTL-search all working, CI green. See `plans/PLAN.md` for the roadmap.
+**Status:** v0.1.0 released. M0–M7 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search shipped, CI green).
 
-## What this is
+---
 
-A fork-and-extend of **PDF4QT** (MIT, `Pdf4QtLibCore` + `PdfTool`) into a standalone
-headless library and CLI, with our own additions:
+## Table of Contents
 
-- **RTL (Arabic/Persian/Hebrew) text write + search** — the differentiator; PDF4QT has none.
-  HarfBuzz shaping + FriBidi bidi + embedded Type0 font + ToUnicode/ActualText, and a
-  search engine with tashkeel/presentation-form/digit/ZWNJ normalization.
-- **Object-level deletion** (text runs, images, other content elements) exposed via CLI.
-- **Add-text** (LTR + RTL) exposed via CLI.
-- Deterministic, agent-testable core: golden-image tests, headless CLI, stable output.
+- [Installation](#installation)
+- [Usage](#usage)
+  - [add-text (incl. RTL)](#add-text)
+  - [recognize-text](#recognize-text)
+  - [delete-object](#delete-object)
+  - [search-text (RTL-aware)](#search-text)
+  - [Other commands](#other-commands)
+- [For AI agents contributing](#for-ai-agents-contributing)
+  - [Start here](#start-here-required-reading)
+  - [Repo layout](#repo-layout)
+  - [AGENT.md guide map](#agentmd-guide-map)
+  - [Build & test](#build--test)
+  - [The tracking database](#the-tracking-database)
+  - [Determinism & coding rules](#determinism--coding-rules)
+  - [Known limitations](#known-limitations)
+- [Testing & CI](#testing--ci)
+- [License](#license)
 
-**GUI is explicitly out of scope.** This repo is the library + CLI only. A future GUI
-(thin Qt shell or PDF4QT's existing apps) will consume this library.
+---
 
-## Repo layout
+## Installation
+
+### Prerequisites
+- CMake ≥ 3.25, Ninja, GCC/Clang (C++20)
+- Qt 6.8+ (Core/Gui/Xml/Svg/Test — **no Widgets/QML**; 6.10.2 tested)
+- [vcpkg](https://github.com/microsoft/vcpkg) with deps in `src/vcpkg.json` (HarfBuzz, FriBidi, FreeType, OpenJPEG, OpenSSL, TBB, LCMS2, zlib, libjpeg-turbo, libpng, blend2d)
+
+### Option A — your own machine
+```bash
+git clone <repo-url> pdfedit && cd pdfedit/src
+export VCPKG_ROOT=/path/to/vcpkg
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+      -DPDFEDIT_BUILD_TESTS=ON
+cmake --build build
+```
+
+### Option B — dev container (recommended, reproducible)
+```bash
+docker build -t pdfedit-dev -f Dockerfile .
+docker run -it --rm -v $(pwd):/workspace/pdfedit -w /workspace/pdfedit pdfedit-dev
+# inside: cmake + build + test as above (toolchain already at /workspace/vcpkg)
+```
+The Dockerfile installs Qt 6 + vcpkg deps + all tools, sets `QT_QPA_PLATFORM=offscreen`, and provides the `ci/run-ci.sh` gate.
+
+### Verify
+```bash
+build/bin/PdfTool --version        # → PdfTool 0.1.0
+QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (10 tests)
+```
+
+---
+
+## Usage
+
+All commands follow `PdfTool <command> <args>`. Exit codes: **0** success, **7** invalid arguments.
+RTL fonts (OFL) ship in `src/tests/fonts/` (Vazirmatn, Noto Naskh Arabic, Noto Sans Hebrew).
+
+### add-text
+
+```bash
+# LTR — standard Helvetica, no font embedding
+PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 --text "Hello" --size 18
+
+# RTL — FriBidi + HarfBuzz + embedded TrueType font
+PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 \
+        --text "سلام دنیا" --size 24 --rtl \
+        --font src/tests/fonts/Vazirmatn-Regular.ttf --lang fa
+```
+Coordinates are PDF points (origin bottom-left). `--lang` ∈ `fa|ar|he|ur`.
+
+### recognize-text
+
+```bash
+# List page content objects (text/image/path) with bounding boxes.
+# The printed index is the address used by delete-object.
+PdfTool recognize-text in.pdf
+```
+
+### delete-object
+
+```bash
+# Delete a whole content object by page + index (see recognize-text).
+PdfTool delete-object in.pdf out.pdf --page 1 --index 3
+PdfTool delete-object in.pdf --page 1 --list      # list without modifying
+```
+
+### search-text
+
+```bash
+# RTL-aware, logical-order query; normalization ON by default.
+PdfTool search-text in.pdf "سلام"
+PdfTool search-text in.pdf "123"                   # matches ۱۲۳ (digit unification)
+PdfTool search-text in.pdf "محمد" --no-normalize   # exact match only
+PdfTool search-text in.pdf "hello" --case-sensitive
+```
+Normalization strips tashkeel/ZWNJ/ZWJ, folds presentation forms & lam-alef, unifies Persian/Arabic letters and digit sets. Output: page / item / bounding box / matched text.
+
+### Other commands
+
+`render`, `fetch-text`, `info`, `info-fonts`, `info-inks`, `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `xml`, `statistics`, `diff`, `attachments`, `cert-store`, `verify-signatures`, `remove-external-links`, `benchmark`, … — run `PdfTool help` for the full list.
+
+---
+
+## For AI agents contributing
+
+### Start here (required reading)
+1. **`AGENTS.md`** (repo root) — the binding contract. Read it fully first; it overrides general habits.
+2. **`docs/coding-standard.md`** — C++20/Qt style, determinism, TDD, git rules.
+3. **This README** — layout, build, commands.
+4. **`plans/PLAN.md`** — milestone roadmap and exit criteria.
+5. **The tracking DB** — every component/task/decision/question is tracked.
+
+### Repo layout
 
 ```
-docs/            design, decisions (ADRs), coding standard, research notes
-plans/           master plan + milestone breakdowns
-db/              schema + seed for the SQLite tracking database
-scripts/         db.py (tracking DB CLI) + other tooling
-ci/              run-ci.sh — the CI gate (build + tests + sanitizers + format)
-agents/          role definitions for the agent team that writes this code
-skills/          skills vendored/pinned for agents
-src/             the fork: Pdf4QtLibCore + PdfTool + UnitTests
-src/tests/       fixtures (PDFs, RTL fonts), golden images, smoke.sh
+AGENTS.md                  binding contract for every agent (read first)
+README.md                  this file
+.clang-format              enforced style (LLVM base, 4-space, 120-col)
+Dockerfile                 reproducible dev container
+ci/run-ci.sh               CI gate: build + ctest + ASAN/UBSAN + clang-format
+db/                        tracking DB (schema.sql + seed.py committed; pdfedit.db gitignored)
+scripts/db.py              tracking DB CLI
+plans/PLAN.md              master roadmap (M0–M7)
+docs/                      coding standard, ADRs, research, release notes, man page
+agents/roles/              one markdown contract per agent role
+skills/                    vendored skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review)
+src/                       the fork: Pdf4QtLibCore + PdfTool + UnitTests + tests
+tools/                     (legacy empty scaffold — unused)
+vendor-upstream-pdf4qt/    gitignored upstream clone (reference only)
 ```
 
-## Build
+### AGENT.md guide map
 
-Requires CMake ≥ 3.25, Ninja, Qt 6 (Core/Gui/Widgets + dev packages), and the vcpkg
-deps declared in `src/vcpkg.json` (HarfBuzz, FriBidi, FreeType, ...). On the dev
-container, run `scripts-tmp/reinstall-toolchain.sh` first (the OS layer is ephemeral).
+Each major directory has an `AGENT.md` onboarding guide (with its own TOC):
+
+| Guide | What it covers |
+|---|---|
+| `src/AGENT.md` | source tree layout, build, RTL pipeline location, custom CLI tools, determinism, pitfalls |
+| `src/Pdf4QtLibCore/AGENT.md` | the core PDF library: naming, subsystems, registering new sources, RTL quirks |
+| `src/PdfTool/AGENT.md` | how to add a CLI command, output formatter + exit-code contracts |
+| `src/UnitTests/AGENT.md` | how to add a unit/integration test, the QProcess helper pattern |
+| `src/tests/AGENT.md` | fixtures, fonts, golden images, smoke.sh |
+| `db/AGENT.md` | the tracking database: db.py commands, evidence-gated completion |
+| `docs/AGENT.md` | writing docs, ADRs vs research notes, man page, context7 vendoring |
+
+### Build & test
 
 ```bash
 cd src
@@ -45,73 +163,48 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
       -DPDFEDIT_BUILD_TESTS=ON
 cmake --build build
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # 10 tests
+# Full gate (build + ctest + ASAN/UBSAN + clang-format):
+bash ci/run-ci.sh            # or --skip-asan --skip-format for a fast loop
 ```
 
-Binary: `build/bin/PdfTool`. Tests: `QT_QPA_PLATFORM=offscreen ctest --test-dir build`.
-
-## CLI quick reference (our commands)
+### The tracking database
 
 ```bash
-# Add text (LTR) — standard Helvetica, no embedding
-PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 --text "Hello" --size 18
-
-# Add text (RTL) — bidi + HarfBuzz shaping + embedded TrueType
-PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 \
-        --text "سلام دنیا" --size 24 --rtl \
-        --font /path/to/Vazirmatn-Regular.ttf --lang fa
-
-# List page content objects (text/image/path) with bounding boxes
-PdfTool recognize-text in.pdf
-
-# Delete a whole content object by its recognize-text index
-PdfTool delete-object in.pdf out.pdf --page 1 --index 3
-
-# Search (RTL-aware): logical-order query, normalization on by default
-PdfTool search-text in.pdf "سلام"
-PdfTool search-text in.pdf "محمد" --no-normalize      # exact match only
-PdfTool search-text in.pdf "123"                      # matches ۱۲۳ too
+python3 scripts/db.py status              # full status by component
+python3 scripts/db.py search "rtl"        # FTS5 search across tasks/decisions/notes
+python3 scripts/db.py tasks --open        # open tasks
+python3 scripts/db.py task-done 9 --ref <sha>   # close a task WITH evidence (required)
 ```
+Every task you touch must exist in the DB. **Closing a task requires `--ref <commit-sha>`** — no evidence, no close. Never commit `db/pdfedit.db`; only `schema.sql` + `seed.py`.
 
-Search normalization (disable with `--no-normalize`): strips tashkeel and
-ZWNJ/ZWJ, folds Arabic presentation forms and the lam-alef ligature, unifies
-Persian/Arabic letter forms and digit sets. Queries are given in LOGICAL
-order; the engine inverts them to the visual order stored in PDF content
-streams. Match output is a table of page / item / bounding box / matched text.
+### Determinism & coding rules
 
-Rendering and inspection (from upstream PDF4QT) also work: `render`,
-`fetch-text`, `info`, `info-fonts`, `unite`, `separate`, `redact`, `encrypt`,
-`decrypt`, `optimize`, `xml`, and more — see `PdfTool help`.
+- **Byte-deterministic output** for a given input — no timestamps/random IDs in document output.
+- **Headless** — everything passes with `QT_QPA_PLATFORM=offscreen`; no window-needed tests.
+- **CLI-first** — a capability exists only if reachable from a shell command.
+- **TDD** — failing test first for every fix/feature; golden-image tests for anything visual.
+- **Small commits** — one logical change, Conventional Commits (`feat:|fix:|test:|docs:|refactor:|chore:`), commit messages explain WHY.
+- **No scope creep** — note extras in the DB as proposals, don't implement silently.
+- **Never fake results** — a task isn't done until `git log` + passing test prove it.
+- **clang-format** must be clean on every touched file. Vendored upstream files are exempt (keep cherry-picks clean).
+
+### Known limitations
+
+- ToUnicode CMap entries are one UTF-16 unit: ligatures degrade in `fetch-text` (full text in `/ActualText`; search still works via normalization).
+- Decomposed marks duplicate their base letter in extraction.
+- Vertical mark offsets (diacritic height) dropped in v1 rendering.
+- Search matches within a single text item (no cross-item spans).
+
+---
 
 ## Testing & CI
 
-```bash
-# Full gate (build + offscreen ctest + ASAN/UBSAN + clang-format):
-bash ci/run-ci.sh
-bash ci/run-ci.sh --skip-asan --skip-format   # fast loop
-
-# Manual test run
-cd src && QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
-```
-
-Suite (10 targets): unit tests, font encoding, recognize-text, delete-object,
-add-text, **RTL add-text** (incl. mirror-regression), **RTL search** (Hebrew,
-digits, ZWNJ, tashkeel, mixed bidi), golden-image harness, CLI smoke.
-
-Known limitations (documented in the code): ToUnicode CMap entries are
-2-byte-only so ligatures degrade in `fetch-text` (full text lives in
-`/ActualText`); decomposed marks duplicate their base letter in extraction;
-vertical mark offsets are dropped in v1 rendering.
-
-## How to work here (for agents AND humans)
-
-1. **Read `AGENTS.md`** at the repo root first — it is the binding contract for every agent.
-2. **Read `docs/coding-standard.md`** — style, naming, testing, commit rules.
-3. **Check the tracking DB** — every component, task, decision, and question is tracked:
-   `python3 scripts/db.py status` (see `scripts/db.py --help`).
-4. **Follow the plan** — `plans/PLAN.md` is the master roadmap. Work in milestones.
+- **10 ctest targets**: unit, font encoding, recognize-text, delete-object, add-text, RTL add-text (incl. mirror-regression), RTL search (Hebrew/digits/ZWNJ/tashkeel/mixed-bidi corpus), golden-image render harness, CLI smoke (34 checks).
+- **ASAN/UBSAN**: full suite clean.
+- **clang-format gate**: authored files only (vendored upstream exempt).
+- Run everything: `bash ci/run-ci.sh`.
 
 ## License
 
-MIT (inherited from PDF4QT) unless the ADRs decide otherwise. Third-party deps:
-Qt (LGPL), FreeType (FTL), OpenJPEG (MIT), OpenSSL (Apache-2.0), ZLIB, HarfBuzz
-(MIT), FriBidi (LGPL-2.1, dynamically linked — see ADR-0004 / deps register).
+MIT (inherited from PDF4QT). Deps (permissive only — ADR-0004): Qt (LGPL), FreeType (FTL), OpenJPEG (MIT), OpenSSL (Apache-2.0), ZLIB, HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamically linked). RTL fonts are OFL.
