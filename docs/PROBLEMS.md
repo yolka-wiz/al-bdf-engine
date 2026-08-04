@@ -58,7 +58,7 @@ search and (2) spec-valid PDF over perfect glyph-positioning in v1.
 
 ### Search limitations
 
-- **S#1** — matches within a single text item only (no cross-item/cross-line spans). Multi-word queries spanning items miss.
+- **S#1** — matches within a single text item only (no cross-item/cross-line spans). Multi-word queries spanning items miss. **Observed in the field (compat-agent-b, 2026-08-04):** our own `add-text --rtl` output can split at a word boundary on dense pages — the Layout flow algorithm (upstream `PDFDocumentTextFlowFactory`) merges the first word of the added run into the surrounding column item (reading-order continuity) while the rest forms its own item. Content stream is identical (one `TJ`, one `/ActualText` span) in both cases; the split is purely geometric. Symptom: `search-text "تست نهایی"` = 0 matches on the modified copy of `کالا.pdf` / `پروژه نهایی.pdf`, while `"تست"` and `"نهایی"` each match. Book1 (sparse page) keeps one item → phrase matches. Verified NOT an add-text defect; fixing means reworking the upstream flow builder (out of scope).
 - **S#2** — mixed LTR+RTL same-run handled, but the cluster-to-char mapping relies on `hb_buffer_add_utf16(item_offset=run.begin)` returning **absolute** clusters — the engine must NOT re-add `run.begin`. This was a real data-loss bug (`d516e4e`).
 
 ---
