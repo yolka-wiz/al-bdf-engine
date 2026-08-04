@@ -83,7 +83,7 @@ QByteArray sha256OfFile(const QString& path)
     }
     return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256).toHex();
 }
-}   // namespace
+} // namespace
 
 class DeleteObjectTest : public QObject
 {
@@ -104,13 +104,14 @@ void DeleteObjectTest::test_listObjects()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(toolPath, {
-        QStringLiteral("delete-object"),
-        QString::fromUtf8(TEST_BASELINE_PDF),
-        tmpDir.path() + QStringLiteral("/out.pdf"),
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--list")
-    }, tmpDir.path());
+    ToolResult result = runTool(toolPath,
+                                {QStringLiteral("delete-object"),
+                                 QString::fromUtf8(TEST_BASELINE_PDF),
+                                 tmpDir.path() + QStringLiteral("/out.pdf"),
+                                 QStringLiteral("--page"),
+                                 QStringLiteral("1"),
+                                 QStringLiteral("--list")},
+                                tmpDir.path());
 
     QCOMPARE(result.exitCode, 0);
     QVERIFY2(result.stdoutData.contains("text"), "list must contain a text object");
@@ -126,18 +127,20 @@ void DeleteObjectTest::test_deleteTextRun()
 
     // Delete the text run (index 0) on page 1.
     const QString outputPath = tmpDir.path() + QStringLiteral("/del-text.pdf");
-    ToolResult delResult = runTool(toolPath, {
-        QStringLiteral("delete-object"),
-        QString::fromUtf8(TEST_BASELINE_PDF),
-        outputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--index"), QStringLiteral("0")
-    }, tmpDir.path());
+    ToolResult delResult = runTool(toolPath,
+                                   {QStringLiteral("delete-object"),
+                                    QString::fromUtf8(TEST_BASELINE_PDF),
+                                    outputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--index"),
+                                    QStringLiteral("0")},
+                                   tmpDir.path());
     QCOMPARE(delResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "output document must be created");
 
     // The deleted text must be gone, the surviving text must remain.
-    ToolResult fetchResult = runTool(toolPath, { QStringLiteral("fetch-text"), outputPath }, tmpDir.path());
+    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(!fetchResult.stdoutData.contains("Hello PDF4QT baseline!"), "deleted text must not be extractable");
     QVERIFY2(fetchResult.stdoutData.contains("Second page with numbers 12345"), "surviving text on page 2 must remain");
@@ -150,16 +153,18 @@ void DeleteObjectTest::test_deletePathKeepsText()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/del-path.pdf");
-    ToolResult delResult = runTool(toolPath, {
-        QStringLiteral("delete-object"),
-        QString::fromUtf8(TEST_BASELINE_PDF),
-        outputPath,
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--index"), QStringLiteral("1")
-    }, tmpDir.path());
+    ToolResult delResult = runTool(toolPath,
+                                   {QStringLiteral("delete-object"),
+                                    QString::fromUtf8(TEST_BASELINE_PDF),
+                                    outputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--index"),
+                                    QStringLiteral("1")},
+                                   tmpDir.path());
     QCOMPARE(delResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, { QStringLiteral("fetch-text"), outputPath }, tmpDir.path());
+    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.contains("Hello PDF4QT baseline!"), "text must survive path deletion");
 }
@@ -170,13 +175,15 @@ void DeleteObjectTest::test_invalidIndexFails()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(toolPath, {
-        QStringLiteral("delete-object"),
-        QString::fromUtf8(TEST_BASELINE_PDF),
-        tmpDir.path() + QStringLiteral("/out.pdf"),
-        QStringLiteral("--page"), QStringLiteral("1"),
-        QStringLiteral("--index"), QStringLiteral("99")
-    }, tmpDir.path());
+    ToolResult result = runTool(toolPath,
+                                {QStringLiteral("delete-object"),
+                                 QString::fromUtf8(TEST_BASELINE_PDF),
+                                 tmpDir.path() + QStringLiteral("/out.pdf"),
+                                 QStringLiteral("--page"),
+                                 QStringLiteral("1"),
+                                 QStringLiteral("--index"),
+                                 QStringLiteral("99")},
+                                tmpDir.path());
     QVERIFY2(result.exitCode != 0, "invalid index must fail with non-zero exit code");
 }
 

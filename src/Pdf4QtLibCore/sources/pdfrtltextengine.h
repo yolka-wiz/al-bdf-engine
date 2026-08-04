@@ -53,13 +53,13 @@ public:
     /// Settings for one shaped text run.
     struct Settings
     {
-        QString text;                       ///< Logical-order input text
-        QString language;                   ///< "fa", "ar", "he", ... ('' = auto)
-        PDFReal fontSize = 12.0;            ///< Font size in PDF points
-        PDFReal x = 0.0;                    ///< Run origin x (left edge of the run)
-        PDFReal y = 0.0;                    ///< Baseline y
-        QByteArray fontData;                ///< TTF font program bytes (subsetted)
-        QString fontFamily;                 ///< Font family name for the descriptor
+        QString text;            ///< Logical-order input text
+        QString language;        ///< "fa", "ar", "he", ... ('' = auto)
+        PDFReal fontSize = 12.0; ///< Font size in PDF points
+        PDFReal x = 0.0;         ///< Run origin x (left edge of the run)
+        PDFReal y = 0.0;         ///< Baseline y
+        QByteArray fontData;     ///< TTF font program bytes (subsetted)
+        QString fontFamily;      ///< Font family name for the descriptor
     };
 
     /// Result: the embedded font dictionary and the content stream fragment.
@@ -88,23 +88,23 @@ public:
 private:
     struct ShapedGlyph
     {
-        PDFInteger code = 0;      ///< Subset code (2-byte Identity-H)
-        PDFReal xAdvance = 0.0;   ///< Advance in font units (hmtx)
-        PDFReal xOffset = 0.0;    ///< Offset in font units (GPOS mark)
+        PDFInteger code = 0;    ///< Subset code (2-byte Identity-H)
+        PDFReal xAdvance = 0.0; ///< Advance in font units (hmtx)
+        PDFReal xOffset = 0.0;  ///< Offset in font units (GPOS mark)
         PDFReal yOffset = 0.0;
-        QByteArray unicode;       ///< UTF-16BE of the cluster (logical)
+        QByteArray unicode; ///< UTF-16BE of the cluster (logical)
     };
 
     struct ShapedRun
     {
         bool isRTL = false;
-        size_t begin = 0;   ///< Logical char range of the run (for /ActualText)
+        size_t begin = 0; ///< Logical char range of the run (for /ActualText)
         size_t end = 0;
-        std::vector<ShapedGlyph> glyphs;  ///< VISUAL order (leftmost first)
-        PDFReal totalAdvance = 0.0;       ///< Sum of advances, font units
+        std::vector<ShapedGlyph> glyphs; ///< VISUAL order (leftmost first)
+        PDFReal totalAdvance = 0.0;      ///< Sum of advances, font units
     };
 };
 
-}   // namespace pdf
+} // namespace pdf
 
 #endif // PDFRTLTEXTENGINE_H

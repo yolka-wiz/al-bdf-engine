@@ -53,11 +53,11 @@ class PDF4QTLIBCORESHARED_EXPORT PDFRTLTextNormalizer
 public:
     struct Options
     {
-        bool stripDiacritics = true;   ///< Remove tashkeel + tatweel
-        bool stripJoiners = true;      ///< Remove ZWNJ/ZWJ
-        bool unifyPersianArabic = true;///< ي<->ی, ك<->ک, أ<->ا, ة<->ه ...
-        bool unifyDigits = true;       ///< ۰-۹/٠-٩ -> 0-9
-        bool collapseLamAlef = true;   ///< لا -> ل (ligature degradation)
+        bool stripDiacritics = true;    ///< Remove tashkeel + tatweel
+        bool stripJoiners = true;       ///< Remove ZWNJ/ZWJ
+        bool unifyPersianArabic = true; ///< ي<->ی, ك<->ک, أ<->ا, ة<->ه ...
+        bool unifyDigits = true;        ///< ۰-۹/٠-٩ -> 0-9
+        bool collapseLamAlef = true;    ///< لا -> ل (ligature degradation)
     };
 
     /// Normalize \p text. Returns the normalized string and (optionally) a map
@@ -69,4 +69,4 @@ public:
     static QString normalize(const QString& text, std::vector<int>* charMap = nullptr);
 };
 
-}   // namespace pdf
+} // namespace pdf

@@ -24,10 +24,10 @@
 
 #include "pdfcms.h"
 #include "pdfconstants.h"
+#include "pdffont.h"
 #include "pdfmeshqualitysettings.h"
 #include "pdfoptionalcontent.h"
 #include "pdfrecognizetext.h"
-#include "pdffont.h"
 
 namespace pdftool
 {
@@ -38,18 +38,19 @@ QString PDFToolRecognizeText::getStandardString(StandardString standardString) c
 {
     switch (standardString)
     {
-        case Command:
-            return "recognize-text";
+    case Command:
+        return "recognize-text";
 
-        case Name:
-            return PDFToolTranslationContext::tr("Recognize text");
+    case Name:
+        return PDFToolTranslationContext::tr("Recognize text");
 
-        case Description:
-            return PDFToolTranslationContext::tr("Recognize page content objects (text, image, path) and print them with bounding boxes.");
+    case Description:
+        return PDFToolTranslationContext::tr(
+            "Recognize page content objects (text, image, path) and print them with bounding boxes.");
 
-        default:
-            Q_ASSERT(false);
-            break;
+    default:
+        Q_ASSERT(false);
+        break;
     }
 
     return QString();
@@ -71,8 +72,7 @@ int PDFToolRecognizeText::execute(const PDFToolOptions& options)
     cmsManager.setSettings(options.cmsSettings);
     pdf::PDFCMSPointer cms = cmsManager.getCurrentCMS();
 
-    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT,
-                                pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
     fontCache.setDocument(pdf::PDFModifiedDocument(&document, &optionalContentActivity));
     fontCache.setCacheShrinkEnabled(nullptr, false);
 
@@ -81,10 +81,12 @@ int PDFToolRecognizeText::execute(const PDFToolOptions& options)
     pdf::PDFRecognizeText recognizer(&document, &fontCache, cms.data(), &optionalContentActivity, &meshQualitySettings);
 
     QString errorMessage;
-    std::vector<pdf::PDFInteger> pages = options.getPageRange(document.getCatalog()->getPageCount(), errorMessage, false);
+    std::vector<pdf::PDFInteger> pages =
+        options.getPageRange(document.getCatalog()->getPageCount(), errorMessage, false);
     if (!errorMessage.isEmpty())
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page range: %1").arg(errorMessage), options.outputCodec);
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid page range: %1").arg(errorMessage),
+                               options.outputCodec);
         return ErrorInvalidArguments;
     }
 
@@ -107,9 +109,12 @@ int PDFToolRecognizeText::execute(const PDFToolOptions& options)
             formatter.writeText("page", QString::number(object.page));
             formatter.writeText("index", QString::number(object.index));
             formatter.writeText("type", object.type);
-            formatter.writeText("bbox", QStringLiteral("%1 %2 %3 %4")
-                                        .arg(object.bbox.x()).arg(object.bbox.y())
-                                        .arg(object.bbox.width()).arg(object.bbox.height()));
+            formatter.writeText("bbox",
+                                QStringLiteral("%1 %2 %3 %4")
+                                    .arg(object.bbox.x())
+                                    .arg(object.bbox.y())
+                                    .arg(object.bbox.width())
+                                    .arg(object.bbox.height()));
             if (!object.text.isEmpty())
             {
                 formatter.writeText("text", object.text);
@@ -134,4 +139,4 @@ PDFToolAbstractApplication::Options PDFToolRecognizeText::getOptionsFlags() cons
     return ConsoleFormat | OpenDocument | PageSelector;
 }
 
-}   // namespace pdftool
+} // namespace pdftool
