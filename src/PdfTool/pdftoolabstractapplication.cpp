@@ -211,6 +211,9 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("y", "Y position of the text baseline in PDF points.", "number"));
         parser->addOption(QCommandLineOption("text", "Text to add.", "text"));
         parser->addOption(QCommandLineOption("size", "Font size in points (default 12).", "number"));
+        parser->addOption(QCommandLineOption("rtl", "Use the RTL pipeline (bidi + HarfBuzz shaping + font embedding)."));
+        parser->addOption(QCommandLineOption("font", "TTF font file for RTL text.", "file"));
+        parser->addOption(QCommandLineOption("lang", "Language tag for RTL text: fa, ar, he, ur.", "tag"));
     }
 
     if (optionFlags.testFlag(SignatureVerification))
@@ -505,6 +508,9 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.addText = parser->value("text");
         options.addTextFontSize = parser->value("size");
         options.addTextOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+        options.addTextRTL = parser->isSet("rtl");
+        options.addTextFont = parser->value("font");
+        options.addTextLanguage = parser->value("lang");
     }
 
     if (optionFlags.testFlag(Separate))

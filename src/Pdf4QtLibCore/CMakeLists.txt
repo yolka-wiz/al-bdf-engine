@@ -164,6 +164,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfpagecontenteditorprocessor.cpp
     sources/pdfrecognizetext.h
     sources/pdfrecognizetext.cpp
+    sources/pdfrtltextengine.h
+    sources/pdfrtltextengine.cpp
     sources/pdfpagecontenteditorcontentstreambuilder.h
     sources/pdfpagecontenteditorcontentstreambuilder.cpp
     sources/pdfeditorfallbackfont.h
@@ -202,6 +204,7 @@ target_include_directories(Pdf4QtLibCore INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/s
 target_include_directories(Pdf4QtLibCore PUBLIC ${CMAKE_BINARY_DIR}/${INSTALL_INCLUDEDIR})
 
 target_link_libraries(Pdf4QtLibCore PRIVATE blend2d::blend2d)
+target_link_libraries(Pdf4QtLibCore PRIVATE harfbuzz::harfbuzz PkgConfig::FRIBIDI)
 
 set_target_properties(Pdf4QtLibCore PROPERTIES
                       VERSION ${PDF4QT_VERSION}
