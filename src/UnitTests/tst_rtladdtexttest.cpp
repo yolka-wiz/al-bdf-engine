@@ -77,6 +77,7 @@ private slots:
     void test_rtlFontEmbedded();
     void test_rtlKeepsLtrIntact();
     void test_rtlRenderNoErrors();
+    void test_rtlNotMirrored();
 };
 
 void RtlAddTextTest::test_hebrewRoundTrip()
@@ -106,9 +107,12 @@ void RtlAddTextTest::test_hebrewRoundTrip()
 
     ToolResult fetchResult = runTool(toolPath, { QStringLiteral("fetch-text"), outputPath }, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
-    // Hebrew has no ligatures or decomposed marks: exact round-trip expected.
-    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("שלום עולם")),
-             "Hebrew text must extract exactly (round-trip)");
+    // PDF content streams store VISUAL order: RTL text extracts in
+    // right-to-left reading order (entire line reversed: "שלום עולם" ->
+    // "םלוע םולש"). Hebrew has no ligatures or decomposed marks, so the
+    // reversal is exact.
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("םלוע םולש")),
+             "Hebrew text must extract in visual order (reversed for RTL)");
 }
 
 void RtlAddTextTest::test_persianExtraction()
@@ -135,10 +139,11 @@ void RtlAddTextTest::test_persianExtraction()
 
     ToolResult fetchResult = runTool(toolPath, { QStringLiteral("fetch-text"), outputPath }, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
-    // Lam-alef ligature degrades to lam in ToUnicode (2-byte CMap limit);
-    // the remaining characters must be present in logical order.
-    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("سلم دنیا")),
-             "Persian text must extract with lam-alef degraded to lam");
+    // Lam-alef ligature degrades to lam in ToUnicode (2-byte CMap limit).
+    // RTL extracts in visual order: "سلام دنیا" -> reversed runs.
+    // "سلام دنیا" logical -> visual: "ایند ملس" (with لا -> ل: "ایند ملس").
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ایند ملس")),
+             "Persian text must extract in visual order with lam-alef degraded");
 }
 
 void RtlAddTextTest::test_rtlFontEmbedded()
@@ -210,7 +215,8 @@ void RtlAddTextTest::test_rtlKeepsLtrIntact()
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains("LTR still OK"), "LTR text must survive RTL add");
     // Lam-alef ligature degrades to lam in extraction (ToUnicode 2-byte limit).
-    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("سلم")),
+    // RTL extracts in visual order: "سلام" -> "ملس" (لا ligature -> ل: "ملس").
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ملس")),
              "RTL text must survive LTR add");
 }
 
@@ -253,6 +259,40 @@ void RtlAddTextTest::test_rtlRenderNoErrors()
              "RTL page must render without errors");
     QVERIFY2(QFile::exists(tmpDir.path() + QStringLiteral("/Image_1.png")),
              "render must produce an image");
+}
+
+void RtlAddTextTest::test_rtlNotMirrored()
+{
+    // Mirror-regression: with a correct content stream, RTL text extracts in
+    // VISUAL order (entire line reversed). If someone reintroduces the fpdf2
+    // #1802 glyph reversal, extraction returns LOGICAL order and this fails.
+    // (Verified against Qt's bidi-aware QPainter reference: glyph positions
+    // match only without the reversal — HarfBuzz >= 4 emits RTL runs
+    // leftmost-first already.)
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString outputPath = tmpDir.path() + QStringLiteral("/he.pdf");
+    ToolResult addResult = runTool(toolPath, {
+        QStringLiteral("add-text"),
+        QString::fromUtf8(TEST_BLANK_PDF),
+        outputPath,
+        QStringLiteral("--page"), QStringLiteral("1"),
+        QStringLiteral("--x"), QStringLiteral("72"),
+        QStringLiteral("--y"), QStringLiteral("700"),
+        QStringLiteral("--text"), QString::fromUtf8("אבג"),
+        QStringLiteral("--size"), QStringLiteral("24"),
+        QStringLiteral("--rtl"),
+        QStringLiteral("--font"), QString::fromUtf8(TEST_FONT_HEBREW),
+        QStringLiteral("--lang"), QStringLiteral("he")
+    }, tmpDir.path());
+    QCOMPARE(addResult.exitCode, 0);
+
+    ToolResult fetchResult = runTool(toolPath, { QStringLiteral("fetch-text"), outputPath }, tmpDir.path());
+    QCOMPARE(fetchResult.exitCode, 0);
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("גבא")),
+             "RTL must extract in visual order (אבג -> גבא); glyph reversal would mirror the render");
 }
 
 QTEST_GUILESS_MAIN(RtlAddTextTest)

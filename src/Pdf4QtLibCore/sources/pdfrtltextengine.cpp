@@ -336,15 +336,14 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         }
 
         // ------------------------------------------------------------------
-        // 4. THE REVERSAL RULE (fpdf2 issue #1802): HarfBuzz emits RTL runs
-        //    in visual order (rightmost glyph first). PDF Tj places the first
-        //    code at the leftmost position, which would mirror the word.
-        //    Reverse to leftmost-first for correct rendering.
+        // RTL ordering: HarfBuzz (>= 4) emits RTL buffers in VISUAL order
+        // already, starting with the LEFTMOST glyph (verified empirically with
+        // hb 14.2.1: glyph[0].cluster == last logical char). PDF Tj draws the
+        // first code at the current point and advances right, which matches
+        // leftmost-first visual order — so NO reversal is needed. (The fpdf2
+        // #1802 reversal applies to fpdf2's own buffer setup, not ours;
+        // reversing here would mirror the text.)
         // ------------------------------------------------------------------
-        if (run.isRTL)
-        {
-            std::reverse(shapedRun.glyphs.begin(), shapedRun.glyphs.end());
-        }
 
         hb_buffer_destroy(buffer);
         shapedRuns.push_back(std::move(shapedRun));
