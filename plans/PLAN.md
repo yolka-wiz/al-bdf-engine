@@ -90,10 +90,10 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - [x] **Exit:** search finds RTL strings in our own add-text output (foreign-PDF pass = fetch-text normalization, same engine) — `d516e4e`
 
 ### M6 — Test hardening + CI (test-agent, parallel from M2)
-- [ ] Golden-image harness (deterministic render diff)
-- [ ] RTL corpus fixtures committed
-- [ ] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate
-- **Exit:** CI green on bare container
+- [x] Golden-image harness (deterministic render diff) — earlier
+- [x] RTL corpus fixtures committed — earlier (blank.pdf + fonts + README)
+- [x] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate — `f3d20e7`, `c433dfe`
+- [x] **Exit:** CI green on bare container — `ci/run-ci.sh` all-green incl. ASAN 10/10
 
 ### M7 — Polish & release (all agents)
 - [ ] CLI docs (`--help` complete, man page), deterministic saves
