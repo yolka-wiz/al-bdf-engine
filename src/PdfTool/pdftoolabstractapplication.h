@@ -177,6 +177,14 @@ struct PDFToolOptions
     bool deleteObjectList = false;  ///< List objects instead of deleting
     QString deleteObjectOutputDocument; ///< Output document filename
 
+    // For option 'AddText'
+    QString addTextPage;            ///< Page number (1-based)
+    QString addTextX;               ///< X position in PDF points
+    QString addTextY;               ///< Y position in PDF points
+    QString addText;                ///< Text to add
+    QString addTextFontSize;        ///< Font size
+    QString addTextOutputDocument;  ///< Output document filename
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -272,6 +280,7 @@ public:
         Diff                            = 0x01000000,       ///< Diff settings (compare documents)
         Redact                          = 0x02000000,       ///< Settings for Redact tool
         DeleteObject                    = 0x04000000,       ///< Settings for DeleteObject tool
+        AddText                         = 0x08000000,       ///< Settings for AddText tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 
