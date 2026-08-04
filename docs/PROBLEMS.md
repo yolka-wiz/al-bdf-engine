@@ -41,13 +41,18 @@ an agent must know them before "fixing" extraction and breaking search.
 | P1 | Ligatures degrade in extraction | `ToUnicode` CMap destinations are one UTF-16 unit; a lam-alef ligature maps to its first letter | `fetch-text` shows `ل` where the visual glyph is `لا` | `/ActualText` carries exact logical text; search works because the normalizer collapses lam-alef |
 | P2 | Decomposed marks duplicate base letter | Arabic yeh (U+064A) decomposes into base + dot; both glyphs share the base's cluster | extraction shows `علييكم` (double ي) for `عليكم` | Accepted trade-off (matches fpdf2); `/ActualText` is exact |
 | P3 | Vertical mark offsets dropped | TJ spacing can't express y-offset; zero-width marks emit inline at baseline | diacritics render at baseline, not above the letter | Documented v1 limitation; needs GPOS-to-Tm or anchor machinery to fix |
+| P4 | Foreign PDFs with broken ToUnicode (glyphs → C0 control chars U+0001/U+0002) break add-text/delete-object | content editor serializes content streams through XML; QXmlStreamReader rejects control chars → "Invalid XML text" | pages 1/2/10 of Elsevier 2025-2.pdf failed add-text | Fixed `0ba70c1`: sanitize invalid XML chars (→ U+FFFD) in `createItemsAsText`; glyphs intact in PDF |
 
 **Design decision:** these are intentional. The RTL engine prioritizes (1) correct
 search and (2) spec-valid PDF over perfect glyph-positioning in v1.
 
 ### RTL rendering limitations
 
-- **R#1** — RTL font is merged into page resources as key **F2** (original F1 untouched). If a page already has `F2`, collision risk. Fine for v1.
+- **R#1** — RTL font is merged into page resources under a **free F<N> key** (was
+  hardcoded F2 — fixed `0ba70c1`). The key scan and the font merge both resolve
+  INDIRECT `/Resources` references (e.g. `/Resources 29 0 R`); real-world PDFs use
+  arbitrary font keys (F1/F2/F3/...) and indirect resources. **Verified against
+  318.pdf** (Persian financial doc): RTL font lands at F4, original F1/F2/F3 intact.
 - **R#2** — HB≥4 emits RTL runs **leftmost-first**; the engine does NOT reverse glyphs. Re-applying the fpdf2 #1802 reversal *mirrors* the text (fixed in `23dc377`, regression-tested). Do not "fix" this.
 - **R#3** — Arabic presentation-form shaping in `fribidi_log2vis` (both system and vcpkg 1.0.16) requires a **second NFKC pass after inversion** in search. Removing it breaks Arabic search.
 
