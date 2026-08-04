@@ -118,6 +118,32 @@ add_test(UnitTestsAddText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTe
 
 add_dependencies(UnitTestsAddText PdfTool)
 
+# RTL add-text integration test: runs PdfTool with --rtl against the blank
+# fixture and the bundled OFL fonts (Vazirmatn / Noto Naskh Arabic / Noto Sans
+# Hebrew). The fonts are MIT/OFL permissive; see src/tests/fonts/README.
+add_executable(UnitTestsRtlAddText
+	tst_rtladdtexttest.cpp
+)
+
+target_link_libraries(UnitTestsRtlAddText PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsRtlAddText PRIVATE
+    TEST_BLANK_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/blank.pdf"
+    TEST_FONT_PERSIAN="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/Vazirmatn-Regular.ttf"
+    TEST_FONT_ARABIC="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/NotoNaskhArabic-Regular.ttf"
+    TEST_FONT_HEBREW="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/NotoSansHebrew-Regular.ttf"
+)
+
+set_target_properties(UnitTestsRtlAddText PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsRtlAddText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRtlAddText")
+
+add_dependencies(UnitTestsRtlAddText PdfTool)
+
 # Golden-image regression harness: renders src/tests/fixtures/*.pdf with
 # PdfTool render (72 dpi, PNG) and compares SHA-256 against the committed
 # goldens in src/tests/golden/. See tst_goldentest.cpp for details.

@@ -32,7 +32,11 @@
 #include "pdfoptionalcontent.h"
 #include "pdfpagecontenteditorcontentstreambuilder.h"
 #include "pdfpagecontenteditorprocessor.h"
+#include "pdfrtltextengine.h"
 #include "pdfstreamfilters.h"
+
+#include <QFile>
+#include <QFileInfo>
 
 namespace pdftool
 {
@@ -165,6 +169,164 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     const pdf::PDFPage* page = document.getCatalog()->getPage(pageIndex);
     Q_ASSERT(page);
 
+    // ------------------------------------------------------------------
+    // RTL path (--rtl): FriBidi bidi + HarfBuzz shaping + embedded Type0
+    // font + ToUnicode + /ActualText. Produces the font dict and the content
+    // fragment; the fragment is written as an additional content stream of
+    // the page (Contents becomes an array of the original + the new one).
+    // ------------------------------------------------------------------
+    if (options.addTextRTL)
+    {
+        if (options.addTextFont.isEmpty())
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("RTL text requires --font <ttf-file>."), options.outputCodec);
+            return ErrorInvalidArguments;
+        }
+        QFile fontFile(options.addTextFont);
+        if (!fontFile.open(QIODevice::ReadOnly))
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Cannot open font file '%1'.").arg(options.addTextFont), options.outputCodec);
+            return ErrorInvalidArguments;
+        }
+        const QByteArray fontData = fontFile.readAll();
+        const QString language = options.addTextLanguage.isEmpty() ? QStringLiteral("fa") : options.addTextLanguage;
+
+        pdf::PDFRTLTextEngine::Settings rtlSettings;
+        rtlSettings.text = options.addText;
+        rtlSettings.language = language;
+        rtlSettings.fontSize = fontSize;
+        rtlSettings.x = x;
+        rtlSettings.y = y;
+        rtlSettings.fontData = fontData;
+        rtlSettings.fontFamily = QFileInfo(options.addTextFont).completeBaseName();
+
+        const QByteArray fontKey = "F2";
+        pdf::PDFRTLTextEngine::Result rtlResult = pdf::PDFRTLTextEngine::create(rtlSettings, fontKey);
+        if (!rtlResult.errors.isEmpty())
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("RTL text shaping failed: %1")
+                                           .arg(rtlResult.errors.join(QStringLiteral(", "))), options.outputCodec);
+            return ErrorFailedWriteToFile;
+        }
+
+        pdf::PDFDocumentModifier modifier(&document);
+        pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+
+        pdf::PDFDictionary fontDictionary = rtlResult.fontDictionary;
+        builder->replaceObjectsByReferences(fontDictionary);
+
+        // New content stream for the shaped text.
+        pdf::PDFArray filters;
+        filters.appendItem(pdf::PDFObject::createName("FlateDecode"));
+        const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(rtlResult.contentFragment);
+        pdf::PDFDictionary contentDictionary;
+        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"), pdf::PDFObject::createInteger(compressedData.size()));
+        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"), pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
+        pdf::PDFObject contentObject = pdf::PDFObject::createStream(std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
+
+        // Merge the font into the page Resources (KEEPING the existing font
+        // entries — the RTL font gets its own key F2 so original text with F1
+        // stays intact) and append the new content stream to Contents.
+        pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
+
+        pdf::PDFObjectFactory pageFactory;
+        pageFactory.beginDictionary();
+        pageFactory.beginDictionaryItem("Resources");
+        pageFactory.beginDictionary();
+
+        // Existing font dictionary, if any.
+        pdf::PDFDictionary mergedFontDict = fontDictionary;
+        if (const pdf::PDFDictionary* pageDict = pageObject.getDictionary())
+        {
+            const pdf::PDFObject& resourcesObject = pageDict->get("Resources");
+            if (resourcesObject.isDictionary())
+            {
+                const pdf::PDFDictionary* resourcesDict = resourcesObject.getDictionary();
+                const pdf::PDFObject& existingFontsObject = resourcesDict->get("Font");
+                if (existingFontsObject.isDictionary())
+                {
+                    const pdf::PDFDictionary* existingFontsDict = existingFontsObject.getDictionary();
+                    for (size_t i = 0; i < existingFontsDict->getCount(); ++i)
+                    {
+                        const QByteArray key = existingFontsDict->getKey(i).getString();
+                        if (!mergedFontDict.hasKey(key))
+                        {
+                            mergedFontDict.addEntry(pdf::PDFInplaceOrMemoryString(key),
+                                                    pdf::PDFObject(existingFontsDict->getValue(i)));
+                        }
+                    }
+                }
+            }
+        }
+        pageFactory.beginDictionaryItem("Font");
+        pageFactory << mergedFontDict;
+        pageFactory.endDictionaryItem();
+
+        pageFactory.endDictionary();
+        pageFactory.endDictionaryItem();
+
+        // Append the RTL content stream: Contents = [existing, new].
+        pageFactory.beginDictionaryItem("Contents");
+        pageFactory.beginArray();
+        const pdf::PDFDictionary* pageDict = pageObject.getDictionary();
+        const pdf::PDFObject existingContents = pageDict ? pageDict->get("Contents") : pdf::PDFObject();
+        if (existingContents.isReference())
+        {
+            pageFactory << existingContents;
+        }
+        else if (existingContents.isStream())
+        {
+            pageFactory << builder->addObject(existingContents);
+        }
+        else if (existingContents.isArray())
+        {
+            const pdf::PDFArray* contentsArray = existingContents.getArray();
+            if (contentsArray)
+            {
+                for (size_t i = 0; i < contentsArray->getCount(); ++i)
+                {
+                    pageFactory << contentsArray->getItem(i);
+                }
+            }
+        }
+        pageFactory << builder->addObject(std::move(contentObject));
+        pageFactory.endArray();
+        pageFactory.endDictionaryItem();
+
+        pageFactory.endDictionary();
+
+        pageObject = pdf::PDFObjectManipulator::merge(pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
+        builder->setObject(page->getPageReference(), std::move(pageObject));
+
+        modifier.markPageContentsChanged();
+        if (!modifier.finalize())
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."), options.outputCodec);
+            return ErrorFailedWriteToFile;
+        }
+
+        pdf::PDFDocumentWriter writer(nullptr);
+        pdf::PDFOperationResult writeResult = writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
+        if (!writeResult)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to write document: %1")
+                                           .arg(writeResult.getErrorMessage()), options.outputCodec);
+            return ErrorFailedWriteToFile;
+        }
+
+        PDFOutputFormatter formatter(options.outputStyle);
+        formatter.beginDocument("add-text", PDFToolTranslationContext::tr("Add text"));
+        formatter.writeText("added", PDFToolTranslationContext::tr("Added RTL text '%1' to page %2 at (%3, %4).")
+                                       .arg(options.addText).arg(pageNumber).arg(x).arg(y));
+        formatter.endDocument();
+        PDFConsole::writeText(formatter.getString(), options.outputCodec);
+
+        return ExitSuccess;
+    }
+
+    // ------------------------------------------------------------------
+    // LTR path (default): standard Helvetica, no embedding.
+    // ------------------------------------------------------------------
     // Parse the page content into edited elements, keep them all.
     pdf::PDFPageContentEditorProcessor processor(page, &document, &fontCache, cms.data(), &optionalContentActivity, QTransform(), meshQualitySettings);
     processor.processContents();
