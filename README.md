@@ -15,6 +15,7 @@ The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text w
   - [recognize-text](#recognize-text)
   - [delete-object](#delete-object)
   - [search-text (RTL-aware)](#search-text)
+  - [Forms & signatures](#forms--signatures)
   - [Other commands](#other-commands)
 - [For AI agents contributing](#for-ai-agents-contributing)
   - [Start here](#start-here-required-reading)
@@ -110,6 +111,29 @@ Normalization strips tashkeel/ZWNJ/ZWJ, folds presentation forms & lam-alef, uni
 ### Other commands
 
 `render`, `fetch-text`, `info`, `info-fonts`, `info-inks`, `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `xml`, `statistics`, `diff`, `attachments`, `cert-store`, `verify-signatures`, `remove-external-links`, `benchmark`, … — run `PdfTool help` for the full list.
+
+### Forms & signatures
+
+```bash
+PdfTool form-list in.pdf                          # list interactive form fields (name, type, value, page, rect)
+PdfTool form-fill in.pdf out.pdf \
+  --field name --value "Ali" --field agree --value On   # fill fields, write new doc
+PdfTool sign in.pdf signed.pdf \
+  --cert mykey.p12 --password secret --reason "approved" # apply PKCS#7 digital signature
+PdfTool sign in.pdf signed.pdf --cert mykey.p12 --password secret \
+  --page 1 --rect-x 100 --rect-y 100 --rect-w 200 --rect-h 50   # visible signature widget
+PdfTool verify-signatures signed.pdf                # validate signatures (upstream tool)
+```
+
+`form-list` walks the AcroForm tree and reports every field (text / button /
+choice / signature) with its current value and widget location. `form-fill`
+sets values through PDF4QT's `PDFFormField::setValue` (appearance streams are
+regenerated) and writes a new document. `sign` implements the standard
+PAdES-style byte-range flow: it reserves the signature contents with a
+same-size probe, patches `/ByteRange` in place, signs the covered ranges with
+OpenSSL `PKCS7_sign` (adbe.pkcs7.detached), and writes the final signature
+back. `verify-signatures` then validates it — and detects any tampering of the
+signed bytes.
 
 ---
 

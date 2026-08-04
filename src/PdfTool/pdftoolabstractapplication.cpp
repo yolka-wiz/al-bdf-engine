@@ -212,6 +212,29 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("redact-copy-outline", "Copy source outline into the redacted document."));
     }
 
+    if (optionFlags.testFlag(FormFill))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("field", "Field fully qualified name to set (repeatable).", "name"));
+        parser->addOption(
+            QCommandLineOption("value", "Value for the field (repeatable, paired with --field).", "value"));
+    }
+
+    if (optionFlags.testFlag(Sign))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("cert", "PKCS#12 certificate file (.p12/.pfx).", "file"));
+        parser->addOption(QCommandLineOption("password", "Private key password.", "password"));
+        parser->addOption(QCommandLineOption("reason", "Reason for signing (optional).", "text"));
+        parser->addOption(QCommandLineOption("contact", "Contact info (optional).", "text"));
+        parser->addOption(QCommandLineOption(
+            "page", "Page number (1-based) for a visible signature widget (default: invisible).", "number"));
+        parser->addOption(QCommandLineOption("rect-x", "Visible widget left (PDF points).", "number"));
+        parser->addOption(QCommandLineOption("rect-y", "Visible widget top (PDF points).", "number"));
+        parser->addOption(QCommandLineOption("rect-w", "Visible widget width (PDF points).", "number"));
+        parser->addOption(QCommandLineOption("rect-h", "Visible widget height (PDF points).", "number"));
+    }
+
     if (optionFlags.testFlag(DeleteObject))
     {
         parser->addPositionalArgument("outputdocument", "Output document filename.");
@@ -633,6 +656,27 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.deleteObjectIndex = parser->value("index");
         options.deleteObjectList = parser->isSet("list");
         options.deleteObjectOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(FormFill))
+    {
+        options.formFillFields = parser->values("field");
+        options.formFillValues = parser->values("value");
+        options.formFillOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(Sign))
+    {
+        options.signCertificateFile = parser->value("cert");
+        options.signPassword = parser->value("password");
+        options.signReason = parser->value("reason");
+        options.signContactInfo = parser->value("contact");
+        options.signPage = parser->value("page");
+        options.signX = parser->value("rect-x");
+        options.signY = parser->value("rect-y");
+        options.signW = parser->value("rect-w");
+        options.signH = parser->value("rect-h");
+        options.signOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
     }
 
     if (optionFlags.testFlag(AddText))

@@ -195,6 +195,25 @@ add_dependencies(UnitTestsGolden PdfTool)
 add_test(NAME UnitTestsGolden COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsGolden")
 set_tests_properties(UnitTestsGolden PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# Forms + signatures integration test: runs form-list/form-fill/sign/verify
+# against a synthetic AcroForm fixture and a generated PKCS#12 certificate.
+add_executable(UnitTestsFormSignature
+	tst_formsignaturetest.cpp
+)
+
+target_link_libraries(UnitTestsFormSignature PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsFormSignature PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsFormSignature COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsFormSignature")
+set_tests_properties(UnitTestsFormSignature PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsFormSignature PdfTool)
+
 # CLI smoke test: exercises fetch-text/render/info/unite on the fixtures
 # (and recognize-text/delete-object when present) and asserts invariants.
 find_program(BASH_PROGRAM bash)
