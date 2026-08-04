@@ -133,6 +133,83 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
         }
     }
 
+    // Collapse duplicate yeh (U+06CC/U+064A) from the decomposed-mark
+    // artifact: HarfBuzz splits Arabic yeh into base + dot mark; both glyphs
+    // share the base's cluster, so the ToUnicode CMap emits the yeh twice
+    // (known P2 limitation). A final yeh therefore extracts as "یی", which
+    // breaks full-phrase search ("نهایی" -> visual "یاهن" won't match
+    // extracted "ییاهن"). The PDF text flow may also insert a phantom space
+    // between the zero-width duplicate glyph and its neighbour (gap > 1.2x
+    // advance heuristic), producing "ی ی" or "ی اهن". Collapse:
+    //   - consecutive duplicate yeh:  یی -> ی
+    //   - yeh + phantom space + yeh:  ی ی -> ی  (zero-width duplicate)
+    //   - yeh + phantom space + letter: ی ا -> یا  (space from zero-width gap)
+    // The last rule is safe for search: a real word space in Persian is
+    // always followed by a word start, and yeh-space-letter ("ی ا") does not
+    // occur in genuine text (the yeh would join the next word as a suffix).
+    // The charMap keeps the LAST original index so geometry still points at
+    // the real glyph.
+    if (options.collapseDuplicateYeh)
+    {
+        auto isYeh = [](char32_t c) { return c == 0x06CC || c == 0x064A; };
+
+        QString collapsed;
+        collapsed.reserve(result.size());
+        std::vector<int> collapsedMap;
+        if (charMap)
+        {
+            collapsedMap.reserve(charMap->size());
+        }
+        for (int i = 0; i < result.size(); ++i)
+        {
+            const char32_t c = result.at(i).unicode();
+            const char32_t prev = collapsed.isEmpty() ? char32_t(0) : collapsed.back().unicode();
+
+            // یی -> ی (duplicate from decomposition)
+            if (i > 0 && isYeh(c) && isYeh(prev))
+            {
+                if (charMap)
+                {
+                    collapsedMap.back() = charMap->at(i);
+                }
+                continue;
+            }
+
+            // ی [space] ی -> ی (zero-width duplicate + phantom space)
+            if (i > 1 && c == 0x0020 && isYeh(prev) && result.at(i - 2).unicode() == prev)
+            {
+                if (charMap)
+                {
+                    collapsedMap.back() = charMap->at(i);
+                }
+                continue;
+            }
+
+            // ی [space] <letter> -> ی<letter> (phantom space from zero-width gap)
+            if (i > 1 && c != 0x0020 && prev == 0x0020 && collapsed.size() >= 2 &&
+                isYeh(collapsed.at(collapsed.size() - 2).unicode()))
+            {
+                collapsed.chop(1); // remove the phantom space
+                if (charMap)
+                {
+                    collapsedMap.pop_back();
+                }
+            }
+
+            collapsed.append(result.at(i));
+            if (charMap)
+            {
+                collapsedMap.push_back(charMap->at(i));
+            }
+        }
+        result = collapsed;
+        if (charMap)
+        {
+            *charMap = std::move(collapsedMap);
+            Q_ASSERT(charMap->size() == result.size());
+        }
+    }
+
     if (charMap)
     {
         Q_ASSERT(charMap->size() == result.size());
