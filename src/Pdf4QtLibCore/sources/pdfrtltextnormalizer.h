@@ -44,6 +44,9 @@ namespace pdf
 ///   5. Unify Persian/Arabic-Indic digits with Western digits
 ///   6. Collapse lam-alef ligature (U+0644 U+0627) to a single lam — matches
 ///      PDFs whose ToUnicode degrades the ligature to lam (2-byte CMap limit)
+///   7. Collapse duplicate yeh (U+06CC/U+064A) produced by the decomposed-mark
+///      artifact (HarfBuzz splits yeh into base + dot; both map to the same
+///      ToUnicode char) — see P2 in docs/PROBLEMS.md
 ///
 /// The result is used for matching only; geometry maps back through the
 /// per-character original indices returned alongside.
@@ -52,11 +55,12 @@ class PDF4QTLIBCORESHARED_EXPORT PDFRTLTextNormalizer
 public:
     struct Options
     {
-        bool stripDiacritics = true;    ///< Remove tashkeel + tatweel
-        bool stripJoiners = true;       ///< Remove ZWNJ/ZWJ
-        bool unifyPersianArabic = true; ///< ي<->ی, ك<->ک, أ<->ا, ة<->ه ...
-        bool unifyDigits = true;        ///< ۰-۹/٠-٩ -> 0-9
-        bool collapseLamAlef = true;    ///< لا -> ل (ligature degradation)
+        bool stripDiacritics = true;      ///< Remove tashkeel + tatweel
+        bool stripJoiners = true;         ///< Remove ZWNJ/ZWJ
+        bool unifyPersianArabic = true;   ///< ي<->ی, ك<->ک, أ<->ا, ة<->ه ...
+        bool unifyDigits = true;          ///< ۰-۹/٠-٩ -> 0-9
+        bool collapseLamAlef = true;      ///< لا -> ل (ligature degradation)
+        bool collapseDuplicateYeh = true; ///< یی -> ی (decomposed-mark artifact)
     };
 
     /// Normalize \p text. Returns the normalized string and (optionally) a map
