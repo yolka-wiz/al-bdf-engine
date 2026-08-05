@@ -32,6 +32,7 @@ namespace pdf
 {
 
 class PDFDocument;
+class PDFDocumentTextFlow;
 
 /// Text search engine with RTL support (M5).
 ///
@@ -49,13 +50,21 @@ class PDFDocument;
 class PDF4QTLIBCORESHARED_EXPORT PDFTextSearchEngine
 {
 public:
+    struct ItemSpan
+    {
+        size_t itemIndex = 0;  ///< text-flow item index on the page
+        int charBegin = 0;     ///< first original char index in the item
+        int charEnd = 0;       ///< last original char index in the item (inclusive)
+    };
+
     struct Match
     {
         PDFInteger pageIndex = 0;     ///< 0-based page
-        size_t itemIndex = 0;         ///< text-flow item index on the page
+        size_t itemIndex = 0;         ///< text-flow item index on the page (first span)
         QString matchedText;          ///< original (un-normalized) text
         QRectF boundingRect;          ///< union of matched char rects (page coords)
         int normalizedQueryIndex = 0; ///< position in the visual query string
+        std::vector<ItemSpan> spans;  ///< item spans covered; empty => single-item match
     };
 
     struct Options
@@ -68,7 +77,7 @@ public:
         }
     };
 
-    /// Search \p query in pages [pageFirst, pageLast] (0-based, inclusive).
+    /// Search \\p query in pages [pageFirst, pageLast] (0-based, inclusive).
     std::vector<Match> search(const PDFDocument* document,
                               const QString& query,
                               PDFInteger pageFirst,
@@ -78,6 +87,14 @@ public:
     /// Search with default options.
     std::vector<Match>
     search(const PDFDocument* document, const QString& query, PDFInteger pageFirst, PDFInteger pageLast);
+
+    /// Search an already-extracted text flow (test seam; the CLI path builds
+    /// the flow from the document via search()).
+    std::vector<Match> searchFlow(const PDFDocumentTextFlow& flow,
+                                  const QString& query,
+                                  PDFInteger pageFirst,
+                                  PDFInteger pageLast,
+                                  const Options& options);
 
 private:
     /// Invert a logical query to visual order using FriBidi.

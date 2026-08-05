@@ -25,6 +25,9 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include "pdfdocumenttextflow.h"
+#include "pdftextsearchengine.h"
+
 class SearchTextTest : public QObject
 {
     Q_OBJECT
@@ -37,6 +40,8 @@ private slots:
     void test_tashkeelInsensitive();
     void test_mixedBidi();
     void test_noFalsePositive();
+    void test_crossItemPhrase();
+    void test_crossItemNoFalsePositive();
 
 private:
     struct ToolResult
@@ -314,6 +319,67 @@ void SearchTextTest::test_noFalsePositive()
     QCOMPARE(searchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(searchResult.stdoutData).contains(QStringLiteral("0\n")),
              "non-matching query must report 0 matches");
+}
+
+void SearchTextTest::test_crossItemPhrase()
+{
+    // S#1: a phrase split across two adjacent text-flow items must be found.
+    // The CLI/add-text path cannot produce a deterministic 2-item flow (the
+    // docstrum Layout algorithm merges adjacent runs on synthetic pages), so
+    // drive the engine's searchFlow() test seam directly with a hand-built
+    // flow: two RTL runs on the same line, word-sized gap (~11 pt at 24 pt).
+    //
+    // RTL visual order: "نهایی" renders LEFT (visual "ییاهن"), "تست" RIGHT.
+    // Left-to-right concatenation must reconstruct "ییاهن تست", which is the
+    // visual form of the logical query "تست نهایی".
+    pdf::PDFDocumentTextFlow flow;
+
+    pdf::PDFDocumentTextFlow::Item item1;
+    item1.pageIndex = 0;
+    item1.text = QString::fromUtf8("ییاهن");
+    item1.boundingRect = QRectF(72.0, 700.0, 67.25, 17.53);
+    item1.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item1);
+
+    pdf::PDFDocumentTextFlow::Item item2;
+    item2.pageIndex = 0;
+    item2.text = QString::fromUtf8("تست");
+    item2.boundingRect = QRectF(150.0, 700.0, 28.64, 17.06);
+    item2.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item2);
+
+    pdf::PDFTextSearchEngine engine;
+    const auto matches =
+        engine.searchFlow(flow, QString::fromUtf8("تست نهایی"), 0, 0, pdf::PDFTextSearchEngine::Options());
+    QCOMPARE(matches.size(), size_t(1));
+    QCOMPARE(matches.front().spans.size(), size_t(2));
+}
+
+void SearchTextTest::test_crossItemNoFalsePositive()
+{
+    // S#1 guard: far-apart items must NOT be joined into a false phrase match.
+    // Two LTR runs on the same line, 288 pt apart (a column gap, not a word
+    // space) — a naive space-join of every item would falsely match.
+    pdf::PDFDocumentTextFlow flow;
+
+    pdf::PDFDocumentTextFlow::Item item1;
+    item1.pageIndex = 0;
+    item1.text = QStringLiteral("hello");
+    item1.boundingRect = QRectF(72.0, 700.0, 40.0, 17.0);
+    item1.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item1);
+
+    pdf::PDFDocumentTextFlow::Item item2;
+    item2.pageIndex = 0;
+    item2.text = QStringLiteral("world");
+    item2.boundingRect = QRectF(400.0, 700.0, 50.0, 17.0);
+    item2.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item2);
+
+    pdf::PDFTextSearchEngine engine;
+    const auto matches =
+        engine.searchFlow(flow, QStringLiteral("hello world"), 0, 0, pdf::PDFTextSearchEngine::Options());
+    QCOMPARE(matches.size(), size_t(0));
 }
 
 QTEST_GUILESS_MAIN(SearchTextTest)
