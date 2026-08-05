@@ -559,10 +559,12 @@ void RtlAddTextTest::test_verticalMarkOffsets()
     QVERIFY2(!kasraMarkRows.isEmpty(), "the kasra mark must produce visible ink difference vs the plain base text");
 
     // (c) The kasra must render BELOW the base text (below the baseline).
-    // Base "بسم" spans rows 75..91 (baseline ~92); a correctly placed kasra
-    // (GPOS y_offset -335 font units -> ~3.9 pt below baseline) sits at rows
-    // ~96+. Today nothing renders below row 92 -> FAIL.
-    const int belowBandTop = kasraBaseBottom + 3;
+    // Base "بسم" spans rows 75..91 (baseline ~92) in the original calibration.
+    // Measured with the P6 glyph fix (2026-08-05): base bottom ~98..99, and
+    // with a -3.93 Ts rise the kasra ink (which hangs BELOW its glyph origin,
+    // ink box y -505..-236 font units) lands at rows ~99..102. The band is
+    // base bottom + 2 — the kasra must visibly clear the deepest base letter.
+    const int belowBandTop = kasraBaseBottom + 2;
     bool kasraInkBelow = false;
     for (int y : kasraMarkRows)
     {
