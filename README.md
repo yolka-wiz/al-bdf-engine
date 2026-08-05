@@ -56,6 +56,7 @@ docker run -it --rm -v $(pwd):/workspace/albdf -w /workspace/albdf albdf-dev
 # inside: cmake + build + test as above (toolchain already at /workspace/vcpkg)
 ```
 The Dockerfile installs Qt 6 + vcpkg deps + all tools, sets `QT_QPA_PLATFORM=offscreen`, and provides the `ci/run-ci.sh` gate.
+apt and PyPI are preconfigured to **Aliyun mirrors** (fast from Iran); vcpkg has no Aliyun mirror and stays on GitHub (shallow clone).
 
 ### Verify
 ```bash
