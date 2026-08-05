@@ -63,6 +63,8 @@ TASKS = [
     ("rtl-search", "Normalization: tashkeel, presentation forms, lam-alef, Persian/Arabic unification, digits, ZWNJ", 2, "2-3w", "rtl-agent", "done", "", "aa92bee"),
     ("rtl-search", "Bidi inversion of extracted visual-order text for search matching", 2, "2-3w", "rtl-agent", "done",
      "Pure-RTL = straight reversal; mixed lines need level-based run split.", "aa92bee"),
+    ("rtl-search", "S#1: cross-item phrase search via joined visual string + span mapping", 2, "2-3d", "rtl-agent", "done",
+     "Joined per-page visual string (line-cluster + x-sort, word-gap separator); searchFlow() test seam; CLI item col first+last.", "6b26d14"),
     ("tests", "Golden-image harness (deterministic render diff)", 1, "1-2w", "test-agent", "done", "", "8b9d5bd"),
     ("tests", "RTL corpus: Persian/Arabic/Hebrew fixtures incl. ZWNJ, lam-alef, tashkeel, digits", 2, "1-2w", "test-agent", "done", "", "aa92bee"),
     ("tests", "CI: offscreen ctest + ASAN job", 2, "1w", "test-agent", "done", "", "dc45fcb"),

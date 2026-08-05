@@ -137,6 +137,11 @@ PDF content streams store text in VISUAL order; the engine inverts the
 logical query to visual order (FriBidi) before matching, then maps matched
 characters back to their bounding rects. Output: a table of page, item,
 bounding box (x y w h, PDF points), and matched text.
+.PP
+A phrase split across two adjacent text-flow items (e.g. after re-flowing
+an RTL add on a dense page) is matched as one occurrence; the Item column
+then shows the span range, e.g. \fB2+3\fR covers items 2 and 3. Matches
+never span lines or columns.
 .SS form-list
 List interactive form (AcroForm) fields.
 .PP
