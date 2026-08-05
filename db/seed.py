@@ -73,8 +73,10 @@ TASKS = [
     ("forms-signatures", "sign: PKCS#7 detached signature, PAdES byte-range flow (invisible/visible)", 1, "3-5d", "core-agent", "done", "", "02b8719"),
     ("forms-signatures", "UnitTestsFormSignature: form-list/form-fill/sign/verify/tamper round-trip", 1, "1-2d", "test-agent", "done",
      "Suite now 11/11.", "6a2a325"),
-    ("rtl-writer", "P3: vertical mark offsets via per-glyph Ts (text rise) emission", 2, "M", "rtl-agent", "open",
-     "Design: plans/P3-vertical-mark-offsets.md. Emit Ts around zero-width GPOS marks so diacritics render above baseline. RED pixel-probe test in tst_rtladdtexttest.cpp.", ""),
+    ("rtl-writer", "P3: vertical mark offsets via per-glyph Ts (text rise) emission", 2, "M", "rtl-agent", "done",
+     "Design: plans/P3-vertical-mark-offsets.md. Emit Ts around zero-width GPOS marks so diacritics render above baseline. RED pixel-probe test in tst_rtladdtexttest.cpp. Fixed 109a4af (Ts emission, sign from mark ink position) + 9a4587d (flow phantom-space guard) + 4ed7ab2 (kasra band calibration). Blocked by P6 (74a1166).", "109a4af"),
+    ("rtl-writer", "P6: emit spec-valid 65536-entry CIDToGIDMap stream (PDF 32000-1 9.7.4.3) — short array renders wrong glyphs in all strict renderers", 1, "M", "rtl-agent", "done",
+     "Verified with Ghostscript 2026-08-05: short array [0,681]/[0,1173,728,1266] falls back to Identity; PDF4QT reads streams only (pdffont.cpp isStream). Blocks P3 verification. Fixed 74a1166: Flate stream, code->gid, unused=0.", "74a1166"),
 ]
 
 DECISIONS = [
