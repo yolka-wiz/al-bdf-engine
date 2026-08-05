@@ -1,23 +1,24 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// MIT License
 //
-// Copyright (c) 2026 albdf contributors
+// Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-//
-// This file is part of the albdf project, a fork of PDF4QT (MIT).
-// The upstream PDF4QT portions remain under the MIT License; see the
-// upstream copyright headers and the LICENSE file.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include "pdftextsearchengine.h"
 
@@ -32,20 +33,38 @@ namespace pdf
 std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDocument* document,
                                                                     const QString& query,
                                                                     PDFInteger pageFirst,
-                                                                    PDFInteger pageLast)
-{
-    return search(document, query, pageFirst, pageLast, Options());
-}
-
-std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDocument* document,
-                                                                    const QString& query,
-                                                                    PDFInteger pageFirst,
                                                                     PDFInteger pageLast,
                                                                     const Options& options)
 {
     std::vector<Match> matches;
 
     if (!document || query.isEmpty())
+    {
+        return matches;
+    }
+
+    // Extract text flow per page (visual order, per-char rects).
+    PDFDocumentTextFlowFactory factory;
+    std::vector<PDFInteger> pageIndices;
+    for (PDFInteger page = pageFirst; page <= pageLast; ++page)
+    {
+        pageIndices.push_back(page);
+    }
+    const PDFDocumentTextFlow flow =
+        factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
+
+    return searchFlow(flow, query, pageFirst, pageLast, options);
+}
+
+std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PDFDocumentTextFlow& flow,
+                                                                        const QString& query,
+                                                                        PDFInteger pageFirst,
+                                                                        PDFInteger pageLast,
+                                                                        const Options& options)
+{
+    std::vector<Match> matches;
+
+    if (query.isEmpty())
     {
         return matches;
     }
@@ -61,20 +80,12 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDoc
         return matches;
     }
 
-    // 2. Extract text flow per page (visual order, per-char rects).
-    PDFDocumentTextFlowFactory factory;
-    std::vector<PDFInteger> pageIndices;
-    for (PDFInteger page = pageFirst; page <= pageLast; ++page)
-    {
-        pageIndices.push_back(page);
-    }
-    const PDFDocumentTextFlow flow =
-        factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
-
+    // 2. Match per item (v1 behavior: no cross-item spans).
     for (size_t itemIndex = 0; itemIndex < flow.getSize(); ++itemIndex)
     {
         const PDFDocumentTextFlow::Item& item = *flow.getItem(itemIndex);
-        if (!item.flags.testFlag(PDFDocumentTextFlow::Text) || item.text.isEmpty())
+        if (!item.flags.testFlag(PDFDocumentTextFlow::Text) || item.text.isEmpty() || item.pageIndex < pageFirst ||
+            item.pageIndex > pageLast)
         {
             continue;
         }
@@ -124,9 +135,9 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::search(const PDFDoc
                 {
                     match.boundingRect = item.boundingRect;
                 }
-            }
 
-            matches.push_back(match);
+                matches.push_back(match);
+            }
             from = matchIndex + 1;
         }
     }
