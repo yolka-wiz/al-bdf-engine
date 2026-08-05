@@ -1,15 +1,15 @@
-# pdfedit dev container
+# albdf dev container
 #
-# Reproducible headless build/test environment for the pdfedit C++ project
-# (fork of PDF4QT: Pdf4QtLibCore + PdfTool + UnitTests). NO GUI — everything
+# Reproducible headless build/test environment for the albdf C++ project
+# (fork of PDF4QT: Pdf4QtLibCore + albdf + UnitTests). NO GUI — everything
 # runs with QT_QPA_PLATFORM=offscreen.
 #
-# Build:   docker build -t pdfedit-dev .
-# Run:     docker run -it --rm -v $(pwd):/workspace/pdfedit \
-#                     -w /workspace/pdfedit pdfedit-dev
+# Build:   docker build -t albdf-dev .
+# Run:     docker run -it --rm -v $(pwd):/workspace/albdf \
+#                     -w /workspace/albdf albdf-dev
 # Inside:  cd src && cmake ... && cmake --build build && bash ../ci/run-ci.sh
 #
-# The repo is NOT baked in — mount it at /workspace/pdfedit so edits on the
+# The repo is NOT baked in — mount it at /workspace/albdf so edits on the
 # host are live inside the container.
 
 FROM ubuntu:24.04
@@ -58,5 +58,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends ccache \
     && echo 'export QT_QPA_PLATFORM=offscreen' >> /root/.bashrc \
     && echo 'export VCPKG_ROOT=/workspace/vcpkg' >> /root/.bashrc
 
-WORKDIR /workspace/pdfedit
+WORKDIR /workspace/albdf
 CMD ["bash"]

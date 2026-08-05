@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
@@ -27,7 +27,7 @@
 
 /// Integration tests for the form-list / form-fill / sign commands.
 ///
-/// Runs the PdfTool binary against a synthetic AcroForm PDF generated in a
+/// Runs the albdf binary against a synthetic AcroForm PDF generated in a
 /// temporary directory, then verifies:
 ///   - form-list enumerates the fields with their values
 ///   - form-fill writes new values and form-list reads them back
@@ -126,7 +126,7 @@ void FormSignatureTest::initTestCase()
                    QStringLiteral("365"),
                    QStringLiteral("-nodes"),
                    QStringLiteral("-subj"),
-                   QStringLiteral("/CN=pdfedit test/O=pdfedit")});
+                   QStringLiteral("/CN=albdf test/O=albdf")});
     QVERIFY2(openssl.waitForFinished(30000), "openssl req failed");
     QVERIFY2(openssl.exitCode() == 0, qPrintable(openssl.readAllStandardError()));
 
@@ -166,7 +166,7 @@ FormSignatureTest::runTool(const QString& toolPath, const QStringList& arguments
 
 void FormSignatureTest::test_formList()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const ToolResult result = runTool(toolPath, {QStringLiteral("form-list"), m_formPdf}, m_tmpDir.path());
     QCOMPARE(result.exitCode, 0);
     QVERIFY(result.stdOut.contains(QStringLiteral("name")));
@@ -178,7 +178,7 @@ void FormSignatureTest::test_formList()
 
 void FormSignatureTest::test_formFill()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString filledPath = m_tmpDir.filePath(QStringLiteral("filled.pdf"));
     const ToolResult fillResult = runTool(toolPath,
                                           {QStringLiteral("form-fill"),
@@ -210,7 +210,7 @@ void FormSignatureTest::test_formFill()
 
 void FormSignatureTest::test_signAndVerify()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString signedPath = m_tmpDir.filePath(QStringLiteral("signed.pdf"));
     const ToolResult signResult = runTool(toolPath,
                                           {QStringLiteral("sign"),
@@ -231,12 +231,12 @@ void FormSignatureTest::test_signAndVerify()
     QCOMPARE(verifyResult.exitCode, 0);
     QVERIFY(verifyResult.stdOut.contains(QStringLiteral("Signature")));
     QVERIFY(verifyResult.stdOut.contains(QStringLiteral("OK")));
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("pdfedit test")));
+    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("albdf test")));
 }
 
 void FormSignatureTest::test_signTamperDetected()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString signedPath = m_tmpDir.filePath(QStringLiteral("signed2.pdf"));
     const ToolResult signResult = runTool(toolPath,
                                           {QStringLiteral("sign"),
@@ -272,8 +272,8 @@ void FormSignatureTest::test_signTamperDetected()
     // The tampered row: Certificate=Error, Signature=Error (double Error).
     // An intact signature shows "Error ... OK" (self-signed cert untrusted,
     // but the signature itself validates). Assert the distinguishing pattern.
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("pdfedit test      Error            Error")));
-    QVERIFY(!verifyResult.stdOut.contains(QStringLiteral("pdfedit test      Error            OK")));
+    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("albdf test      Error            Error")));
+    QVERIFY(!verifyResult.stdOut.contains(QStringLiteral("albdf test      Error            OK")));
 }
 
 QTEST_GUILESS_MAIN(FormSignatureTest)

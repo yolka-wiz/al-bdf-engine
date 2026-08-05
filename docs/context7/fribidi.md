@@ -43,7 +43,7 @@ FriBidiLevel max_level = fribidi_log2vis(
 - Reorder flags: `FRIBIDI_FLAGS_DEFAULT` enables mirroring + NSM reordering
 - Max return level 0 = failure
 
-## Key notes for pdfedit M4
+## Key notes for albdf M4
 
 - To get directional runs: call `fribidi_get_par_embedding_levels_ex` (or log2vis to
   get levels), then split the logical string into maximal runs of equal

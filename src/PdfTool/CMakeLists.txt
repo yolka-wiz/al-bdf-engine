@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_executable(PdfTool
+add_executable(albdf
     main.cpp 
     pdfoutputformatter.cpp 
     pdftoolabstractapplication.cpp 
@@ -70,17 +70,17 @@ add_executable(PdfTool
     pdftoolredact.h
 )
 
-target_link_libraries(PdfTool PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Xml)
+target_link_libraries(albdf PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Xml)
 
 if(MINGW)
-    target_link_libraries(PdfTool PRIVATE ole32 sapi)
+    target_link_libraries(albdf PRIVATE ole32 sapi)
 endif()
 
-set_target_properties(PdfTool PROPERTIES
+set_target_properties(albdf PROPERTIES
     WIN32_EXECUTABLE OFF
     MACOSX_BUNDLE OFF
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
 
-install(TARGETS PdfTool RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
+install(TARGETS albdf RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})

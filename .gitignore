@@ -23,7 +23,7 @@ tests/golden/out/
 *.log
 
 # Database (tracking DB is committed as schema + seed, not the live file)
-db/pdfedit.db
+db/albdf.db
 db/*.db-journal
 db/*.db-wal
 db/*.db-shm

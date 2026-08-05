@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic minimal PDF writer for the pdfedit test fixture corpus.
+"""Deterministic minimal PDF writer for the albdf test fixture corpus.
 
 Byte-deterministic by construction: no timestamps, fixed object order,
 fixed zlib level (6). Generalizes the pattern from

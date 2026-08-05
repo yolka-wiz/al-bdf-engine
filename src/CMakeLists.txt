@@ -1,19 +1,19 @@
-# pdfedit — headless PDF editing library + CLI (fork of PDF4QT, MIT)
-# v1 scope: Pdf4QtLibCore + PdfTool + UnitTests. NO GUI (ADR-0002).
+# albdf — headless PDF editing library + CLI (fork of PDF4QT, MIT)
+# v1 scope: Pdf4QtLibCore + albdf + UnitTests. NO GUI (ADR-0002).
 cmake_minimum_required(VERSION 3.16)
 
-set(PDFEDIT_VERSION 0.1.0)
+set(ALBDF_VERSION 0.1.0)
 set(PDF4QT_VERSION 1.6.0.0)   # kept for upstream compatibility in vendored CMake
-project(pdfedit VERSION ${PDFEDIT_VERSION} LANGUAGES CXX)
+project(albdf VERSION ${ALBDF_VERSION} LANGUAGES CXX)
 
-add_compile_definitions(PDF4QT_PROJECT_VERSION="${PDFEDIT_VERSION}")
+add_compile_definitions(PDF4QT_PROJECT_VERSION="${ALBDF_VERSION}")
 add_compile_definitions(QT_NO_EMIT)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(PDFEDIT_BUILD_TESTS "Build UnitTests" ON)
-option(PDFEDIT_INSTALL_INCLUDE "Install include headers" ON)
+option(ALBDF_BUILD_TESTS "Build UnitTests" ON)
+option(ALBDF_INSTALL_INCLUDE "Install include headers" ON)
 
 # vcpkg toolchain (deps: tbb openssl lcms zlib openjpeg freetype libjpeg-turbo
 # libpng blend2d — see vcpkg.json; blend2d MUST come from vcpkg, see baseline doc)
@@ -88,9 +88,9 @@ cmake_path(RELATIVE_PATH PDF4QT_INSTALL_TRANS_DIR BASE_DIRECTORY "${PDF4QT_INSTA
 configure_file(config.h.cmake config.h)
 
 add_subdirectory(Pdf4QtLibCore)
-add_subdirectory(PdfTool)
+add_subdirectory(PdfTool)   # dir keeps upstream name; target produces the albdf binary
 
-if(PDFEDIT_BUILD_TESTS)
+if(ALBDF_BUILD_TESTS)
     enable_testing()
     add_subdirectory(UnitTests)
 endif()

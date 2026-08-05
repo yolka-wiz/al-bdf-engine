@@ -1,4 +1,4 @@
-# pdfedit test harness (M2)
+# albdf test harness (M2)
 
 Deterministic regression harness for the fork. Everything here is committed;
 fixtures and goldens are reproducible from `scripts/`.
@@ -52,5 +52,5 @@ A golden mismatch means renderer output changed and must be investigated.
 **Never update goldens to silence a failure** - the `test-baseline.pdf` goldens
 are the pre-fork upstream reference and must hash-match exactly; new-fixture
 goldens are fork-anchored regression anchors. To (deliberately) re-anchor,
-render at 72 dpi with the current `PdfTool`, replace the files, and document
+render at 72 dpi with the current `albdf`, replace the files, and document
 the change in the commit message.

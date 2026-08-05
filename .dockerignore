@@ -16,7 +16,7 @@ cmake-build-*/
 vendor-upstream-pdf4qt/
 
 # Tracking DB (runtime state, rebuilt from schema + seed)
-db/pdfedit.db
+db/albdf.db
 
 # Local scratch
 scripts-tmp/

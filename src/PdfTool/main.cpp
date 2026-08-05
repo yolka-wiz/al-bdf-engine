@@ -30,13 +30,13 @@ int main(int argc, char *argv[])
 {
     QGuiApplication a(argc, argv);
     QCoreApplication::setOrganizationName("MelkaJ");
-    QCoreApplication::setApplicationName("PdfTool");
+    QCoreApplication::setApplicationName("albdf");
     QCoreApplication::setApplicationVersion(pdf::PDF_LIBRARY_VERSION);
 
     QStringList arguments = QCoreApplication::arguments();
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("PdfTool - work with pdf documents via command line");
+    parser.setApplicationDescription("albdf - work with pdf documents via command line");
     parser.addPositionalArgument("command", "Command to execute.");
     parser.parse(arguments);
 

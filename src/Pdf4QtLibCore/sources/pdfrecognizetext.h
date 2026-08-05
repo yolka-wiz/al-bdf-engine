@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
@@ -40,12 +40,12 @@ class PDFMeshQualitySettings;
 
 /// Recognizes page content objects (text, image, path) of a PDF document
 /// and serializes them as machine-readable JSON. It is the engine behind
-/// the PdfTool 'recognize-text' CLI command.
+/// the albdf 'recognize-text' CLI command.
 ///
 /// Index contract: the \p index emitted for each object is the 0-based index
 /// of the element in the PDFEditedPageContent element list produced by
 /// PDFPageContentEditorProcessor for that page (in content stream order).
-/// The same index space is consumed by the PdfTool 'delete-object' command,
+/// The same index space is consumed by the albdf 'delete-object' command,
 /// so indices are stable between recognize and delete on the same document.
 class PDF4QTLIBCORESHARED_EXPORT PDFRecognizeText
 {

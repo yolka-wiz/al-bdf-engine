@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
@@ -124,7 +124,7 @@ int PDFToolSign::execute(const PDFToolOptions& options)
         "Adobe.PPKLite", "adbe.pkcs7.detached", probe, QDateTime::currentDateTime(), offsetMark);
 
     const QString signatureName =
-        QStringLiteral("pdfedit_signature_%1").arg(QString::number(QDateTime::currentMSecsSinceEpoch()));
+        QStringLiteral("albdf_signature_%1").arg(QString::number(QDateTime::currentMSecsSinceEpoch()));
     pdf::PDFObjectReference formField = builder.createFormFieldSignature(signatureName, {}, signatureDictionary);
     builder.createAcroForm({formField});
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""pdfedit tracking database CLI.
+"""albdf tracking database CLI.
 
 Searchable project DB (SQLite + FTS5) for an agent-written codebase.
 Every task/component/decision/research-note/question/skill is tracked here.
 
 Usage:
-  db.py init                          create db/pdfedit.db from schema.sql
+  db.py init                          create db/albdf.db from schema.sql
   db.py status [--component ID]       full status view
   db.py search TERM                   FTS5 search across all tracked items
   db.py task-add --component ID --title "..." [--priority N] [--estimate "3-5d"] [--assignee ROLE] [--notes "..."]
@@ -32,7 +32,7 @@ import os
 import sqlite3
 import sys
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "db", "pdfedit.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "db", "albdf.db")
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "db", "schema.sql")
 
 STATUS_COLOR = {
@@ -305,7 +305,7 @@ def cmd_dump(args):
 
 
 def main():
-    p = argparse.ArgumentParser(description="pdfedit tracking DB")
+    p = argparse.ArgumentParser(description="albdf tracking DB")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("init")

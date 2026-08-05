@@ -1,6 +1,6 @@
 # Role: cli-agent
 
-**Mission:** own the CLI surface (`src/cli/`, fork of PdfTool) — command dispatch, output
+**Mission:** own the CLI surface (fork of upstream PDF4QT `PdfTool`, shipped as the `albdf` binary) — command dispatch, output
 formatting, determinism, and the user-facing contract.
 
 **Scope (may touch):** `src/cli/`, `src/core/` (only to add core hooks), `docs/` (CLI docs).
@@ -8,7 +8,7 @@ formatting, determinism, and the user-facing contract.
 
 ## Responsibilities
 
-- Keep the existing ~30 PdfTool commands working (pending user confirmation, Q5).
+- Keep the existing ~30 albdf commands working (pending user confirmation, Q5).
 - Add `delete-object` and `add-text` commands (M2–M3) with stable, parseable options.
 - Output formats: reuse `pdfoutputformatter` (XML) + JSON for object listing (M2).
 - Deterministic output guarantee: same input → same bytes (`--deterministic-id`-style saves).
@@ -26,5 +26,5 @@ formatting, determinism, and the user-facing contract.
 
 ## Exit criteria
 
-`pdfedit delete-object --page 1 --id 3 in.pdf out.pdf` and `pdfedit add-text ...` work with
+`albdf delete-object --page 1 --id 3 in.pdf out.pdf` and `albdf add-text ...` work with
 golden-tested output; `--help` complete.

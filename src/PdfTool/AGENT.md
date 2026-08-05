@@ -1,6 +1,6 @@
-# AGENT.md — PdfTool CLI (`src/PdfTool/`)
+# AGENT.md — albdf CLI (`src/PdfTool/`)
 
-Onboarding guide for AI agents adding or modifying CLI commands in the `pdfedit`
+Onboarding guide for AI agents adding or modifying CLI commands in the `albdf`
 fork. Read [`AGENTS.md`](../../AGENTS.md) (binding contract) and
 [`docs/coding-standard.md`](../../docs/coding-standard.md) first. This file covers
 **how the CLI works and how to add a new command.**
@@ -14,8 +14,8 @@ fork. Read [`AGENTS.md`](../../AGENTS.md) (binding contract) and
 - [6. Pitfalls](#6-pitfalls)
 
 ## 1. What this directory is
-- Builds the `PdfTool` binary (output: `src/build/bin/PdfTool`), declared in
-  `src/PdfTool/CMakeLists.txt` as `add_executable(PdfTool ...)`, linked against
+- Builds the `albdf` binary (output: `src/build/bin/albdf`), declared in
+  `src/PdfTool/CMakeLists.txt` as `add_executable(albdf ...)`, linked against
   `Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Xml`.
 - Each **command** (e.g. `add-text`, `search-text`) is one `pdftool*` pair of
   files. The fork's custom commands live here: `pdftooladdtext.{h,cpp}`,
@@ -63,13 +63,13 @@ CLI flag → `PDFToolOptions` mapping is implemented in
    `pdftoolabstractapplication.cpp` (mirror the existing `SearchText`/`AddText`
    handling).
 5. **Register the sources** in `src/PdfTool/CMakeLists.txt` — add
-   `pdftoolnewcmd.cpp` and `pdftoolnewcmd.h` to the `add_executable(PdfTool ...)`
+   `pdftoolnewcmd.cpp` and `pdftoolnewcmd.h` to the `add_executable(albdf ...)`
    list (keep it sorted with the other `pdftool*` entries).
 6. **Add a test.** Add a ctest target in `src/UnitTests/CMakeLists.txt` (see
    [`../UnitTests/AGENT.md`](../UnitTests/AGENT.md)) and a smoke.sh entry if it
    changes core invariants.
 7. **Verify:** `cmake --build src/build -j$(nproc)`, then
-   `QT_QPA_PLATFORM=offscreen ./src/build/bin/PdfTool new-cmd --help` and
+   `QT_QPA_PLATFORM=offscreen ./src/build/bin/albdf new-cmd --help` and
    `cd src/build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure`.
    Run `ci/run-ci.sh` (or at minimum the clang-format gate) before finishing.
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
 // Golden-image regression harness.
 //
-// Renders every fixture in src/tests/fixtures with PdfTool render
+// Renders every fixture in src/tests/fixtures with albdf render
 // (72 dpi, PNG, offscreen) and compares the SHA-256 of each rendered page
 // against the committed golden files in src/tests/golden/. The golden files
 // for test-baseline.pdf are the pre-fork reference recorded in
@@ -30,7 +30,7 @@
 // anchors). A mismatch means the renderer output changed and must be
 // investigated - do NOT regenerate goldens blindly.
 //
-// Paths are injected at build time via PDFEDIT_TESTS_DIR.
+// Paths are injected at build time via ALBDF_TESTS_DIR.
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -59,13 +59,13 @@ private:
 
 QString GoldenTest::testsDir()
 {
-    return QString::fromUtf8(PDFEDIT_TESTS_DIR);
+    return QString::fromUtf8(ALBDF_TESTS_DIR);
 }
 
 QString GoldenTest::pdfToolPath()
 {
-    // PdfTool is built into the same runtime output directory as this test.
-    return QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    // albdf is built into the same runtime output directory as this test.
+    return QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
 }
 
 QByteArray GoldenTest::sha256OfFile(const QString& path, bool* ok)
@@ -105,7 +105,7 @@ void GoldenTest::golden()
     const QString goldenDir = testsDir() + QStringLiteral("/golden/");
 
     const QString toolPath = pdfToolPath();
-    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("PdfTool binary missing: %1").arg(toolPath)));
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
 
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
@@ -130,11 +130,11 @@ void GoldenTest::golden()
                                    tmpDir.path()};
 
     process.start(toolPath, arguments);
-    QVERIFY2(process.waitForStarted(), "PdfTool render did not start");
-    QVERIFY2(process.waitForFinished(180000), "PdfTool render timed out");
+    QVERIFY2(process.waitForStarted(), "albdf render did not start");
+    QVERIFY2(process.waitForFinished(180000), "albdf render timed out");
     const QString stderrText = QString::fromUtf8(process.readAllStandardError());
     QVERIFY2(process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0,
-             qPrintable(QStringLiteral("PdfTool render failed (exit %1): %2").arg(process.exitCode()).arg(stderrText)));
+             qPrintable(QStringLiteral("albdf render failed (exit %1): %2").arg(process.exitCode()).arg(stderrText)));
 
     for (int page = 1; page <= pageCount; ++page)
     {
@@ -211,7 +211,7 @@ void GoldenTest::fixtureRegistryConsistency()
 }
 
 // QTEST_GUILESS_MAIN instantiates a QCoreApplication so that
-// QCoreApplication::applicationDirPath() resolves the PdfTool binary path
+// QCoreApplication::applicationDirPath() resolves the albdf binary path
 // (QTEST_APPLESS_MAIN left it empty -> tool lookup failed).
 QTEST_GUILESS_MAIN(GoldenTest)
 

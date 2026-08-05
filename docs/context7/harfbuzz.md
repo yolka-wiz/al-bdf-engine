@@ -76,7 +76,7 @@ FT_Done_FreeType(ft_lib);
 - The shaper maps chars → glyphs + positions; it does NOT do outline manipulation,
   line breaks, or cross-run layout
 
-## Key notes for PDF RTL embedding (pdfedit M4)
+## Key notes for PDF RTL embedding (albdf M4)
 
 - Glyph IDs come from `info[i].codepoint` — these are the GIDs to emit in the PDF
 - Cluster → ToUnicode: cluster values map glyphs back to input character indices
