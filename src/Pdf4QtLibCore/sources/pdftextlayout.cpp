@@ -1380,9 +1380,19 @@ PDFTextFlows PDFTextFlow::createTextFlows(const PDFTextLayout& layout, FlowFlags
                 const TextCharacter& currentCharacter = characters[i];
                 if (i > 0 && !currentCharacter.character.isSpace())
                 {
-                    // Jakub Melka: try to guess space between letters
+                    // Jakub Melka: try to guess space between letters.
+                    // albdf P3 fix: a zero-advance previous character is a
+                    // combining mark (e.g. Arabic fatha/kasra raised via PDF
+                    // text rise `Ts`). Its Euclidean distance to the next
+                    // glyph includes the vertical offset, and
+                    // `advance * 1.2` is 0, so ANY vertical rise produced a
+                    // phantom space inside "مَا" and broke RTL search. A
+                    // mark is part of the previous word's cluster — it must
+                    // never start a word gap. (Rotated text still uses the
+                    // Euclidean check: its characters carry real advances.)
                     const TextCharacter& previousCharacter = characters[i - 1];
-                    if (!previousCharacter.character.isSpace() && QLineF(previousCharacter.position, currentCharacter.position).length() > previousCharacter.advance * 1.2)
+                    if (!previousCharacter.character.isSpace() && !qFuzzyIsNull(previousCharacter.advance) &&
+                        QLineF(previousCharacter.position, currentCharacter.position).length() > previousCharacter.advance * 1.2)
                     {
                         currentFlow.m_text += QChar(' ');
                         currentFlow.m_characterPointers.emplace_back();

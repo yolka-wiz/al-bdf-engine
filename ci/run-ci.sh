@@ -40,7 +40,8 @@ AUTHORED_FILES="$(
         | grep -vE '^src/PdfTool/pdftoolabstractapplication\.(cpp|h)$' \
         | grep -vE '^src/PdfTool/main\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
-        | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$'
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$' \
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdftextlayout\.cpp$'
 )"
 
 step "1/4 configure + build (Release)"
