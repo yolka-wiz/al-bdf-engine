@@ -357,15 +357,11 @@ void SearchTextTest::test_crossItemPhrase()
     // word-space separator (this is what the CLI "Text" column shows).
     QVERIFY2(matches.front().matchedText.contains(QStringLiteral(" ")),
              "matched text must contain the space separator");
-    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("تست")),
-             "matched text must contain the second word");
-    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("اهن")),
-             "matched text must contain the first word");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("تست")), "matched text must contain the second word");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("اهن")), "matched text must contain the first word");
     // The bounding rect is the union across both spans (page coordinates).
-    QVERIFY2(matches.front().boundingRect.left() <= 72.0 + 1.0,
-             "bounding rect must start at the first item");
-    QVERIFY2(matches.front().boundingRect.right() >= 150.0 + 28.64 - 1.0,
-             "bounding rect must end at the second item");
+    QVERIFY2(matches.front().boundingRect.left() <= 72.0 + 1.0, "bounding rect must start at the first item");
+    QVERIFY2(matches.front().boundingRect.right() >= 150.0 + 28.64 - 1.0, "bounding rect must end at the second item");
 }
 
 void SearchTextTest::test_crossItemNoFalsePositive()

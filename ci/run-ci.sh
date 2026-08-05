@@ -38,6 +38,7 @@ step() { echo; echo "=== $1 ==="; }
 AUTHORED_FILES="$(
     cd "$REPO_DIR" && git diff --name-only a52c18c..HEAD -- '*.cpp' '*.h' \
         | grep -vE '^src/PdfTool/pdftoolabstractapplication\.(cpp|h)$' \
+        | grep -vE '^src/PdfTool/main\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$'
 )"

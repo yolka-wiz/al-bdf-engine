@@ -122,8 +122,7 @@ int PDFToolSearchText::execute(const PDFToolOptions& options)
         {
             // Multi-item match: show "first+last" span indices, e.g. "2+3"
             // means the match covers items 2 and 3.
-            itemColumn += QStringLiteral("+%1")
-                              .arg(static_cast<qlonglong>(match.spans.back().itemIndex));
+            itemColumn += QStringLiteral("+%1").arg(static_cast<qlonglong>(match.spans.back().itemIndex));
         }
         formatter.beginTableRow("match");
         formatter.writeTableColumn("page", QString::number(match.pageIndex + 1));
