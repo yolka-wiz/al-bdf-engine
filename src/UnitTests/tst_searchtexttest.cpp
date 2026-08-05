@@ -353,6 +353,19 @@ void SearchTextTest::test_crossItemPhrase()
         engine.searchFlow(flow, QString::fromUtf8("تست نهایی"), 0, 0, pdf::PDFTextSearchEngine::Options());
     QCOMPARE(matches.size(), size_t(1));
     QCOMPARE(matches.front().spans.size(), size_t(2));
+    // The matched text must reconstruct the full phrase including the
+    // word-space separator (this is what the CLI "Text" column shows).
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral(" ")),
+             "matched text must contain the space separator");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("تست")),
+             "matched text must contain the second word");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("اهن")),
+             "matched text must contain the first word");
+    // The bounding rect is the union across both spans (page coordinates).
+    QVERIFY2(matches.front().boundingRect.left() <= 72.0 + 1.0,
+             "bounding rect must start at the first item");
+    QVERIFY2(matches.front().boundingRect.right() >= 150.0 + 28.64 - 1.0,
+             "bounding rect must end at the second item");
 }
 
 void SearchTextTest::test_crossItemNoFalsePositive()
