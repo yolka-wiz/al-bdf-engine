@@ -201,7 +201,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     // gets a unique sequential code, so the same GID used in different
     // contexts (e.g. a fatha mark over two different base letters) maps to
     // its own ToUnicode entry. The GID for each code is recorded in
-    // codeToGid and emitted as an explicit /CIDToGIDMap array.
+    // codeToGid and emitted as a 65536-entry /CIDToGIDMap stream.
     PDFInteger nextCode = 1;                         // code 0 = .notdef
     std::vector<PDFInteger> codeToGid;               // index = code, value = GID
     std::map<PDFInteger, QByteArray> glyphToUnicode; // code -> UTF-16BE (logical cluster)
@@ -269,7 +269,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             const unsigned cluster = glyphInfo[g].cluster;
 
             // Unique per-instance code; the GID is stored for the
-            // /CIDToGIDMap array (code -> gid).
+            // /CIDToGIDMap stream (code -> gid).
             const PDFInteger code = nextCode++;
             codeToGid.push_back(PDFInteger(gid));
 
@@ -601,17 +601,32 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     factory.endArray();
     factory.endDictionaryItem();
 
-    // /CIDToGIDMap: explicit array (code -> gid). Per-instance codes mean
-    // /Identity would be wrong; the array maps each unique code to the GID
-    // it was assigned from.
+    // /CIDToGIDMap: a 65536-entry STREAM (2 bytes per entry, big-endian,
+    // entry[code] = gid, all other entries = 0). PDF 32000-1 §9.7.4.3
+    // requires exactly 65536 entries (or a stream) for a 2-byte-CID font.
+    // The previous short array was invalid: strict renderers (Ghostscript)
+    // AND PDF4QT's own parser (pdffont.cpp reads the map only when the
+    // object isStream()) ignored it and fell back to /Identity — code 1
+    // painted GID 1 (.null, invisible), code 2 painted GID 2 (Latin 'A').
+    // Flate-compressed like the FontFile2 stream above; the all-zero
+    // padding collapses to a few hundred bytes.
     factory.beginDictionaryItem("CIDToGIDMap");
-    factory.beginArray();
-    factory << PDFObject::createInteger(0); // code 0 = .notdef
-    for (const PDFInteger gid : codeToGid)
     {
-        factory << PDFObject::createInteger(gid);
+        QByteArray cidToGidData(65536 * 2, '\0'); // entry 0 = 0 (.notdef)
+        for (PDFInteger code = 0; code < PDFInteger(codeToGid.size()) && code + 1 <= 65535; ++code)
+        {
+            const PDFInteger gid = codeToGid[size_t(code)];
+            const size_t offset = size_t(2 * (code + 1)); // code 0 = .notdef
+            cidToGidData[offset] = char((gid >> 8) & 0xFF);
+            cidToGidData[offset + 1] = char(gid & 0xFF);
+        }
+        const QByteArray compressedCidToGid = PDFFlateDecodeFilter::compress(cidToGidData);
+        PDFDictionary cidToGidDict;
+        cidToGidDict.setEntry(PDFInplaceOrMemoryString("Length"), PDFObject::createInteger(compressedCidToGid.size()));
+        cidToGidDict.setEntry(PDFInplaceOrMemoryString("Filter"), PDFObject::createName("FlateDecode"));
+        factory << PDFObject::createStream(
+            std::make_shared<PDFStream>(std::move(cidToGidDict), QByteArray(compressedCidToGid)));
     }
-    factory.endArray();
     factory.endDictionaryItem();
     factory.endDictionary();
     factory.endArray();
