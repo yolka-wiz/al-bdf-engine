@@ -1,5 +1,5 @@
 #!/bin/bash
-# pdfedit CI gate — run on a bare container after reinstall-toolchain.sh.
+# albdf CI gate — run on a bare container after reinstall-toolchain.sh.
 #
 #   ci/run-ci.sh [--skip-asan] [--skip-format]
 #
@@ -36,7 +36,7 @@ step() { echo; echo "=== $1 ==="; }
 # whole file would destroy cherry-pick diffs. We keep our own added lines styled
 # to match the surrounding code instead.
 AUTHORED_FILES="$(
-    cd "$REPO_DIR" && git diff --name-only 4f46302..HEAD -- '*.cpp' '*.h' \
+    cd "$REPO_DIR" && git diff --name-only a52c18c..HEAD -- '*.cpp' '*.h' \
         | grep -vE '^src/PdfTool/pdftoolabstractapplication\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$'
@@ -46,7 +46,7 @@ step "1/4 configure + build (Release)"
 cd "$SRC_DIR"
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
-      -DPDFEDIT_BUILD_TESTS=ON > /tmp/ci-build.log 2>&1
+      -DALBDF_BUILD_TESTS=ON > /tmp/ci-build.log 2>&1
 if [ $? -ne 0 ]; then echo "configure FAILED"; tail -20 /tmp/ci-build.log; FAILED=1; fi
 cmake --build build >> /tmp/ci-build.log 2>&1
 if [ $? -ne 0 ]; then echo "build FAILED"; tail -20 /tmp/ci-build.log; FAILED=1; fi
@@ -62,7 +62,7 @@ if [ "$SKIP_ASAN" -eq 0 ]; then
     step "3/4 ASAN/UBSAN build + ctest"
     cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
-          -DPDFEDIT_BUILD_TESTS=ON \
+          -DALBDF_BUILD_TESTS=ON \
           -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
           -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \

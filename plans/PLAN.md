@@ -1,6 +1,6 @@
-# pdfedit — Master Project Plan (v2, finalized 2026-08-04)
+# albdf — Master Project Plan (v2, finalized 2026-08-04)
 
-> **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/pdfedit.db`
+> **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/albdf.db`
 > (`python3 scripts/db.py status`). Implementation is delegated to agent roles in
 > `agents/roles/`, executing per `AGENTS.md` + `docs/coding-standard.md`.
 >
@@ -10,7 +10,7 @@
 **Goal:** a headless PDF editing **library + CLI** for Linux — fork of MIT PDF4QT with
 object-level deletion, add-text, and correct **RTL (Arabic/Persian/Hebrew) write + search**.
 
-**Architecture:** fork `Pdf4QtLibCore` + `PdfTool` (MIT) → extend the CLI with
+**Architecture:** fork `Pdf4QtLibCore` + `albdf` (MIT) → extend the CLI with
 `delete-object` / `add-text` → add greenfield RTL pipeline (FriBidi + HarfBuzz + ToUnicode)
 → deterministic golden-tested core. GUI explicitly out of scope for v1 (ADR-0002).
 
@@ -38,7 +38,7 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 ## Milestones (each = reviewable, testable increment; checkboxes = exit criteria)
 
 ### M0 — Infrastructure (DONE 2026-08-04)
-- [x] Repo `pdfedit/`: AGENTS.md, coding-standard, .clang-format, plan, ADRs 0001–0004
+- [x] Repo `albdf/`: AGENTS.md, coding-standard, .clang-format, plan, ADRs 0001–0004
 - [x] Tracking DB + `scripts/db.py` (components/tasks/decisions/research/questions/skills/deps + FTS5)
 - [x] Agent roles (core/cli/rtl/test/research/orchestrator) + vendored Qt skills
 - [x] Research brief 001 delivered to Rosetta; 3 research subagents dispatched (PDF4QT deep dive,
@@ -48,7 +48,7 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 
 ### M0.5 — BASELINE: test the software we want to fork (core-agent) ← user directive
 **Goal: prove upstream PDF4QT builds and works BEFORE we change a single line of it.**
-- [x] Build pristine PDF4QT (core lib + PdfTool CLI only, GUI stripped) on this container
+- [x] Build pristine PDF4QT (core lib + albdf CLI only, GUI stripped) on this container
 - [x] Run upstream `UnitTests/` — record pass/fail baseline
 - [x] CLI smoke: `fetch-text`, `render`, `info`, `unite` on a generated test PDF — record outputs
 - [x] Golden-baseline: render a fixed corpus → PNGs, store as reference for regression
@@ -71,46 +71,46 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - **Exit:** CLI lists objects, deletes text run/image, saves; tests green
 
 ### M3 — Add-text (LTR) via CLI (core-agent, cli-agent)
-- [ ] `add-text` command: reuse `PDFTextLayoutGenerator` + content-stream builder; font embed path
-- [ ] Golden test: inserted text visible + extractable
+- [x] `add-text` command: reuse `PDFTextLayoutGenerator` + content-stream builder; font embed path — `327061b`
+- [x] Golden test: inserted text visible + extractable
 - **Exit:** `add-text "hello" --page 1 --x .. --y ..` works; test green
 
 ### M4 — RTL write pipeline (rtl-agent) — the differentiator
-- [x] HarfBuzz + FriBidi deps in build (registered in DB) — `ca6313c`
-- [x] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning) — `ca6313c`
-- [x] Type0/Identity-H font embedding + `/W` advances — `ca6313c`
-- [x] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText` — `ca6313c`
-- [x] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew — `ca6313c`
+- [x] HarfBuzz + FriBidi deps in build (registered in DB) — `fe016c4`
+- [x] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning) — `fe016c4`
+- [x] Type0/Identity-H font embedding + `/W` advances — `fe016c4`
+- [x] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText` — `fe016c4`
+- [x] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew — `fe016c4`
 - **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order — DONE (7/7 RTL tests; Hebrew exact round-trip; ligature degradation documented)
 
 ### M5 — RTL search (rtl-agent)
-- [x] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ — `d516e4e`
-- [x] Bidi inversion of extracted visual-order text; substring match + highlight geometry — `d516e4e`
-- [x] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases) — `d516e4e`
-- [x] **Exit:** search finds RTL strings in our own add-text output (foreign-PDF pass = fetch-text normalization, same engine) — `d516e4e`
+- [x] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ — `aa92bee`
+- [x] Bidi inversion of extracted visual-order text; substring match + highlight geometry — `aa92bee`
+- [x] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases) — `aa92bee`
+- [x] **Exit:** search finds RTL strings in our own add-text output (foreign-PDF pass = fetch-text normalization, same engine) — `aa92bee`
 
 ### M6 — Test hardening + CI (test-agent, parallel from M2)
 - [x] Golden-image harness (deterministic render diff) — earlier
 - [x] RTL corpus fixtures committed — earlier (blank.pdf + fonts + README)
-- [x] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate — `f3d20e7`, `c433dfe`
+- [x] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate — `b6f4bf6`, `dc45fcb`
 - [x] **Exit:** CI green on bare container — `ci/run-ci.sh` all-green incl. ASAN 10/10
 
 ### M7 — Polish & release (all agents)
-- [x] CLI docs (`--help` complete, man page), deterministic saves — `717d1d4` (README + `docs/PdfTool.1`)
+- [x] CLI docs (`--help` complete, man page), deterministic saves — `479ebe0` (README + `docs/albdf.1`)
 - [x] Perf smoke: 1000-page doc open/render/delete — info 0.03s, fetch 0.04s, render 0.03s, search 0.04s (1000 matches), delete 0.02s
-- [x] **Exit:** release candidate; version tag — **0.1.0** (`b2f4a93`)
+- [x] **Exit:** release candidate; version tag — **0.1.0** (`aef2575`)
 
-### M8 — Forms & signatures (feature/forms-signatures, merged `974ba35`)
-- [x] `form-list` — enumerate AcroForm fields (name, type, value, page, rect, readonly) — `480b7f8`
-- [x] `form-fill` — set field values (text/button/choice), regenerate appearance, write new doc — `64a1b70`
-- [x] `sign` — PKCS#7 detached digital signature (invisible or visible widget), PAdES byte-range flow — `d38c76f`
+### M8 — Forms & signatures (feature/forms-signatures, merged `382dc4b`)
+- [x] `form-list` — enumerate AcroForm fields (name, type, value, page, rect, readonly) — `3b3e563`
+- [x] `form-fill` — set field values (text/button/choice), regenerate appearance, write new doc — `b8efe4a`
+- [x] `sign` — PKCS#7 detached digital signature (invisible or visible widget), PAdES byte-range flow — `02b8719`
 - [x] `verify-signatures` (upstream tool) validates signed docs; one-byte tamper → `Signature: Error` — tested
-- [x] `UnitTestsFormSignature` — form-list/form-fill/sign/verify/tamper round-trip — `75677bf`; suite **11/11**
-- [x] ADR-0006, README section, DB synced — `8299eda`
+- [x] `UnitTestsFormSignature` — form-list/form-fill/sign/verify/tamper round-trip — `6a2a325`; suite **11/11**
+- [x] ADR-0006, README section, DB synced — `b2276d7`
 - [x] **Exit:** forms+signatures scriptable headlessly; CI all green on merged main
 
-### M8.1 — Real-world compatibility sweep (compat agents, merged `974ba35`)
-- [x] `fix(add-text)`: content-stream floats in FixedNotation (precision 8) — strict parsers reject scientific notation — `3920a43`
+### M8.1 — Real-world compatibility sweep (compat agents, merged `382dc4b`)
+- [x] `fix(add-text)`: content-stream floats in FixedNotation (precision 8) — strict parsers reject scientific notation — `591dfee`
 - [x] S#1 field observation documented (dense-page RTL phrase split is flow geometry, not add-text defect)
 - [x] CI format gate exempts upstream-derived content-stream builder
 - [x] **Exit:** 11-file corpus (testing-temp) exercised; agent-a interrupted before committing (work lost), agent-b's fix merged
@@ -139,10 +139,12 @@ M0.5 is the new gate: we cannot touch upstream code until the baseline is record
 
 | ADR | Decision | Status |
 |---|---|---|
-| 0001 | Fork PDF4QT (MIT) as base | proposed |
-| 0002 | No GUI in v1 — library+CLI only | proposed |
-| 0003 | RTL write+search is greenfield differentiator | proposed |
-| 0004 | License posture: MIT fork + permissive deps only | proposed |
+| 0001 | Fork PDF4QT (MIT) as base | accepted |
+| 0002 | No GUI in v1 — library+CLI only | accepted |
+| 0003 | RTL write+search is greenfield differentiator | accepted |
+| 0004 | License posture: MIT fork + permissive deps only | superseded (ADR-0005) |
+| 0005 | Relicense to GPL-3.0-or-later | accepted |
+| 0006 | Forms and digital signatures via CLI | accepted |
 
 ## Risks & mitigations
 
@@ -157,6 +159,8 @@ M0.5 is the new gate: we cannot touch upstream code until the baseline is record
 
 ## Open questions (DB `questions`)
 
-Name (ok=pdfedit), hosting (local for now), upstream remote policy (keep for cherry-picks),
-context7 key (received), CLI command preservation (keep ~30 + add new), roles (confirmed),
-skills install (approved), Rosetta timing (RUNNING now).
+All answered as of 2026-08-05: name **albdf**, hosting GitHub
+(`yolka-wiz/al-bdf-engine`), upstream remote kept for cherry-picks,
+context7 key received and wired via Hermes MCP, CLI commands preserved
+(~30 kept + new added), agent roles confirmed, skills installed, Rosetta
+delivered research briefs.

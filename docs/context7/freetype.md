@@ -35,7 +35,7 @@ Key load flags (PDF4QT uses `FT_LOAD_NO_BITMAP | FT_LOAD_NO_HINTING` for outline
 - `FT_Outline_Decompose(face->glyph->outline, &funcs, &user)` walks move_to/line_to/
   conic_to/cubic_to
 
-## Key notes for pdfedit M4
+## Key notes for albdf M4
 
 - PDF4QT `PDFRealizedFontImpl::getGlyph` calls
   `FT_Load_Glyph(m_face, glyphIndex, FT_LOAD_NO_BITMAP | FT_LOAD_NO_HINTING)`

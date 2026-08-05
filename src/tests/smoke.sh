@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# CLI smoke test for the pdfedit fork.
+# CLI smoke test for the albdf fork.
 #
-# Usage: smoke.sh [PdfTool-binary] [fixtures-dir]
+# Usage: smoke.sh [albdf-binary] [fixtures-dir]
 #   Defaults resolve relative to this script when arguments are omitted.
 #
 # Asserts invariants on the deterministic fixture corpus:
@@ -18,7 +18,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PDFTOOL="${1:-$SCRIPT_DIR/../build/bin/PdfTool}"
+PDFTOOL="${1:-$SCRIPT_DIR/../build/bin/albdf}"
 FIXTURES="${2:-$SCRIPT_DIR/fixtures}"
 
 PASS=0
@@ -40,7 +40,7 @@ page_count() { # page_count <pdf> -> prints page count from `info`
     "$PDFTOOL" info "$1" 2>/dev/null | awk '/Page count/ {print $3}'
 }
 
-# command present? `PdfTool <cmd> --help` prints the *command's* usage line
+# command present? `albdf <cmd> --help` prints the *command's* usage line
 # for known commands and the generic main usage for unknown ones.
 command_present() {
     local main_line; local cmd_line
@@ -53,7 +53,7 @@ command_present() {
 
 echo "== version =="
 expect_exit 0 "version exits 0" "$PDFTOOL" --version
-if "$PDFTOOL" --version 2>/dev/null | grep -qE "PdfTool (0\.1\.0|1\.6\.0\.0)"; then
+if "$PDFTOOL" --version 2>/dev/null | grep -qE "albdf (0\.1\.0|1\.6\.0\.0)"; then
     pass "version string"
 else
     fail "version string (got: $("$PDFTOOL" --version 2>/dev/null | head -1))"

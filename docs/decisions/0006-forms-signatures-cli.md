@@ -16,7 +16,7 @@ its GUI. We need CLI commands.
 
 ## Decision
 
-Add three commands to `PdfTool`:
+Add three commands to `albdf`:
 
 1. **`form-list`** — enumerate interactive form fields (name, type, value,
    page, rect, read-only). Read-only; walks the AcroForm tree via

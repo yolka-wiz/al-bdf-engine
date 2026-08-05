@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
 // Integration test for the delete-object CLI command.
 //
-// Runs the PdfTool binary against the test-baseline fixture (2 pages:
+// Runs the albdf binary against the test-baseline fixture (2 pages:
 // "Hello PDF4QT baseline!" + gray rect on page 1, "Second page with
 // numbers 12345" + red rect on page 2) and verifies:
 //   - --list reports the expected object types/indices
@@ -97,8 +97,8 @@ private slots:
 
 void DeleteObjectTest::test_listObjects()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
-    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("PdfTool binary missing: %1").arg(toolPath)));
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
 
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
@@ -120,7 +120,7 @@ void DeleteObjectTest::test_listObjects()
 
 void DeleteObjectTest::test_deleteTextRun()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -147,7 +147,7 @@ void DeleteObjectTest::test_deleteTextRun()
 
 void DeleteObjectTest::test_deletePathKeepsText()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -170,7 +170,7 @@ void DeleteObjectTest::test_deletePathKeepsText()
 
 void DeleteObjectTest::test_invalidIndexFails()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -187,7 +187,7 @@ void DeleteObjectTest::test_invalidIndexFails()
 }
 
 // QTEST_GUILESS_MAIN instantiates a QCoreApplication so that
-// QCoreApplication::applicationDirPath() resolves the PdfTool binary path.
+// QCoreApplication::applicationDirPath() resolves the albdf binary path.
 QTEST_GUILESS_MAIN(DeleteObjectTest)
 
 #include "tst_deleteobjecttest.moc"

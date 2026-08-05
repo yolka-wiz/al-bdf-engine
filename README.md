@@ -1,6 +1,8 @@
-# pdfedit
+# albdf
 
-Headless PDF editing **library + CLI** for Linux — fork of [PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT, our additions **GPL-3.0-or-later**).
+Headless PDF editing **library + CLI** for Linux — built for **Middle Eastern
+languages** (Arabic, Persian, Hebrew). Fork of
+[PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT, our additions **GPL-3.0-or-later**).
 The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text write + search** is the differentiator.
 
 **Status:** v0.1.0 released. M0–M8 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search/forms/signatures shipped, CI green, real-world compatibility fixes merged).
@@ -39,43 +41,43 @@ The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text w
 
 ### Option A — your own machine
 ```bash
-git clone <repo-url> pdfedit && cd pdfedit/src
+git clone <repo-url> albdf && cd albdf/src
 export VCPKG_ROOT=/path/to/vcpkg
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
-      -DPDFEDIT_BUILD_TESTS=ON
+      -DALBDF_BUILD_TESTS=ON
 cmake --build build
 ```
 
 ### Option B — dev container (recommended, reproducible)
 ```bash
-docker build -t pdfedit-dev -f Dockerfile .
-docker run -it --rm -v $(pwd):/workspace/pdfedit -w /workspace/pdfedit pdfedit-dev
+docker build -t albdf-dev -f Dockerfile .
+docker run -it --rm -v $(pwd):/workspace/albdf -w /workspace/albdf albdf-dev
 # inside: cmake + build + test as above (toolchain already at /workspace/vcpkg)
 ```
 The Dockerfile installs Qt 6 + vcpkg deps + all tools, sets `QT_QPA_PLATFORM=offscreen`, and provides the `ci/run-ci.sh` gate.
 
 ### Verify
 ```bash
-build/bin/PdfTool --version        # → PdfTool 0.1.0
-QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (10 tests)
+build/bin/albdf --version        # → albdf 0.1.0
+QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (11 tests)
 ```
 
 ---
 
 ## Usage
 
-All commands follow `PdfTool <command> <args>`. Exit codes: **0** success, **7** invalid arguments.
+All commands follow `albdf <command> <args>`. Exit codes: **0** success, **7** invalid arguments.
 RTL fonts (OFL) ship in `src/tests/fonts/` (Vazirmatn, Noto Naskh Arabic, Noto Sans Hebrew).
 
 ### add-text
 
 ```bash
 # LTR — standard Helvetica, no font embedding
-PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 --text "Hello" --size 18
+albdf add-text in.pdf out.pdf --page 1 --x 72 --y 700 --text "Hello" --size 18
 
 # RTL — FriBidi + HarfBuzz + embedded TrueType font
-PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 \
+albdf add-text in.pdf out.pdf --page 1 --x 72 --y 700 \
         --text "سلام دنیا" --size 24 --rtl \
         --font src/tests/fonts/Vazirmatn-Regular.ttf --lang fa
 ```
@@ -86,43 +88,43 @@ Coordinates are PDF points (origin bottom-left). `--lang` ∈ `fa|ar|he|ur`.
 ```bash
 # List page content objects (text/image/path) with bounding boxes.
 # The printed index is the address used by delete-object.
-PdfTool recognize-text in.pdf
+albdf recognize-text in.pdf
 ```
 
 ### delete-object
 
 ```bash
 # Delete a whole content object by page + index (see recognize-text).
-PdfTool delete-object in.pdf out.pdf --page 1 --index 3
-PdfTool delete-object in.pdf --page 1 --list      # list without modifying
+albdf delete-object in.pdf out.pdf --page 1 --index 3
+albdf delete-object in.pdf --page 1 --list      # list without modifying
 ```
 
 ### search-text
 
 ```bash
 # RTL-aware, logical-order query; normalization ON by default.
-PdfTool search-text in.pdf "سلام"
-PdfTool search-text in.pdf "123"                   # matches ۱۲۳ (digit unification)
-PdfTool search-text in.pdf "محمد" --no-normalize   # exact match only
-PdfTool search-text in.pdf "hello" --case-sensitive
+albdf search-text in.pdf "سلام"
+albdf search-text in.pdf "123"                   # matches ۱۲۳ (digit unification)
+albdf search-text in.pdf "محمد" --no-normalize   # exact match only
+albdf search-text in.pdf "hello" --case-sensitive
 ```
 Normalization strips tashkeel/ZWNJ/ZWJ, folds presentation forms & lam-alef, unifies Persian/Arabic letters and digit sets. Output: page / item / bounding box / matched text.
 
 ### Other commands
 
-`render`, `fetch-text`, `info`, `info-fonts`, `info-inks`, `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `xml`, `statistics`, `diff`, `attachments`, `cert-store`, `verify-signatures`, `remove-external-links`, `benchmark`, … — run `PdfTool help` for the full list.
+`render`, `fetch-text`, `info`, `info-fonts`, `info-inks`, `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `xml`, `statistics`, `diff`, `attachments`, `cert-store`, `verify-signatures`, `remove-external-links`, `benchmark`, … — run `albdf help` for the full list.
 
 ### Forms & signatures
 
 ```bash
-PdfTool form-list in.pdf                          # list interactive form fields (name, type, value, page, rect)
-PdfTool form-fill in.pdf out.pdf \
+albdf form-list in.pdf                          # list interactive form fields (name, type, value, page, rect)
+albdf form-fill in.pdf out.pdf \
   --field name --value "Ali" --field agree --value On   # fill fields, write new doc
-PdfTool sign in.pdf signed.pdf \
+albdf sign in.pdf signed.pdf \
   --cert mykey.p12 --password secret --reason "approved" # apply PKCS#7 digital signature
-PdfTool sign in.pdf signed.pdf --cert mykey.p12 --password secret \
+albdf sign in.pdf signed.pdf --cert mykey.p12 --password secret \
   --page 1 --rect-x 100 --rect-y 100 --rect-w 200 --rect-h 50   # visible signature widget
-PdfTool verify-signatures signed.pdf                # validate signatures (upstream tool)
+albdf verify-signatures signed.pdf                # validate signatures (upstream tool)
 ```
 
 `form-list` walks the AcroForm tree and reports every field (text / button /
@@ -154,14 +156,13 @@ README.md                  this file
 .clang-format              enforced style (LLVM base, 4-space, 120-col)
 Dockerfile                 reproducible dev container
 ci/run-ci.sh               CI gate: build + ctest + ASAN/UBSAN + clang-format
-db/                        tracking DB (schema.sql + seed.py committed; pdfedit.db gitignored)
+db/                        tracking DB (schema.sql + seed.py committed; albdf.db gitignored)
 scripts/db.py              tracking DB CLI
-plans/PLAN.md              master roadmap (M0–M7)
+plans/PLAN.md              master roadmap (M0–M8.1)
 docs/                      coding standard, ADRs, research, release notes, man page
 agents/roles/              one markdown contract per agent role
 skills/                    vendored skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review)
 src/                       the fork: Pdf4QtLibCore + PdfTool + UnitTests + tests
-tools/                     (legacy empty scaffold — unused)
 vendor-upstream-pdf4qt/    gitignored upstream clone (reference only)
 ```
 
@@ -185,7 +186,7 @@ Each major directory has an `AGENT.md` onboarding guide (with its own TOC):
 cd src
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
-      -DPDFEDIT_BUILD_TESTS=ON
+      -DALBDF_BUILD_TESTS=ON
 cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # 10 tests
 # Full gate (build + ctest + ASAN/UBSAN + clang-format):
@@ -200,7 +201,7 @@ python3 scripts/db.py search "rtl"        # FTS5 search across tasks/decisions/n
 python3 scripts/db.py tasks --open        # open tasks
 python3 scripts/db.py task-done 9 --ref <sha>   # close a task WITH evidence (required)
 ```
-Every task you touch must exist in the DB. **Closing a task requires `--ref <commit-sha>`** — no evidence, no close. Never commit `db/pdfedit.db`; only `schema.sql` + `seed.py`.
+Every task you touch must exist in the DB. **Closing a task requires `--ref <commit-sha>`** — no evidence, no close. Never commit `db/albdf.db`; only `schema.sql` + `seed.py`.
 
 ### Determinism & coding rules
 
@@ -224,7 +225,7 @@ Every task you touch must exist in the DB. **Closing a task requires `--ref <com
 
 ## Testing & CI
 
-- **10 ctest targets**: unit, font encoding, recognize-text, delete-object, add-text, RTL add-text (incl. mirror-regression), RTL search (Hebrew/digits/ZWNJ/tashkeel/mixed-bidi corpus), golden-image render harness, CLI smoke (34 checks).
+- **11 ctest targets**: unit, font encoding, recognize-text, delete-object, add-text, RTL add-text (incl. mirror-regression), RTL search (Hebrew/digits/ZWNJ/tashkeel/mixed-bidi corpus), forms/signatures round-trip, golden-image render harness, CLI smoke (34 checks).
 - **ASAN/UBSAN**: full suite clean.
 - **clang-format gate**: authored files only (vendored upstream exempt).
 - Run everything: `bash ci/run-ci.sh`.

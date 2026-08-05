@@ -1,4 +1,4 @@
-# pdfedit .clang-format — matches PDF4QT conventions (LLVM base, 4-space, 120 cols)
+# albdf .clang-format — matches PDF4QT conventions (LLVM base, 4-space, 120 cols)
 BasedOnStyle: LLVM
 IndentWidth: 4
 ContinuationIndentWidth: 4

@@ -1,4 +1,4 @@
-# Context7 MCP usage notes (pdfedit)
+# Context7 MCP usage notes (albdf)
 
 Fetched 2026-08-04 via native `mcp__context7__*` tools (wired by user on host).
 

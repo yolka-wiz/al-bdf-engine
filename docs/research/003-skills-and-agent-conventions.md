@@ -175,7 +175,7 @@ All are *document-processing tooling* (Python/CLI) → useful to research-agent 
 - **Review**: dedicated Code Review Rules section + mandatory review skills (OpenAI); Human Review Gates (Grafana).
 - **Skill pinning**: mandatory skill usage for defined work types (OpenAI) — skills as enforced procedure, not optional hints.
 
-## B.4 Assessment of `/workspace/pdfedit/AGENTS.md`
+## B.4 Assessment of `/workspace/albdf/AGENTS.md`
 
 **Already strong (vs. the examples):**
 - Determinism-first output rule (§2.1) — exceeds most examples

@@ -1,6 +1,6 @@
 # AGENT.md — Unit / Integration tests (`src/UnitTests/`)
 
-Onboarding guide for agents adding or modifying tests in the `pdfedit` fork.
+Onboarding guide for agents adding or modifying tests in the `albdf` fork.
 Read [`AGENTS.md`](../../AGENTS.md) and
 [`docs/coding-standard.md`](../../docs/coding-standard.md) first. This file covers
 **how tests are structured and how to add a new one.**
@@ -26,7 +26,7 @@ Read [`AGENTS.md`](../../AGENTS.md) and
   `UnitTestsFontEncoding`, `UnitTestsRecognizeText`, `UnitTestsDeleteObject`,
   `UnitTestsAddText`, `UnitTestsRtlAddText`, `UnitTestsSearchText`,
   `UnitTestsGolden`, and `SmokeCli` (the last runs `src/tests/smoke.sh`).
-- Many suites are **integration tests**: they launch the `PdfTool` binary via
+- Many suites are **integration tests**: they launch the `albdf` binary via
   `QProcess` and assert on its stdout/exit code.
 
 ## 2. Test structure & ctest wiring
@@ -36,7 +36,7 @@ Every `add_executable` in `CMakeLists.txt` follows the same template:
 - `set_target_properties(UnitTestsX PROPERTIES WIN32_EXECUTABLE OFF MACOSX_BUNDLE OFF ...)`
 - `add_test(NAME UnitTestsX COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsX")`
 - Integration tests that shell out to the CLI add
-  `add_dependencies(UnitTestsX PdfTool)` so the binary is built first.
+  `add_dependencies(UnitTestsX albdf)` so the binary is built first.
 - Tests that need a headless render add
   `set_tests_properties(UnitTestsX PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")`
   (see `UnitTestsGolden`).
@@ -46,8 +46,8 @@ Every `add_executable` in `CMakeLists.txt` follows the same template:
    with a `Q_OBJECT` macro and `private slots:` (each slot = one test function).
    Add a file-top comment explaining what the suite verifies.
 2. **Wire it into `CMakeLists.txt`** with the template in §2. Give the target a
-   unique name (e.g. `UnitTestsMyThing`). If it runs `PdfTool`, add
-   `add_dependencies(UnitTestsMyThing PdfTool)` and set the offscreen ENV.
+   unique name (e.g. `UnitTestsMyThing`). If it runs `albdf`, add
+   `add_dependencies(UnitTestsMyThing albdf)` and set the offscreen ENV.
 3. **Add compile definitions** for any fixture/font paths the test needs (§5).
 4. **End the file with `QTEST_GUILESS_MAIN(MyThingClass)`** followed by
    `#include "tst_mything.moc"`.
@@ -77,7 +77,7 @@ ToolResult runTool(const QString& toolPath, const QStringList& args, const QStri
     return result;
 }
 ```
-- Resolve the binary via `QCoreApplication::applicationDirPath() + "/PdfTool"`.
+- Resolve the binary via `QCoreApplication::applicationDirPath() + "/albdf"`.
   This is why `QTEST_GUILESS_MAIN` is used — it instantiates a `QCoreApplication`.
 - Do work in a `QTemporaryDir` (never the source tree). Assert with `QCOMPARE`
   (exit code) and `QVERIFY2(cond, "message")` (stdout substrings / file existence).
@@ -91,7 +91,7 @@ Paths are injected at configure time so tests don't hardcode repo locations:
 - `TEST_BLANK_PDF` → `src/tests/fixtures/blank.pdf` (source dir).
 - `TEST_FONT_PERSIAN` / `TEST_FONT_ARABIC` / `TEST_FONT_HEBREW` → the bundled OFL
   fonts in `src/tests/fonts/` (`Vazirmatn`, `NotoNaskhArabic`, `NotoSansHebrew`).
-- `PDFEDIT_TESTS_DIR` → `src/tests` root (used by `UnitTestsGolden`).
+- `ALBDF_TESTS_DIR` → `src/tests` root (used by `UnitTestsGolden`).
 
 Add them like this:
 ```cmake
@@ -115,10 +115,10 @@ Reference in C++ as `QString::fromUtf8(TEST_BLANK_PDF)`.
   `applicationDirPath()` won't resolve → integration tests break.
 - **Forgetting `#include "tst_x.moc"`** at the bottom → automoc doesn't see the
   `Q_OBJECT`, link fails. It must match the `.cpp` basename.
-- **Hardcoding `PdfTool` paths or fixture paths** → breaks in CI; use
+- **Hardcoding `albdf` paths or fixture paths** → breaks in CI; use
   `applicationDirPath()` and the compile definitions.
-- **No `add_dependencies(... PdfTool)`** on a test that launches the CLI → ctest
-  may run before `PdfTool` is built.
+- **No `add_dependencies(... albdf)`** on a test that launches the CLI → ctest
+  may run before `albdf` is built.
 - **Writing into the source tree** instead of a `QTemporaryDir` → pollutes the
   repo and can trip the format/CI gate.
 - **Not adding the ctest target** → your test never runs in CI.

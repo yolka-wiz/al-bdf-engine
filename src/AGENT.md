@@ -1,17 +1,17 @@
-# AGENT.md — pdfedit Source Tree Guide
+# AGENT.md — albdf Source Tree Guide
 
-Onboarding guide for AI agents working in `/workspace/pdfedit/src`. This is the buildable
-source tree of the **pdfedit** project — a fork of MIT-licensed **PDF4QT** delivering a
+Onboarding guide for AI agents working in `/workspace/albdf/src`. This is the buildable
+source tree of the **albdf** project — a fork of MIT-licensed **PDF4QT** delivering a
 headless PDF editing **library + CLI** for Linux (no GUI in v1). Parallel work is governed
-by the binding contract in [`/workspace/pdfedit/AGENTS.md`](../AGENTS.md) and the coding
-standard in [`/workspace/pdfedit/docs/coding-standard.md`](../docs/coding-standard.md).
+by the binding contract in [`/workspace/albdf/AGENTS.md`](../AGENTS.md) and the coding
+standard in [`/workspace/albdf/docs/coding-standard.md`](../docs/coding-standard.md).
 
 ## Table of Contents
 - [Repository & Conventions](#repository--conventions)
 - [Directory Layout](#directory-layout)
 - [Build System (CMake + vcpkg)](#build-system-cmake--vcpkg)
 - [Build & Test Commands](#build--test-commands)
-- [The CLI Binary (PdfTool)](#the-cli-binary-pdftool)
+- [The CLI Binary (albdf)](#the-cli-binary-pdftool)
 - [Our 4 Custom CLI Tools](#our-4-custom-cli-tools)
 - [The RTL Pipeline](#the-rtl-pipeline)
 - [Test Structure](#test-structure)
@@ -36,7 +36,7 @@ standard in [`/workspace/pdfedit/docs/coding-standard.md`](../docs/coding-standa
 | `vcpkg.json` | vcpkg manifest (deps: tbb, openssl, lcms, zlib, openjpeg, freetype, libjpeg-turbo, libpng, blend2d, **harfbuzz**, **fribidi**). |
 | `vcpkg/` | vcpkg **overlays** only (no manifest here). |
 | `Pdf4QtLibCore/` | **The core PDF library** — the real code lives here. See `Pdf4QtLibCore/AGENT.md`. |
-| `PdfTool/` | The CLI. `main.cpp` + `pdftool*.{h,cpp}` per command (~30 upstream + our 4). |
+| `albdf/` | The CLI. `main.cpp` + `pdftool*.{h,cpp}` per command (~30 upstream + our 4). |
 | `UnitTests/` | Our test suite (`tst_*.cpp`, golden tests, smoke.sh). |
 | `tests/` | Test **data** (`fixtures/`, `fonts/`, `golden/`, `scripts/`). |
 | `build/` | Release build dir (Ninja). |
@@ -46,25 +46,25 @@ standard in [`/workspace/pdfedit/docs/coding-standard.md`](../docs/coding-standa
 
 > **Traps:** `cli/` and `core/` look like they hold the CLI/core but they are **empty
 > legacy scaffolds**. The real code is in **`Pdf4QtLibCore/`** (library) and
-> **`PdfTool/`** (CLI). Never create new files there.
+> **`albdf/`** (CLI). Never create new files there.
 
 ## Build System (CMake + vcpkg)
 
 - `CMakeLists.txt` explicitly enumerates every source file — there is **no globbing**.
 - Dependencies are declared in `vcpkg.json`; vcpkg resolves them in **manifest mode**
   (a `vcpkg.json` present in the tree = auto-build of deps).
-- `-DPDFEDIT_BUILD_TESTS=ON` enables the test targets.
+- `-DALBDF_BUILD_TESTS=ON` enables the test targets.
 - New sources must be added to the matching `CMakeLists.txt` or they silently won't compile/link.
 
 ## Build & Test Commands
 
 ```bash
-cd /workspace/pdfedit/src
+cd /workspace/albdf/src
 # Configure (Release, Ninja, vcpkg toolchain, tests on)
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=/workspace/vcpkg/scripts/buildsystems/vcpkg.cmake \
-  -DPDFEDIT_BUILD_TESTS=ON
+  -DALBDF_BUILD_TESTS=ON
 
 # Build
 cmake --build build
@@ -73,13 +73,13 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 
 # Full CI gate (4 stages: build → ctest → ASAN/UBSAN → clang-format on authored files only)
-bash /workspace/pdfedit/ci/run-ci.sh
+bash /workspace/albdf/ci/run-ci.sh
 ```
 
-## The CLI Binary (PdfTool)
+## The CLI Binary (albdf)
 
-- Binary: **`/workspace/pdfedit/src/build/bin/PdfTool`**.
-- Usage: `PdfTool <command> [options]`.
+- Binary: **`/workspace/albdf/src/build/bin/albdf`**.
+- Usage: `albdf <command> [options]`.
 - Dispatch: `main.cpp` resolves `<command>` via `pdftool::PDFToolApplicationStorage::getApplicationByCommand()`;
   unknown commands fall back to the default application.
 - Ships **~30 upstream commands** (render, fetch-text, redact, encrypt, optimize, unite,
@@ -87,7 +87,7 @@ bash /workspace/pdfedit/ci/run-ci.sh
 
 ## Our 4 Custom CLI Tools
 
-These are the project's differentiators. All live in `PdfTool/` and are registered like
+These are the project's differentiators. All live in `albdf/` and are registered like
 the upstream tools:
 
 | Command | Class files | Purpose |
@@ -144,7 +144,7 @@ without updating the contract in AGENTS.md.
 ## Common Pitfalls
 
 - **Editing empty scaffolds:** don't put code in `src/cli/` or `src/core/` — they are legacy
-  stubs. Real code is in `Pdf4QtLibCore/` + `PdfTool/`.
+  stubs. Real code is in `Pdf4QtLibCore/` + `albdf/`.
 - **New source not in CMakeLists.txt:** files aren't globbed — forgetting to register a new
   `.cpp`/`.h` causes silent missing symbols or link failures.
 - **Forgetting `QT_QPA_PLATFORM=offscreen`:** tests that touch Qt GUI/rendering fail or hang

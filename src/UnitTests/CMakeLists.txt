@@ -80,7 +80,7 @@ set_target_properties(UnitTestsRecognizeText PROPERTIES
 )
 add_test(UnitTestsRecognizeText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRecognizeText")
 
-# delete-object integration test: runs PdfTool against the baseline fixture.
+# delete-object integration test: runs albdf against the baseline fixture.
 add_executable(UnitTestsDeleteObject
 	tst_deleteobjecttest.cpp
 )
@@ -97,9 +97,9 @@ set_target_properties(UnitTestsDeleteObject PROPERTIES
 )
 add_test(UnitTestsDeleteObject  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsDeleteObject")
 
-add_dependencies(UnitTestsDeleteObject PdfTool)
+add_dependencies(UnitTestsDeleteObject albdf)
 
-# add-text integration test: runs PdfTool against the baseline fixture.
+# add-text integration test: runs albdf against the baseline fixture.
 add_executable(UnitTestsAddText
 	tst_addtexttest.cpp
 )
@@ -116,9 +116,9 @@ set_target_properties(UnitTestsAddText PROPERTIES
 )
 add_test(UnitTestsAddText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsAddText")
 
-add_dependencies(UnitTestsAddText PdfTool)
+add_dependencies(UnitTestsAddText albdf)
 
-# RTL add-text integration test: runs PdfTool with --rtl against the blank
+# RTL add-text integration test: runs albdf with --rtl against the blank
 # fixture and the bundled OFL fonts (Vazirmatn / Noto Naskh Arabic / Noto Sans
 # Hebrew). The fonts are MIT/OFL permissive; see src/tests/fonts/README.
 add_executable(UnitTestsRtlAddText
@@ -142,9 +142,9 @@ set_target_properties(UnitTestsRtlAddText PROPERTIES
 )
 add_test(UnitTestsRtlAddText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRtlAddText")
 
-add_dependencies(UnitTestsRtlAddText PdfTool)
+add_dependencies(UnitTestsRtlAddText albdf)
 
-# RTL-aware search integration test (M5): drives PdfTool add-text +
+# RTL-aware search integration test (M5): drives albdf add-text +
 # search-text on RTL corpus (Hebrew, Persian digits, ZWNJ, tashkeel,
 # mixed LTR+RTL) and asserts match counts.
 add_executable(UnitTestsSearchText
@@ -168,10 +168,10 @@ set_target_properties(UnitTestsSearchText PROPERTIES
 )
 add_test(UnitTestsSearchText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsSearchText")
 
-add_dependencies(UnitTestsSearchText PdfTool)
+add_dependencies(UnitTestsSearchText albdf)
 
 # Golden-image regression harness: renders src/tests/fixtures/*.pdf with
-# PdfTool render (72 dpi, PNG) and compares SHA-256 against the committed
+# albdf render (72 dpi, PNG) and compares SHA-256 against the committed
 # goldens in src/tests/golden/. See tst_goldentest.cpp for details.
 add_executable(UnitTestsGolden
 	tst_goldentest.cpp
@@ -187,10 +187,10 @@ set_target_properties(UnitTestsGolden PROPERTIES
 )
 
 target_compile_definitions(UnitTestsGolden PRIVATE
-    PDFEDIT_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../tests"
+    ALBDF_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../tests"
 )
 
-add_dependencies(UnitTestsGolden PdfTool)
+add_dependencies(UnitTestsGolden albdf)
 
 add_test(NAME UnitTestsGolden COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsGolden")
 set_tests_properties(UnitTestsGolden PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -212,7 +212,7 @@ set_target_properties(UnitTestsFormSignature PROPERTIES
 add_test(NAME UnitTestsFormSignature COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsFormSignature")
 set_tests_properties(UnitTestsFormSignature PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_dependencies(UnitTestsFormSignature PdfTool)
+add_dependencies(UnitTestsFormSignature albdf)
 
 # CLI smoke test: exercises fetch-text/render/info/unite on the fixtures
 # (and recognize-text/delete-object when present) and asserts invariants.
@@ -221,7 +221,7 @@ if(BASH_PROGRAM)
     add_test(NAME SmokeCli
         COMMAND "${BASH_PROGRAM}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/../tests/smoke.sh"
-                "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/PdfTool"
+                "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/albdf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures")
     set_tests_properties(SmokeCli PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

@@ -1,12 +1,12 @@
-.TH PDFTOOL 1 "2026-08-04" "pdfedit 0.1.0" "User Commands"
+.TH ALBDF 1 "2026-08-05" "albdf 0.1.0" "User Commands"
 .SH NAME
-PdfTool \- work with PDF documents via command line
+albdf \- work with PDF documents via command line
 .SH SYNOPSIS
-.B PdfTool
+.B albdf
 [\fIoptions\fR] \fIcommand\fR [\fIarguments\fR]
 .SH DESCRIPTION
-.B PdfTool
-is the command-line interface of the pdfedit headless PDF editing library
+.B albdf
+is the command-line interface of the albdf headless PDF editing library
 (a fork of PDF4QT). It can inspect, render, edit, and manipulate PDF
 documents without a GUI. It ships with RTL (Arabic/Persian/Hebrew) text
 writing and search support - features not present in upstream PDF4QT.
@@ -29,15 +29,15 @@ Show help including generic Qt options.
 Show version information.
 .SH COMMANDS
 Run
-.B PdfTool help
-for the full list. This page documents the pdfedit-specific commands in
+.B albdf help
+for the full list. This page documents the albdf-specific commands in
 detail; the inherited PDF4QT commands (render, fetch-text, info, unite,
 separate, redact, encrypt, decrypt, optimize, xml, statistics, ...) keep
 their upstream behavior.
 .SS add-text
 Add a text label to a page.
 .PP
-.B PdfTool add-text
+.B albdf add-text
 .I in.pdf out.pdf
 .B \-\-page
 .I N
@@ -83,12 +83,12 @@ Recognize page content objects (text, image, path) and print them with
 bounding boxes. The printed index is the address space used by
 \fBdelete-object\fR.
 .PP
-.B PdfTool recognize-text
+.B albdf recognize-text
 .I in.pdf
 .SS delete-object
 Delete a whole content object from a page.
 .PP
-.B PdfTool delete-object
+.B albdf delete-object
 .I in.pdf out.pdf
 .B \-\-page
 .I N
@@ -107,7 +107,7 @@ List objects on the page and exit without modifying anything.
 .SS search-text
 Search for text in the document, RTL-aware, reporting bounding rectangles.
 .PP
-.B PdfTool search-text
+.B albdf search-text
 .I in.pdf
 .I "QUERY"
 .RB [ \-\-page\-first
@@ -137,6 +137,72 @@ PDF content streams store text in VISUAL order; the engine inverts the
 logical query to visual order (FriBidi) before matching, then maps matched
 characters back to their bounding rects. Output: a table of page, item,
 bounding box (x y w h, PDF points), and matched text.
+.SS form-list
+List interactive form (AcroForm) fields.
+.PP
+.B albdf form-list
+.I in.pdf
+.TP
+Prints one row per field: name, type (text / button / choice /
+signature), current value, page, and widget rectangle. Walks the
+AcroForm tree; read-only fields are flagged.
+.SS form-fill
+Set form field values and write a new document.
+.PP
+.B albdf form-fill
+.I in.pdf out.pdf
+.B \\-\\-field
+.I name
+.B \\-\\-value
+.I VALUE
+.RB [ \\-\\-field
+.I name
+.B \\-\\-value
+.I VALUE ... ]
+.TP
+.B \\-\\-field, \\-\\-value
+Repeated pairs set field values (text/button/choice). Appearance
+streams are regenerated and the result is written to
+.I out.pdf.
+.SS sign
+Apply a PKCS#7 detached digital signature (PAdES-style byte-range).
+.PP
+.B albdf sign
+.I in.pdf signed.pdf
+.B \\-\\-cert
+.I cert.p12
+.B \\-\\-password
+.I SECRET
+.RB [ \\-\\-reason
+.IR REASON ]
+.RB [ \\-\\-page
+.IR N
+.B \\-\\-rect-x
+.IR X
+.B \\-\\-rect-y
+.IR Y
+.B \\-\\-rect-w
+.IR W
+.B \\-\\-rect-h
+.IR H ]
+.TP
+.B \\-\\-cert
+PKCS#12 certificate file. Without \\fB\\-\\-page\\fR the signature is
+invisible; with a page and rect a visible signature widget is placed.
+.TP
+.B \\-\\-password
+PKCS#12 password.
+.TP
+.B \\-\\-reason
+Optional human-readable signing reason.
+.SS verify-signatures
+Validate digital signatures in a document.
+.PP
+.B albdf verify-signatures
+.I signed.pdf
+.TP
+Reports each signature's validity; any tampering of the signed bytes
+shows as an error.
 .SH RTL BEHAVIOR
 .PP
 RTL text added with \fBadd-text \-\-rtl\fR extracts in visual order via
@@ -168,20 +234,20 @@ Other non-zero codes indicate document read/write or processing errors.
 Add a Persian label and search for it:
 .PP
 .nf
-PdfTool add-text in.pdf out.pdf --page 1 --x 72 --y 700 \\
+albdf add-text in.pdf out.pdf --page 1 --x 72 --y 700 \\
        --text "سلام دنیا" --size 24 --rtl \\
        --font /usr/share/fonts/truetype/vazirmatn/Vazirmatn-Regular.ttf --lang fa
-PdfTool search-text out.pdf "سلام"
+albdf search-text out.pdf "سلام"
 .fi
 .PP
 Delete the second object on page 1:
 .PP
 .nf
-PdfTool recognize-text in.pdf
-PdfTool delete-object in.pdf out.pdf --page 1 --index 1
+albdf recognize-text in.pdf
+albdf delete-object in.pdf out.pdf --page 1 --index 1
 .fi
 .SH SEE ALSO
 .BR qpdf (1),
 .BR pdftotext (1)
 .SH AUTHOR
-pdfedit project — a fork of PDF4QT (MIT) by Jakub Melka and contributors.
+albdf project — a fork of PDF4QT (MIT) by Jakub Melka and contributors.

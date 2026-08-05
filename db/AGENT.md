@@ -1,6 +1,6 @@
 # AGENT.md — the tracking database (source of truth for status)
 
-> Everything about the state of `pdfedit` lives in `db/pdfedit.db`. If you
+> Everything about the state of `albdf` lives in `db/albdf.db`. If you
 > changed a component's status, closed a task, added a decision, found a risk,
 > or imported a dependency, you must record it here. The DB is the project's
 > single source of truth for *what exists and how it's going*.
@@ -39,7 +39,7 @@ python3 scripts/db.py <subcommand>
 Run from the repo root. If the DB doesn't exist, first:
 
 ```bash
-python3 scripts/db.py init        # create db/pdfedit.db from db/schema.sql
+python3 scripts/db.py init        # create db/albdf.db from db/schema.sql
 python3 db/seed.py                # load known components/tasks/decisions/questions
 ```
 
@@ -60,7 +60,7 @@ python3 scripts/db.py task-add --component cli --title "Add delete-object CLI" \
     --priority 1 --estimate "2-4d" --assignee core-agent --notes "wire TextFlowEditor::removeItem"
 python3 scripts/db.py task-open 3 --assignee core-agent
 python3 scripts/db.py task-block 3 --why "blocked on M2 build"
-python3 scripts/db.py task-done 3 --ref 942d55a    # REQUIRES --ref (see below)
+python3 scripts/db.py task-done 3 --ref 327061b    # REQUIRES --ref (see below)
 
 # Components
 python3 scripts/db.py comp-add --id rtl-search --name "RTL-aware search" --owner rtl-agent
@@ -130,7 +130,7 @@ researched before starting work.
 
 ## gitignore discipline
 
-- `db/pdfedit.db` (and its `-wal`/`-shm` sidecars) is **gitignored** — never
+- `db/albdf.db` (and its `-wal`/`-shm` sidecars) is **gitignored** — never
   commit it.
 - What IS committed: `db/schema.sql` (the schema) and `db/seed.py` (the seed).
   These two make the DB fully **rebuildable**:

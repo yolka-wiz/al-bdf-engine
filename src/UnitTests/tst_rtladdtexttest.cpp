@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
 // Integration test for the RTL add-text path (--rtl --font --lang).
 //
-// Runs PdfTool against the blank fixture with the bundled OFL fonts and verifies:
+// Runs albdf against the blank fixture with the bundled OFL fonts and verifies:
 //   - RTL text is embedded as Type0/Identity-H (info-fonts lists it, embedded=Yes)
 //   - Hebrew round-trips exactly through fetch-text (no ligatures/marks)
 //   - Persian extracts with expected degradation (lam-alef ligature -> lam)
@@ -81,8 +81,8 @@ private slots:
 
 void RtlAddTextTest::test_hebrewRoundTrip()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
-    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("PdfTool binary missing: %1").arg(toolPath)));
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
 
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
@@ -123,7 +123,7 @@ void RtlAddTextTest::test_hebrewRoundTrip()
 
 void RtlAddTextTest::test_persianExtraction()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -161,7 +161,7 @@ void RtlAddTextTest::test_persianExtraction()
 
 void RtlAddTextTest::test_rtlFontEmbedded()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -197,7 +197,7 @@ void RtlAddTextTest::test_rtlFontEmbedded()
 
 void RtlAddTextTest::test_rtlKeepsLtrIntact()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -254,7 +254,7 @@ void RtlAddTextTest::test_rtlKeepsLtrIntact()
 
 void RtlAddTextTest::test_rtlRenderNoErrors()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -311,7 +311,7 @@ void RtlAddTextTest::test_rtlNotMirrored()
     // (Verified against Qt's bidi-aware QPainter reference: glyph positions
     // match only without the reversal — HarfBuzz >= 4 emits RTL runs
     // leftmost-first already.)
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 

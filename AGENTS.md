@@ -5,10 +5,11 @@
 
 ## 1. Project identity
 
-- **What we build:** `pdfedit` — a headless PDF editing **library** + **CLI** for Linux.
+- **What we build:** `albdf` — a headless PDF editing **library** + **CLI** for Linux,
+  focused on Middle Eastern languages (Arabic/Persian/Hebrew RTL).
 - **What we do NOT build (yet):** any GUI. No QWidgets, no QML, no web frontend.
   All work must be testable from a terminal with no display.
-- **Base:** fork of PDF4QT (`Pdf4QtLibCore` + `PdfTool`), MIT. We extend it, we don't
+- **Base:** fork of PDF4QT (`Pdf4QtLibCore` + `PdfTool`, CLI shipped as `albdf`), MIT. We extend it, we don't
   rewrite it. Our fork lives under `src/`; upstream is a git remote.
 - **Differentiators:** RTL (Arabic/Persian/Hebrew) write + search; object deletion; add-text.
 
@@ -34,7 +35,7 @@
 
 ## 3. The tracking database is the source of truth for status
 
-Everything is tracked in `db/pdfedit.db` (SQLite + FTS5). CLI: `python3 scripts/db.py`.
+Everything is tracked in `db/albdf.db` (SQLite + FTS5). CLI: `python3 scripts/db.py`.
 
 ```bash
 python3 scripts/db.py status          # full status by component
@@ -67,7 +68,7 @@ Full standard in `docs/coding-standard.md`. Non-negotiable highlights:
 - No `using namespace std;`. No exceptions across API boundaries without docs.
 - Public API in headers gets Doxygen comments.
 - License header on every new file: `SPDX-License-Identifier: GPL-3.0-or-later` +
-  the standard GPLv3 notice, "Copyright (c) 2026 pdfedit contributors". The project is
+  the standard GPLv3 notice, "Copyright (c) 2026 albdf contributors". The project is
   GPL-3.0-or-later (ADR-0005); upstream PDF4QT portions keep MIT.
 
 ## 6. Git workflow

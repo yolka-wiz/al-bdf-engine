@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
 // Integration test for the add-text CLI command.
 //
-// Runs the PdfTool binary against the test-baseline fixture and verifies:
+// Runs the albdf binary against the test-baseline fixture and verifies:
 //   - the added text is extractable via fetch-text
 //   - the original text stays intact
 //   - the added text is listed by recognize-text as a text object with
@@ -77,8 +77,8 @@ private slots:
 
 void AddTextTest::test_addTextExtractable()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
-    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("PdfTool binary missing: %1").arg(toolPath)));
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
 
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
@@ -109,7 +109,7 @@ void AddTextTest::test_addTextExtractable()
 
 void AddTextTest::test_originalTextIntact()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -138,7 +138,7 @@ void AddTextTest::test_originalTextIntact()
 
 void AddTextTest::test_addedTextInRecognize()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 

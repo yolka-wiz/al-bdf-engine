@@ -1,4 +1,4 @@
-# pdfedit Coding Standard
+# albdf Coding Standard
 
 Applies to ALL code in this repo, human- or agent-written. Binding — see `AGENTS.md` §5.
 When in doubt, follow the surrounding PDF4QT code style; this standard codifies it.
@@ -23,7 +23,7 @@ When in doubt, follow the surrounding PDF4QT code style; this standard codifies 
 | Constants / enums | CamelCase values | `enum Flag { None, Text }` |
 | Namespaces | `pdf::` (core), `pdftool::` (CLI) | — |
 | Files | lowercase, one concept per file | `pdfdocumenttextflow.h` |
-| Macros | `PDF4QT_`/`PDFEDIT_` uppercase | `PDF4QTLIBCORESHARED_EXPORT` |
+| Macros | `PDF4QT_`/`ALBDF_` uppercase | `PDF4QTLIBCORESHARED_EXPORT` |
 
 ## 3. Formatting (enforced)
 

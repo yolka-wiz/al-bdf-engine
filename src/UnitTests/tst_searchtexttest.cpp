@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copyright (c) 2026 pdfedit contributors
+// Copyright (c) 2026 albdf contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-// This file is part of the pdfedit project, a fork of PDF4QT (MIT).
+// This file is part of the albdf project, a fork of PDF4QT (MIT).
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
@@ -87,7 +87,7 @@ SearchTextTest::runTool(const QString& toolPath, const QStringList& arguments, c
 
 void SearchTextTest::test_hebrewSearch()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -123,7 +123,7 @@ void SearchTextTest::test_hebrewSearch()
 
 void SearchTextTest::test_persianDigits()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -160,7 +160,7 @@ void SearchTextTest::test_persianDigits()
 
 void SearchTextTest::test_zwnjInsensitive()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -199,7 +199,7 @@ void SearchTextTest::test_zwnjInsensitive()
 
 void SearchTextTest::test_tashkeelInsensitive()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -239,7 +239,7 @@ void SearchTextTest::test_tashkeelInsensitive()
 
 void SearchTextTest::test_mixedBidi()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
@@ -281,7 +281,7 @@ void SearchTextTest::test_mixedBidi()
 
 void SearchTextTest::test_noFalsePositive()
 {
-    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/PdfTool");
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 

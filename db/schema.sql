@@ -1,5 +1,5 @@
--- pdfedit tracking database schema
--- SQLite + FTS5. Live file db/pdfedit.db is gitignored; this schema + seed are committed.
+-- albdf tracking database schema
+-- SQLite + FTS5. Live file db/albdf.db is gitignored; this schema + seed are committed.
 
 PRAGMA journal_mode = WAL;
 

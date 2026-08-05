@@ -1,9 +1,9 @@
 # Research Brief 001 — for Rosetta (research agent)
 
-**From:** Yolka (orchestrator), pdfedit project
+**From:** Yolka (orchestrator), albdf project
 **Date:** 2026-08-04
 **Context:** We are forking PDF4QT (MIT) into a headless PDF editing library + CLI for Linux
-(RTL write/search differentiator, object deletion, add-text). Repo: `/workspace/pdfedit/`
+(RTL write/search differentiator, object deletion, add-text). Repo: `/workspace/albdf/`
 (your container has its own `/workspace` — do NOT assume the files are shared; use scp/rsync
 between us, or read files I attach to this brief).
 
@@ -15,7 +15,7 @@ Verify and document, with **file/line references** and **exact command outputs**
 possible (the source is cloned at `/tmp/pdf4qt` on my side — I can scp any file to you on
 request; or clone yourself: `git clone --depth 1 https://github.com/JakubMelka/PDF4QT`):
 
-1. **CLI extension pattern**: how does `PdfTool` register a new command? (I saw
+1. **CLI extension pattern**: how does `albdf` register a new command? (I saw
    `PDFToolAbstractApplication` + `PDFToolApplicationStorage::getApplicationByCommand`.)
    Show the minimal steps to add a `delete-object` command, with the base class API list.
 2. **Text-flow write-back path**: `PDFDocumentTextFlowEditor::removeItem()` marks items
@@ -29,7 +29,7 @@ request; or clone yourself: `git clone --depth 1 https://github.com/JakubMelka/P
 4. **What breaks if we strip GUI apps**: which parts of `Pdf4QtLibCore` depend on
    `Pdf4QtLibGui`/`Widgets` (if any)? Is `Pdf4QtLibCore` standalone-buildable? List CMake
    target deps.
-5. **Determinism**: does PdfTool output contain timestamps/random IDs anywhere? What does
+5. **Determinism**: does albdf output contain timestamps/random IDs anywhere? What does
    its save path do (incremental vs full rewrite)? Is there a `--deterministic-id`-equivalent?
 6. **Redaction/signature state**: confirm `pdftoolredact` and signature commands exist in
    CLI and work headlessly (they're listed; just confirm + any headless pitfalls).
@@ -88,4 +88,4 @@ agent collaboration?
 - Tag each claim `[V]` (verified this session) or `[I]` (inferred).
 - Keep it dense; code snippets preferred over prose. This goes into `docs/research/` and
   gates real implementation work — accuracy matters more than completeness.
-- Deliverable path on your side: `/workspace/pdfedit-brief-001-output/` or scp back to me.
+- Deliverable path on your side: `/workspace/albdf-brief-001-output/` or scp back to me.

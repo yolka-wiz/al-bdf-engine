@@ -1,3 +1,27 @@
+# albdf — release notes
+
+## Post-0.1.0 (main, unreleased) — rename + M8/M8.1
+
+Date: 2026-08-05
+Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
+
+- **Rename:** project and CLI renamed from `pdfedit`/`PdfTool` to **albdf**.
+  Binary is now `albdf`; man page `docs/albdf.1`; CMake project `albdf`.
+  Upstream library names (`Pdf4QtLibCore`) and the `src/PdfTool/` layout are
+  kept for cherry-pick hygiene.
+- **License:** authored code relicensed GPL-3.0-or-later (ADR-0005, `68ba8a6`);
+  upstream PDF4QT portions keep MIT.
+- **M8 — Forms & signatures:** `form-list`, `form-fill`, `sign`
+  (PKCS#7 detached, PAdES byte-range), `verify-signatures`; round-trip +
+  tamper tests (`3b3e563`, `b8efe4a`, `02b8719`, `6a2a325`). Suite now 11/11.
+- **M8.1 — Real-world compatibility sweep:** content-stream floats in
+  FixedNotation (strict parsers reject `1.5e-05`, `591dfee`); control-char
+  XML sanitization + indirect page resources (`0edbb03`); search duplicate-yeh
+  collapse (`615b1bc`); CI format gate exempts upstream-derived files
+  (`13cda1c`). All 11 corpus files pass the 7-step battery.
+
+---
+
 # pdfedit 0.1.0 — release notes
 
 Date: 2026-08-04
@@ -57,11 +81,11 @@ HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamically linked), blend2d/asmjit
 
 ## Commits since fork base
 
-- 942d55a M3 add-text (LTR)
-- ca6313c M4 RTL write pipeline
-- 23dc377 fix mirrored RTL rendering (HB>=4 leftmost-first)
-- d516e4e M5 RTL search + engine bugfixes (absolute clusters,
+- 327061b M3 add-text (LTR)
+- fe016c4 M4 RTL write pipeline
+- 9d7d710 fix mirrored RTL rendering (HB>=4 leftmost-first)
+- aa92bee M5 RTL search + engine bugfixes (absolute clusters,
   per-instance codes, TJ kerning arrays)
-- f3d20e7/c433dfe/138619d M6 CI + format gate
-- 717d1d4 M7 docs (README, man page)
+- b6f4bf6/dc45fcb/70e8934 M6 CI + format gate
+- 479ebe0 M7 docs (README, man page)
 - 0.1.0 tag: this release
