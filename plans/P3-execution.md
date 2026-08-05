@@ -2,7 +2,7 @@
 
 > **For Hermes:** orchestrated development via subagents. Each phase is a
 > self-contained delegate_task with its own RED/GREEN gate and commit.
-> Status: **START** (2026-08-05). Owner: yolka (orchestrator) + rtl-agent (impl).
+> Status: **BLOCKED-ROOT-CAUSE-FOUND** (2026-08-05). Owner: yolka (orchestrator) + rtl-agent (impl).
 
 **Goal:** Make Arabic/Persian diacritics (tashkeel) and Hebrew niqqud render
 **above** the baseline by emitting per-glyph `Ts` (text rise) in the RTL
@@ -16,13 +16,51 @@ content-stream emitter, without breaking extraction, search, or golden images.
 
 ---
 
+## ⚠️ CRITICAL FINDING (2026-08-05, verified by orchestrator with Ghostscript)
+
+**The CIDToGIDMap array emitted by pdfrtltextengine.cpp is invalid per PDF spec
+and causes WRONG GLYPHS in every strict renderer — including albdf's own.**
+
+- The emitter writes `/CIDToGIDMap [0 681]` or `[0 1173 728 1266]` — a short
+  **array** (one entry per used glyph). PDF 32000-1 §9.7.4.3 requires
+  **65536 entries** for a 2-byte-CID font, or a **stream**.
+- Strict renderers (Ghostscript) reject the short array → Identity fallback
+  (CID == GID) → code 1 = GID 1 = `.null` (invisible), code 2 = GID 2 =
+  **Latin 'A'**. Single "ا" renders as NO INK; "مَا" renders as 'A' shapes.
+- PDF4QT's parser reads CIDToGIDMap only when it `isStream()` (pdffont.cpp
+  ~2354) — so albdf's own renderer ALSO ignores the array. **The "14px mark
+  blob" in earlier Phase-2 probes was literally Latin 'A' (gid 2), not the
+  fatha.**
+- **Proof:** hand-patched alef.pdf with a proper 65536-entry (Flate or raw)
+  CIDToGIDMap stream → Ghostscript paints the alef correctly (2×16px stroke).
+- Why tests missed it: golden tests never pixel-verify albdf's own RTL output;
+  fetch-text/search use ToUnicode + /ActualText (correct regardless of glyph
+  mapping); RTL render tests only assert exit code / no FreeType errors.
+
+**Consequence:** P3's Ts emission is *mechanically correct* (gid 728 + `Ts 2`
+rises 2px in Ghostscript), but it can never be validated by pixel probes until
+the CIDToGIDMap emission is fixed. Fix order is therefore:
+
+1. **Fix CIDToGIDMap emission** → emit a 65536-entry stream (2 bytes per CID,
+   code→gid, unused = 0), Flate-compressed if the factory supports it, or raw
+   131072-byte stream (matches existing uncompressed ToUnicode style). Keep the
+   per-instance code scheme (codeToGid). Verify with Ghostscript + albdf render.
+2. **Re-apply + verify Ts emission** (kasra sign to be pinned empirically with
+   correct glyph mapping — the earlier ±3.93 confusion was measuring 'A').
+3. No-regression: fetch-text/search/golden — **golden images may legitimately
+   change** (they embedded wrong glyphs); regenerate deliberately with evidence.
+4. Docs + DB: PROBLEMS.md gets a new P# entry for the CIDToGIDMap bug (spec
+   compliance, affects ALL RTL output), P3 → resolved with sha, DB tasks closed.
+
+---
+
 ## Baseline facts (verified 2026-08-05)
 
 | Fact | Value |
 |---|---|
-| Working tree | clean @ `d1f112d` (main, synced with origin) |
+| Working tree | clean @ `dc3e1d8` (RED test committed) |
 | Build dir | `src/build` exists (Release, Ninja) — **not** repo-root `build` |
-| Baseline tests | `QT_QPA_PLATFORM=offscreen ctest --test-dir src/build` → **11/11 pass** |
+| Baseline tests | `QT_QPA_PLATFORM=offscreen ctest --test-dir src/build` → **11/11 pass** (RED test excluded from baseline; now 1 fail expected) |
 | Emitter | `src/Pdf4QtLibCore/sources/pdfrtltextengine.cpp` (666 lines) |
 | Test file | `src/UnitTests/tst_rtladdtexttest.cpp` (runTool helper, offscreen) |
 | Fixtures | `src/tests/fixtures/blank.pdf`; fonts `src/tests/fonts/Vazirmatn-Regular.ttf` (has GPOS anchors), `NotoNaskhArabic-Regular.ttf`, `NotoSansHebrew-Regular.ttf` |
@@ -38,124 +76,77 @@ Configure from `src/` (repo-root has no CMakeLists):
 
 ---
 
-## Execution phases
+## Execution phases (REVISED)
 
-### Phase 1 — RED: pixel-probe test (rtl-agent)
+### Phase 2a — Fix CIDToGIDMap emission (rtl-agent) ← NEW, do FIRST
 
-**Objective:** A failing test that pins the exact symptom: marks at baseline.
-
-**Files:**
-- Modify: `src/UnitTests/tst_rtladdtexttest.cpp` — add
-  `void test_verticalMarkOffsets()` (declaration + definition + `QTest::newRow`).
-
-**Steps:**
-
-1. Read `src/UnitTests/AGENT.md` and the existing test file — copy the
-   `runTool` pattern from `test_rtlRenderNoErrors` / `test_persianExtraction`
-   (add-text → render → inspect PNG).
-2. Write the test:
-   - `add-text --page 1 --x 72 --y 700 --size 24 --rtl --lang fa --font
-     TEST_FONT_PERSIAN` (Vazirmatn) with text `مَا` (fatha) and separately
-     `بِسْم` (kasra), onto `TEST_BLANK_PDF` (blank.pdf), output to tmp dir.
-   - `render` page 1 → PNG (`--image-output-dir`, see
-     `tst_rtladdtexttest.cpp` for the real flag used today).
-   - Load PNG with `QImage`, find the base letter ink band (x-range of any
-     non-background pixel row that contains base-letter ink), then assert:
-     (a) **ink exists** in the band above the base letter's ascender
-     (mark present above baseline), and
-     (b) the mark's pixels are **not** painted overlapping the base letter's
-     core (band between baseline and x-height shows the mark, not the base
-     overpaint).
-   - Keep assertions simple and deterministic: compare pixel columns/rows
-     between the base glyph and a control glyph without a mark, or probe
-     fixed bands. The point is: **this test FAILS today** (marks at baseline,
-     so the above-baseline band is empty).
-3. Run: `cmake --build build -j$(nproc)` then
-   `QT_QPA_PLATFORM=offscreen ctest --test-dir build -R RtlAddText
-   --output-on-failure`.
-   **Expected:** test FAILS for the right reason (band empty / mark
-   overlapping base), other RtlAddText tests still pass.
-4. Commit: `test(rtl): RED — vertical mark offset pixel-probe fails at baseline (P3)`.
-5. Report: test name, exact failure output, PNG probe numbers, commit sha.
-
-**Gate:** RED observed + committed with failing assertion tied to the symptom.
-
----
-
-### Phase 2 — GREEN: emit `Ts` for non-zero `yOffset` (rtl-agent)
-
-**Objective:** Make the RED test pass with minimal emitter change.
+**Objective:** Spec-valid glyph mapping so every renderer paints the right glyph.
 
 **Files:**
-- Modify: `src/Pdf4QtLibCore/sources/pdfrtltextengine.cpp` (loop at 455–478).
-- Modify (as needed): `src/UnitTests/tst_rtladdtexttest.cpp` — only if the
-  probe bands were miscalibrated, and then only after re-reading the failure.
+- Modify: `src/Pdf4QtLibCore/sources/pdfrtltextengine.cpp` (CIDToGIDMap block,
+  lines ~604–615).
 
 **Steps:**
+1. Replace the array emission with a **stream** of 65536 2-byte big-endian
+   entries: entry[0] = 0 (.notdef), entry[code] = gid from `codeToGid`, all
+   other entries = 0. 131072 bytes raw. If the project's PDFStream/factory
+   supports FlateDecode (check how other streams are written), use it — zeros
+   compress to near nothing; otherwise raw stream with `/Length` is acceptable
+   and matches the existing uncompressed ToUnicode style.
+2. **Verify glyph correctness with Ghostscript** (independent, spec-strict):
+   ```
+   gs -q -dNOPAUSE -dBATCH -sDEVICE=png16m -r72 -sOutputFile=/tmp/x.png <out.pdf>
+   ```
+   - single "ا" → a vertical stroke (INK present), NOT empty, NOT 'A'
+   - "مَا" → alef + meem glyphs + small fatha mark, NOT Latin 'A' shapes
+3. Verify albdf's own render matches (same shapes, not 'A').
+4. Full ctest still 11/11 except the RED P3 test (which may still fail —
+   glyph mapping is fixed but Ts is not yet re-applied).
+5. Commit: `fix(rtl): emit spec-valid 65536-entry CIDToGIDMap stream (P6)`.
 
-1. In the glyph loop, for each glyph with non-zero `yOffset`:
-   - `flushHex()`; close/open TJ array as needed (the plan: emit the mark
-     glyph as its own single-glyph string).
-   - `rise = yOffset * fontSize / upem` (font units → PDF points; verify
-     empirically — see Risks).
-   - Emit `"<rise> Ts"`, then the mark hex string `Tj`, then `"0 Ts"`.
-   - Continue the run (re-open TJ array with remaining glyphs).
-2. **Unit-convention probe:** the exact `Ts` semantics (pre/post-`Tfs`
-   scaling) MUST be verified by the pixel test, not assumed. If the first
-   attempt puts the mark too far/not far enough, adjust the conversion
-   factor and re-run. Document the final formula in a code comment.
-3. Build + run the RED test → **GREEN**. Then full:
-   `QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure`
-   → all 11 tests pass.
+**Gate:** Ghostscript + albdf both paint correct Arabic glyphs; no regressions.
+
+### Phase 2b — Re-apply + pin Ts emission (rtl-agent)
+
+**Objective:** Make the RED test GREEN with correct glyph mapping.
+
+**Steps:**
+1. Re-apply the Ts emission from the earlier attempt (flush TJ → `rise Ts` →
+   mark `<hex> Tj` → `0 Ts` → reopen TJ), with the stale comments updated.
+2. **Pin the formula and kasra sign EMPIRICALLY** with Ghostscript on the real
+   output: render mark PDF, measure where fatha ink lands (must be above base
+   top) and kasra ink (must be below base bottom). Try `rise = -yOffset *
+   fontSize / upem` first, then variants, ONE at a time. The earlier kasra
+   confusion (±3.93) was measuring Latin 'A' — re-derive with correct glyphs.
+3. RED test must pass (all three assertions: fatha above, no core overpaint,
+   kasra below). Full ctest 11/11.
 4. Commit: `feat(rtl): emit Ts for GPOS vertical mark offsets (P3 green)`.
-5. Report: exact emitted content-stream snippet for `مَا`, the final
-   conversion formula, ctest summary, commit sha.
 
-**Gate:** RED test green + full ctest green + comment documents formula.
-
----
+**Gate:** RED test green + full ctest green + Ghostscript confirms glyphs.
 
 ### Phase 3 — No-regression: extraction & search (rtl-agent)
 
-**Objective:** Prove `Ts` did not break flow/extraction/search (the Tm-split
-phantom-space trap; `Ts` should avoid it by design).
+**Objective:** Prove glyph-map fix + Ts did not break extraction/search/golden.
 
 **Steps:**
+1. On mark PDF: `fetch-text` → logical text intact; `search-text` → 1 match.
+2. Golden images: **expect changes where goldens embedded wrong glyphs** —
+   regenerate via the golden harness with evidence, do not hand-edit.
+3. Commit as needed: `fix(rtl): regenerate goldens for correct glyph mapping (P6)`.
+4. Report: fetch-text output, search counts, golden diff summary, commits.
 
-1. On the mark PDF from Phase 2:
-   - `fetch-text` → logical text intact (`مَا` / `بِسْم`), no phantom spaces.
-   - `search-text "ما"` and `"بسم"` (normalization strips marks) → 1 match each.
-2. Golden images: run `src/tests/golden/run.sh` (or the UnitTestsGolden
-   ctest) — non-mark fixtures byte-identical to baseline.
-3. If `fetch-text`/`search` regress: STOP, do not hack around — report the
-   exact output. (Design doc says `Ts` must not move the pen; if PDF4QT's
-   flow sees a gap, we need a different emission shape — this is the risky
-   branch.)
-4. Commit only if a guard is genuinely needed (design doc says none should
-   be): `fix(rtl): <what> (P3 extraction guard)`.
-5. Report: fetch-text output, search match counts, golden results, commits.
-
-**Gate:** extraction + search + golden all unchanged vs baseline.
-
----
+**Gate:** extraction + search unchanged; golden diffs are deliberate glyph fixes.
 
 ### Phase 4 — Docs, DB, gate, push (orchestrator, yolka)
 
-**Objective:** Close the loop: PROBLEMS.md P3 → resolved, DB #19 closed with
-evidence, CI gate, push.
-
 **Steps:**
+1. PROBLEMS.md: new entry **P6** CIDToGIDMap array invalid (spec §9.7.4.3) →
+   Fixed with sha; P3 row → Fixed with sha; note P3 was unverifiable until P6.
+2. README/RELEASES limitation note → feature note.
+3. DB: `task-done 19 --ref <green-sha>`; add+close P6 task in seed.py.
+4. Gate: `ci/run-ci.sh` all green; push.
 
-1. `docs/PROBLEMS.md`: P3 row → **Fixed** with commit sha; move note under
-   the "Design decision" if still relevant.
-2. `docs/RELEASES.md` + `README.md`: limitation note → feature note
-   (per design doc Files table).
-3. DB: `python3 scripts/db.py task-done 19 --ref <green-sha>`; update
-   `db/seed.py` TASKS entry status→done + evidence_ref.
-4. Gate: `ci/run-ci.sh` all green (Release + ASAN/UBSAN + clang-format).
-5. Commit: `docs: P3 resolved — vertical mark offsets (Ts)`; push to origin.
-
-**Gate:** DB shows #19 done with sha; CI green; pushed.
+**Gate:** DB shows #19 + P6 done with shas; CI green; pushed.
 
 ---
 
@@ -163,32 +154,14 @@ evidence, CI gate, push.
 
 | Risk | Handling |
 |---|---|
-| `Ts` unit convention wrong (pre/post `Tfs`) | **Ranked hypotheses, test one at a time:** H1 `rise = yOffset*fontSize/upem`; H2 `rise = yOffset/upem` (Ts unscaled); H3 needs `* 1000/upem`. Pixel probe disambiguates. Never stack multiple fixes. |
-| Phantom space from `Ts` in PDF4QT flow | Phase 3 gate; if it appears, this is an architectural flag → STOP, report, do not cargo-cult a Tm split (design doc warns it breaks extraction). |
-| Font lacks GPOS anchors → `yOffset==0` | No `Ts` emitted, behavior unchanged; Vazirmatn has anchors (verified in design doc). |
-| Multi-mark stacking (fatha+shadda) | Per-glyph `Ts` toggles; add a stacked case in Phase 1 if the probe needs it. |
-| S#1 search interplay | Mark glyph has zero advance → same flow item; Phase 3 explicitly tests search on mark text. |
+| CIDToGIDMap stream too large (131KB raw per font) | Flate it if supported; verify size in real output; if factory lacks Flate, accept raw and note as follow-up |
+| `Ts` unit convention wrong (pre/post `Tfs`) | Ghostscript pixel probe pins it; ranked hypotheses H1/H2, one at a time |
+| Kasra sign ambiguity | Re-derive with CORRECT glyphs (earlier data was polluted by 'A') |
+| Golden images "break" | Expected — they embedded wrong glyphs; regenerate with evidence |
+| PDF4QT renderer still differs from Ghostscript | Compare both on same PDF; PDF4QT reads stream maps so should now match |
 
 **Debugging rules (systematic-debugging):**
-- Phase 1 first, always. No GREEN without a witnessed RED.
-- One variable per change; re-run the tight loop (`-R RtlAddText`) after every
-  edit.
+- Phase 2a FIRST — no Ts work until glyphs map correctly (symptom-fix trap).
+- One variable per change; tight loop = Ghostscript pixel probe + `-R RtlAddText`.
 - Temporary logs tagged `[DEBUG-p3]`; removed before commit.
-- If 3+ fix attempts fail → stop, question the emission architecture, report
-  to orchestrator.
-
----
-
-## Subagent dispatch plan (orchestrator)
-
-1. **Phase 1** → `delegate_task(goal="Implement P3 RED test", context=<repo
-   facts + this plan>)`. Leaf, toolsets terminal+file.
-2. After Phase 1 returns (sha verified), **Phase 2** → fresh delegate.
-3. After Phase 2 returns, **Phase 3** → fresh delegate.
-4. Orchestrator does Phase 4 (docs+DB+gate+push) directly — it needs no
-   subagent and requires repo-level judgment.
-
-Each delegate gets: repo path, AGENTS.md is binding, build commands,
-QT_QPA_PLATFORM=offscreen, TDD rules, commit conventions (Conventional
-Commits, one logical change per commit), and the exact Phase gate. Child
-summaries are self-reports — verify shas/tests/pushes ourselves.
+- If 3+ fix attempts fail → stop, question the emission architecture, report.
