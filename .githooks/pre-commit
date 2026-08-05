@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# albdf pre-commit hook
+#
+# 1. Regenerates REPO_MAP.md (deterministic orientation index) and stages it,
+#    so the committed map always reflects the committed tree.
+# 2. Runs the markdown structure gate on STAGED .md files (except README.md
+#    and vendored skills/), enforcing the "structured, not minimal" doc rule.
+#
+# Install:  scripts/install-hooks.sh   (sets core.hooksPath to .githooks)
+# Skip:     git commit --no-verify      (or SKIP=1 git commit ...)
+#
+# Fail-fast, deterministic, no network. Exits 1 on gate failure (aborts commit).
+
+set -u
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# ---- 1. Regenerate REPO_MAP.md ---------------------------------------------
+if python3 "$REPO_DIR/scripts/gen-repo-map.py" >/dev/null 2>&1; then
+    # Stage the regenerated map so it rides along with the commit.
+    git -C "$REPO_DIR" add REPO_MAP.md 2>/dev/null || true
+else
+    echo "pre-commit: WARNING: REPO_MAP.md regeneration failed — skipping (not blocking)."
+fi
+
+# ---- 2. Markdown structure gate on staged .md files ------------------------
+STAGED_MD="$(git -C "$REPO_DIR" diff --cached --name-only --diff-filter=ACM -- '*.md' 2>/dev/null || true)"
+
+if [ -n "$STAGED_MD" ]; then
+    # shellcheck disable=SC2086
+    if ! python3 "$REPO_DIR/scripts/check-markdown-structure.py" $STAGED_MD; then
+        echo
+        echo "pre-commit: markdown structure gate FAILED (staged .md files above)."
+        echo "Fix the doc (add an H1 title + sections) or stage only intended files."
+        echo "To bypass: git commit --no-verify"
+        exit 1
+    fi
+fi
+
+exit 0
