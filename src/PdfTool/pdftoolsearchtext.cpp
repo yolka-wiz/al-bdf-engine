@@ -117,9 +117,17 @@ int PDFToolSearchText::execute(const PDFToolOptions& options)
 
     for (const pdf::PDFTextSearchEngine::Match& match : matches)
     {
+        QString itemColumn = QString::number(static_cast<qlonglong>(match.itemIndex));
+        if (match.spans.size() > 1)
+        {
+            // Multi-item match: show "first+last" span indices, e.g. "2+3"
+            // means the match covers items 2 and 3.
+            itemColumn += QStringLiteral("+%1")
+                              .arg(static_cast<qlonglong>(match.spans.back().itemIndex));
+        }
         formatter.beginTableRow("match");
         formatter.writeTableColumn("page", QString::number(match.pageIndex + 1));
-        formatter.writeTableColumn("item", QString::number(static_cast<qlonglong>(match.itemIndex)));
+        formatter.writeTableColumn("item", itemColumn);
         formatter.writeTableColumn("bbox",
                                    QStringLiteral("%1 %2 %3 %4")
                                        .arg(match.boundingRect.x())
