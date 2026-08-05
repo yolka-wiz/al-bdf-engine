@@ -73,6 +73,8 @@ TASKS = [
     ("forms-signatures", "sign: PKCS#7 detached signature, PAdES byte-range flow (invisible/visible)", 1, "3-5d", "core-agent", "done", "", "02b8719"),
     ("forms-signatures", "UnitTestsFormSignature: form-list/form-fill/sign/verify/tamper round-trip", 1, "1-2d", "test-agent", "done",
      "Suite now 11/11.", "6a2a325"),
+    ("rtl-writer", "P3: vertical mark offsets via per-glyph Ts (text rise) emission", 2, "M", "rtl-agent", "open",
+     "Design: plans/P3-vertical-mark-offsets.md. Emit Ts around zero-width GPOS marks so diacritics render above baseline. RED pixel-probe test in tst_rtladdtexttest.cpp.", ""),
 ]
 
 DECISIONS = [
