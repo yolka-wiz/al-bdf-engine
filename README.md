@@ -159,6 +159,9 @@ Dockerfile                 reproducible dev container
 ci/run-ci.sh               CI gate: build + ctest + ASAN/UBSAN + clang-format
 db/                        tracking DB (schema.sql + seed.py committed; albdf.db gitignored)
 scripts/db.py              tracking DB CLI
+scripts/gen-repo-map.py    REPO_MAP.md generator (pre-commit hook runs it)
+scripts/check-markdown-structure.py  doc-structure gate (H1 + sections)
+scripts/install-hooks.sh   install .githooks/pre-commit (core.hooksPath)
 plans/PLAN.md              master roadmap (M0–M8.1)
 docs/                      coding standard, ADRs, research, release notes, man page
 agents/roles/              one markdown contract per agent role

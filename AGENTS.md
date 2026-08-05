@@ -78,6 +78,11 @@ Full standard in `docs/coding-standard.md`. Non-negotiable highlights:
 - Every commit must compile (no "wip" commits that break the build — use `git stash`
   or work in a branch).
 - Merge via rebase, keep history linear. Squash only under explicit instruction.
+- **No push to main until fully tested** — `ci/run-ci.sh` green (see CONTRIBUTING.md).
+- The pre-commit hook (`.githooks/pre-commit`, install with
+  `scripts/install-hooks.sh`) regenerates `REPO_MAP.md` and gates markdown
+  structure on staged docs. `git commit --no-verify` bypasses it, but the same
+  checks run in CI.
 
 ## 7. If you are unsure
 
@@ -87,6 +92,8 @@ Full standard in `docs/coding-standard.md`. Non-negotiable highlights:
 
 ## 8. Quick map of AGENT.md guides
 
+Orientation first: `REPO_MAP.md` (auto-generated index: quick start, doc
+index, key files) and `CONTRIBUTING.md` (the five binding contribution rules).
 Per-folder onboarding guides supplement this file. Load the one for whatever
 you are touching:
 
