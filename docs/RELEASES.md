@@ -50,7 +50,9 @@ CLI-first: no GUI in v1 (ADR-0002). The differentiator is RTL
   tashkeel strip, presentation-form/lam-alef folding, ZWNJ/ZWJ strip,
   Persian<->Arabic letter unification, Persian/Arabic-Indic digit
   unification. Reports page/item/bbox/matched text. `--case-sensitive`,
-  `--no-normalize`.
+  `--no-normalize`. Cross-item phrase matching: a phrase split across two
+  adjacent text-flow items is found as one occurrence and the Item column
+  shows the span range (`2+3`); matches never span lines or columns.
 
 ## Quality gates (all green)
 
@@ -71,7 +73,7 @@ CLI-first: no GUI in v1 (ADR-0002). The differentiator is RTL
   normalization).
 - Decomposed marks duplicate their base letter in extraction.
 - Vertical mark offsets (diacritic height) dropped in rendering.
-- Search matches within a single text item (no cross-item spans).
+- Search matches within a single text item, or across adjacent items split at a word boundary (S#1 resolved: joined per-page visual string; cross-line spans remain out of scope).
 
 ## Dependencies (permissive only, ADR-0004)
 

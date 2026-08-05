@@ -220,7 +220,7 @@ Every task you touch must exist in the DB. **Closing a task requires `--ref <com
 - ToUnicode CMap entries are one UTF-16 unit: ligatures degrade in `fetch-text` (full text in `/ActualText`; search still works via normalization).
 - Decomposed marks duplicate their base letter in extraction.
 - Vertical mark offsets (diacritic height) dropped in v1 rendering.
-- Search matches within a single text item (no cross-item spans).
+- Search matches within a single text item, or across adjacent items split at a word boundary (S#1 resolved: joined per-page visual string; cross-line spans remain out of scope).
 
 ---
 
