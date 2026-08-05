@@ -52,9 +52,9 @@ class PDF4QTLIBCORESHARED_EXPORT PDFTextSearchEngine
 public:
     struct ItemSpan
     {
-        size_t itemIndex = 0;  ///< text-flow item index on the page
-        int charBegin = 0;     ///< first original char index in the item
-        int charEnd = 0;       ///< last original char index in the item (inclusive)
+        size_t itemIndex = 0; ///< text-flow item index on the page
+        int charBegin = 0;    ///< first original char index in the item
+        int charEnd = 0;      ///< last original char index in the item (inclusive)
     };
 
     struct Match

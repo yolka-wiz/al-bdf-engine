@@ -129,9 +129,9 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
         // ascending. item.text is already the visual glyph string, so
         // left-to-right concatenation reconstructs the page's visual text for
         // both LTR and RTL (docstrum flow order is not guaranteed visual).
-        std::sort(pageRefs.begin(), pageRefs.end(),
-                  [](const FlowRef& a, const FlowRef& b)
-                  { return a.item->boundingRect.center().y() < b.item->boundingRect.center().y(); });
+        std::sort(pageRefs.begin(), pageRefs.end(), [](const FlowRef& a, const FlowRef& b) {
+            return a.item->boundingRect.center().y() < b.item->boundingRect.center().y();
+        });
 
         std::vector<std::vector<FlowRef>> lines;
         for (const FlowRef& ref : pageRefs)
@@ -144,9 +144,8 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
             auto& lastLine = lines.back();
             const PDFDocumentTextFlow::Item* prev = lastLine.back().item;
             const PDFDocumentTextFlow::Item* cur = ref.item;
-            const bool sameLine =
-                qAbs(cur->boundingRect.center().y() - prev->boundingRect.center().y()) <=
-                0.5 * (cur->boundingRect.height() + prev->boundingRect.height());
+            const bool sameLine = qAbs(cur->boundingRect.center().y() - prev->boundingRect.center().y()) <=
+                                  0.5 * (cur->boundingRect.height() + prev->boundingRect.height());
             if (sameLine)
             {
                 lastLine.push_back(ref);
@@ -159,16 +158,16 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
 
         for (auto& line : lines)
         {
-            std::sort(line.begin(), line.end(),
-                      [](const FlowRef& a, const FlowRef& b)
-                      { return a.item->boundingRect.left() < b.item->boundingRect.left(); });
+            std::sort(line.begin(), line.end(), [](const FlowRef& a, const FlowRef& b) {
+                return a.item->boundingRect.left() < b.item->boundingRect.left();
+            });
         }
 
         // Build the joined string + a global origin map.
         struct Origin
         {
             size_t itemIndex = 0;
-            int charIndex = -1;   // -1 => separator
+            int charIndex = -1; // -1 => separator
         };
         QString joinedText;
         std::vector<Origin> joinedMap;
@@ -177,7 +176,7 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
         {
             if (li > 0)
             {
-                joinedText += QLatin1Char('\n');   // hard boundary between lines
+                joinedText += QLatin1Char('\n'); // hard boundary between lines
                 joinedMap.push_back(Origin{0, -1});
             }
             const auto& line = lines.at(li);
@@ -192,15 +191,13 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
                     QString sep;
                     if (gap <= 0.0)
                     {
-                        sep = QString();   // touching: mid-word continuation
+                        sep = QString(); // touching: mid-word continuation
                     }
                     else
                     {
                         const int nChars = qMax(1, prev->text.size() + cur->text.size());
-                        const double avgCharWidth =
-                            (prev->boundingRect.width() + cur->boundingRect.width()) / nChars;
-                        sep = (gap <= 2.0 * qMax(avgCharWidth, 1.0)) ? QStringLiteral(" ")
-                                                                      : QStringLiteral("\n");
+                        const double avgCharWidth = (prev->boundingRect.width() + cur->boundingRect.width()) / nChars;
+                        sep = (gap <= 2.0 * qMax(avgCharWidth, 1.0)) ? QStringLiteral(" ") : QStringLiteral("\n");
                     }
                     if (!sep.isEmpty())
                     {
@@ -220,7 +217,8 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
 
         // 3. Normalize the joined string, keeping a global char map.
         std::vector<int> globalCharMap;
-        const QString normalizedJoined = PDFRTLTextNormalizer::normalize(joinedText, options.normalizer, &globalCharMap);
+        const QString normalizedJoined =
+            PDFRTLTextNormalizer::normalize(joinedText, options.normalizer, &globalCharMap);
 
         // 4. Substring match (repeated, to find all occurrences). Matches can
         //    never cross a '\n' boundary because the query contains none.
@@ -277,7 +275,9 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
                 const PDFDocumentTextFlow::Item* item = flow.getItem(span.itemIndex);
                 if (!item->characterBoundingRects.empty())
                 {
-                    for (int i = span.charBegin; i <= span.charEnd && i < static_cast<int>(item->characterBoundingRects.size()); ++i)
+                    for (int i = span.charBegin;
+                         i <= span.charEnd && i < static_cast<int>(item->characterBoundingRects.size());
+                         ++i)
                     {
                         spanUnion = spanUnion.united(item->characterBoundingRects.at(static_cast<size_t>(i)));
                     }
