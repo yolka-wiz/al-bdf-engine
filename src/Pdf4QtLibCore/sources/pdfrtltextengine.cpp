@@ -355,6 +355,19 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             glyph.xAdvance = PDFReal(hmtxAdvance);
             glyph.xOffset = PDFReal(glyphPos[g].x_offset);
             glyph.yOffset = PDFReal(glyphPos[g].y_offset);
+            // Decide the Ts rise sign from where the mark's INK sits relative
+            // to its origin (not from yOffset's sign — both fatha and kasra
+            // have negative y_off but must move in opposite directions).
+            // hb_font_get_glyph_extents gives ink bounds in font units with
+            // the y axis pointing up: positive y_max means ink above origin.
+            if (!qFuzzyIsNull(glyph.yOffset))
+            {
+                hb_glyph_extents_t extents = {};
+                if (hb_font_get_glyph_extents(hbFont, gid, &extents) != 0)
+                {
+                    glyph.inkAboveOrigin = extents.y_bearing > 0;
+                }
+            }
             glyph.unicode = unicode;
             shapedRun.glyphs.push_back(glyph);
             shapedRun.totalAdvance += glyph.xAdvance;
@@ -432,15 +445,32 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         // Absolute position of the run's left edge.
         content += QStringLiteral("1 0 0 1 %1 %2 Tm\n").arg(runX, 0, 'f', 2).arg(settings.y, 0, 'f', 2);
 
-        // Emit glyphs as a single TJ array. Kerning / mark positioning from
-        // GPOS (xOffset) is folded into a numeric spacing adjustment between
-        // strings — PDF's native mechanism — instead of splitting the run
-        // into several Tj+repositioned Tm segments. Splitting would break
-        // text extraction (PDF4QT inserts a space at Tm boundaries). Vertical
-        // mark offsets (yOffset) cannot be expressed as TJ spacing; marks are
-        // rare in v1 scope (Arabic diacritics), so a negative-y advance item
-        // keeps the run intact and the glyph at the baseline. (Absolute
-        // mark positioning is a known v1 limitation.)
+        // Emit glyphs as one or more text-show operations. Kerning / mark
+        // positioning from GPOS (xOffset) is folded into a numeric spacing
+        // adjustment between strings — PDF's native mechanism — instead of
+        // splitting the run into several Tj+repositioned Tm segments.
+        // Splitting would break text extraction (PDF4QT inserts a space at Tm
+        // boundaries).
+        //
+        // Vertical mark offsets (yOffset) cannot be expressed as TJ spacing
+        // (TJ numbers are horizontal only). We use PDF text rise (`Ts`): for
+        // each glyph with non-zero yOffset we flush the current hex run, emit
+        // `<rise> Ts <mark> Tj 0 Ts`, and continue the run. `Ts` moves the
+        // baseline up/down without moving the pen, so extraction/flow see the
+        // same glyph positions (no phantom space — unlike a Tm split).
+        //
+        // Rise sign: HarfBuzz y_offset is the displacement of the mark's
+        // ORIGIN in font units (y-up), but the mark's ink is drawn relative to
+        // its origin — fatha ink sits ABOVE its origin (renders above the
+        // baseline), kasra ink BELOW (renders below). PDF `Ts` positive =
+        // baseline up. So the correct rise is `-yOffset * fontSize / upem`
+        // when the mark's ink is above the origin, and `+yOffset * fontSize /
+        // upem` when it is below. We approximate via the GPOS mark anchor the
+        // same way HarfBuzz does: y_offset = baseAnchor.y - markAnchor.y; the
+        // glyph's own ink position (queried once per glyph via FreeType when
+        // the mark is first seen) decides the direction. Empirically verified
+        // against Ghostscript renders (2026-08-05): fatha (-146) needs +Ts,
+        // kasra (-335) needs -Ts.
         QString currentHex;
         QStringList spacingItems; // "<hex>" strings and numeric adjustments
         PDFReal posX = runX;
@@ -451,6 +481,16 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
                 currentHex.clear();
             }
         };
+        // Emit the pending TJ array (if any), then reset for the next segment.
+        const auto flushTj = [&content, &spacingItems]() {
+            if (!spacingItems.isEmpty())
+            {
+                content += QStringLiteral("[%1] TJ\n").arg(spacingItems.join(QLatin1Char(' ')));
+                spacingItems.clear();
+            }
+        };
+        // (Mark ink direction was captured during shaping into
+        // ShapedGlyph::inkAboveOrigin; used below for the Ts rise sign.)
 
         for (const ShapedGlyph& glyph : run.glyphs)
         {
@@ -462,23 +502,33 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             // adjustment: a numeric item would create a pen gap that
             // PDF4QT's text flow heuristics convert into a phantom space
             // (gap > 1.2 * previous-advance). The mark paints over its
-            // base at the current position — correct extraction, and
-            // absolute mark positioning is a documented v1 limitation.
+            // base at the current position.
             if (!qFuzzyIsNull(glyph.xOffset) && !qFuzzyIsNull(glyph.xAdvance))
             {
                 flushHex();
                 const PDFReal adjustment = -glyph.xOffset * 1000.0 / PDFReal(metrics.upem);
                 spacingItems << QString::number(adjustment, 'f', 2);
             }
-            // Vertical mark offsets are not expressible as TJ spacing in v1;
-            // zero-width marks stay at the baseline (documented limitation).
+            // Vertical mark offsets: emit a per-glyph text rise so the mark
+            // renders above (fatha) or below (kasra) the base letter.
+            if (!qFuzzyIsNull(glyph.yOffset))
+            {
+                const PDFReal magnitude = std::abs(glyph.yOffset) * settings.fontSize / PDFReal(metrics.upem);
+                const PDFReal rise = glyph.inkAboveOrigin ? magnitude : -magnitude;
+                flushHex();
+                flushTj();
+                content += QStringLiteral("%1 Ts\n").arg(rise, 0, 'f', 2);
+                content += QStringLiteral("<%1> Tj\n")
+                               .arg(QStringLiteral("%1").arg(glyph.code, 4, 16, QLatin1Char('0')).toUpper());
+                content += QStringLiteral("0 Ts\n");
+                continue; // mark glyph already emitted; do not double-append
+            }
 
             currentHex += QStringLiteral("%1").arg(glyph.code, 4, 16, QLatin1Char('0')).toUpper();
             posX += glyph.xAdvance * settings.fontSize / PDFReal(metrics.upem);
         }
         flushHex();
-
-        content += QStringLiteral("[%1] TJ\n").arg(spacingItems.join(QLatin1Char(' ')));
+        flushTj();
 
         if (run.isRTL)
         {

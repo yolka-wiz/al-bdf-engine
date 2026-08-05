@@ -91,7 +91,10 @@ private:
         PDFReal xAdvance = 0.0; ///< Advance in font units (hmtx)
         PDFReal xOffset = 0.0;  ///< Offset in font units (GPOS mark)
         PDFReal yOffset = 0.0;
-        QByteArray unicode; ///< UTF-16BE of the cluster (logical)
+        bool inkAboveOrigin = true; ///< Mark ink sits above the glyph origin
+                                    ///< (fatha-like); false = below (kasra-like).
+                                    ///< Decides the sign of the Ts rise.
+        QByteArray unicode;         ///< UTF-16BE of the cluster (logical)
     };
 
     struct ShapedRun
