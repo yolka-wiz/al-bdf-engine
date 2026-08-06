@@ -1,5 +1,37 @@
 # albdf — release notes
 
+## Wave 1 infra (unreleased, feature/wave1-infra) — hosted CI, release packaging, perf benchmark
+
+Date: 2026-08-06
+Branch: `feature/wave1-infra` (target: `main`)
+
+- **Hosted CI (W1, DB #25)** — the local gate now also runs on GitHub-hosted
+  runners (`.github/workflows/ci.yml`): `gate` / `asan` / `format` jobs shell
+  out to `ci/run-ci.sh` with stage-selection flags, so stage logic lives in
+  exactly one place. vcpkg deps are pinned (`2026.07.29`) and binary-cached;
+  Qt 6.8 comes from the official archives (`d254041`).
+- **Release packaging (W7, DB #26)** — `scripts/package.sh` produces a
+  deterministic `albdf-<version>-linux-<arch>.tar.gz` from the CMake install
+  rules: albdf binary + `libPdf4QtLibCore` + public headers + man page +
+  license. The script stages via `cmake --install` into a temp prefix,
+  validates the *installed* binary headless (`--version` + `info` on a
+  fixture, `QT_QPA_PLATFORM=offscreen`), and tars with reproducible metadata
+  (`--sort=name`, root-owned, `SOURCE_DATE_EPOCH` mtime, `gzip -n`) — two
+  runs from one build produce identical sha256. Install rules were added
+  additively to `src/CMakeLists.txt`, including an `$ORIGIN` INSTALL_RPATH so
+  the installed binary never carries a build-tree path. `--deb` additionally
+  builds a minimal (skeleton, not policy-complete) `.deb`.
+- **Perf benchmark (W8, DB #27)** — the manual M7 perf smoke is promoted to a
+  tracked benchmark, `scripts/benchmark.sh`: generates a deterministic
+  1000-page document, measures open/info, fetch-text, render, search and
+  delete+write timings, prints a stable machine-readable summary
+  (`albdf-benchmark-v1` key=value block), and fails if any op exceeds
+  `ALBDF_PERF_THRESHOLD_MS` (default 5000 ms). Runs on every PR as a
+  separate non-gating CI job (`benchmark`) with the summary uploaded as an
+  artifact; locally: `bash scripts/benchmark.sh`.
+
+---
+
 ## Post-0.1.0 (main, unreleased) — rename + M8/M8.1
 
 Date: 2026-08-05

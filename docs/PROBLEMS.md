@@ -21,6 +21,7 @@
   - [Container is ephemeral](#container-is-ephemeral)
   - [Lifecycle guard crashes (Hermes)](#lifecycle-guard-crashes-hermes)
   - [vcpkg / toolchain traps](#vcpkg--toolchain-traps)
+  - [Release-packaging traps (W7)](#release-packaging-traps-w7)
   - [Determinism traps](#determinism-traps)
   - [Fork-hygiene traps](#fork-hygiene-traps)
   - [Agent-workflow traps](#agent-workflow-traps)
@@ -109,7 +110,7 @@ docs, 309-page and 100-page books).
 ### Quality backlog
 
 - Perf smoke is manual (`scripts-tmp/m7-perf.sh`); promote to a tracked benchmark.
-- ASAN job is in CI but not upstreamed to a hosted runner; runs only on the dev container.
+- ~~ASAN job is in CI but not upstreamed to a hosted runner; runs only on the dev container.~~ **Resolved** `d254041`: the ASAN/UBSAN Debug build + ctest now runs as the `asan` job on ubuntu-24.04 hosted runners (`.github/workflows/ci.yml`), driven by `ci/run-ci.sh --skip-release --skip-format`.
 - Golden-image regeneration is manual; document the exact `--image-format png` + commit flow in `src/tests/AGENT.md`.
 
 ---
@@ -136,6 +137,11 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 - blend2d has CMake recursion bugs on gcc15 + aarch64 — must come from the **vcpkg overlay** (PDF4QT pins blend2d + asmjit commits).
 - FriBidi ships only pkg-config (no CMake config); HarfBuzz ships CONFIG. Both in `src/vcpkg.json` (manifest mode).
 - ASAN builds need `-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON` or vcpkg's install hook rejects the RPATH relink under Ninja (see `ci/run-ci.sh`).
+
+### Release-packaging traps (W7)
+
+- The built `albdf` carries a **build-tree RUNPATH** (`<build>/lib`) that CMake bakes in for libraries linked from the build tree. Staged installs must override it with `INSTALL_RPATH=$ORIGIN/../lib` (set in `src/CMakeLists.txt`, W7) or the release tarball leaks a machine-specific absolute path. `scripts/package.sh` verifies this with `readelf` and fails the run otherwise.
+- Reproducible tarballs need `tar --sort=name --numeric-owner --owner=0 --group=0 --mtime=@$SOURCE_DATE_EPOCH` **and** `gzip -n` (plain `tar -z` lets gzip stamp the input filename + mtime into its header). `scripts/package.sh` uses both; two runs from one build produce identical sha256 (asserted during W7 testing).
 
 ### Determinism traps
 

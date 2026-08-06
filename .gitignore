@@ -23,6 +23,9 @@ vcpkg_installed/
 tests/golden/out/
 *.log
 
+# Release packaging output (scripts/package.sh)
+dist/
+
 # Database (tracking DB is committed as schema + seed, not the live file)
 db/albdf.db
 db/*.db-journal

@@ -94,3 +94,35 @@ if(ALBDF_BUILD_TESTS)
     enable_testing()
     add_subdirectory(UnitTests)
 endif()
+
+# ---------------------------------------------------------------------------
+# W7 — release packaging (DB #26). The albdf binary and Pdf4QtLibCore shared
+# library get their own install() rules in their subdirectory CMakeLists; this
+# block adds what a staged release package needs on top of those:
+#   - a relocatable $ORIGIN RPATH for the installed binary. CMake bakes the
+#     build-tree path into RUNPATH for libraries linked from the build tree,
+#     which would leak a machine-specific path into the release tarball
+#     (scripts/package.sh verifies this with readelf).
+#   - the public headers (Pdf4QtLibCore/sources/*.h) plus the generated
+#     pdf4qtlibcore_export.h they include, under include/Pdf4QtLibCore.
+#   - the man page and the license file.
+# scripts/package.sh drives this via `cmake --install <build> --prefix <stage>`.
+# ---------------------------------------------------------------------------
+if(UNIX AND NOT APPLE)
+    set_target_properties(albdf PROPERTIES
+        INSTALL_RPATH "\$ORIGIN/../${PDF4QT_INSTALL_LIB_DIR}")
+endif()
+
+if(ALBDF_INSTALL_INCLUDE)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Pdf4QtLibCore/sources/
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Pdf4QtLibCore
+            FILES_MATCHING PATTERN "*.h")
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pdf4qtlibcore_export.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Pdf4QtLibCore)
+endif()
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../docs/albdf.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/albdf)
