@@ -14,9 +14,22 @@ with real evidence. (The "wire upstream redact" part is already done — see bel
   `src/PdfTool/CMakeLists.txt`, self-registers via static instance, and the
   built binary responds: `albdf redact --help` works, command list includes
   `redact`. Upstream `pdf::PDFRedact` engine is linked.
-- **What is missing:** any test coverage, any headless verification on a
-  fixture, any DB evidence. The task as written in PLAN.md ("wire upstream
-  redact") is stale — actual remaining work is verify + test + document.
+- **CORRECTION from first agent run (verified):** `albdf redact` takes
+  `<input> <redacteddocument>` positionals plus `--redact-copy-title/metadata/
+  outline` only — there is **NO `--page` or rect flag**. Redaction regions come
+  exclusively from **Redact annotations embedded in the source PDF**
+  (`PDFRedact::perform` scans page annotations, unions `AnnotationType::Redact`
+  regions). `multipage.pdf` has **no annotations**, so a plain redact on it
+  changes nothing. **A new fixture with a Redact annotation** (`/Subtype
+  /Redact`, `/Rect`; QuadPoints optional — `parseQuadrilaterals` falls back to
+  `/Rect`) is required. Also: `PDFRedact` rebuilds pages through `QPdfWriter`,
+  which likely serializes glyphs to vector curves — `fetch-text` on output may
+  return no text at all (verify empirically).
+- **Build blocker (fixed 2026-08-06):** page-ops merge added flags past 32 bits
+  to a QFlags enum; Qt 6.8/6.10 rejects it. Fix `4bb644f` (on this branch)
+  replaces it with a 64-bit Options class. Build + ctest 12/12 verified.
+- **What is missing:** test coverage, headless verification on an annotated
+  fixture, DB evidence.
 
 ## Scope
 
