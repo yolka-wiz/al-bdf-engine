@@ -213,6 +213,11 @@ All are *document-processing tooling* (Python/CLI) → useful to research-agent 
    - [ ] Commit message: Conventional Commit, body explains WHY
 3. **New §9 — Review protocol:** every task lands via a review pass by the orchestrator or a designated reviewer agent (trailofbits `c-review` clusters or in-house checklist); no agent merges its own work; reviewer checks: determinism, hostile-input handling, headless-ness, golden diffs, DB evidence.
 4. **New §10 — Parallel-work discipline (max 3 agents):** per-area ownership table (core-agent → `src/core/`; cli-agent → `src/cli/`; rtl-agent → `src/core/rtl-*`; test-agent → `src/tests/`, `scripts/`); `git pull --rebase` before every commit; small commits to shrink collision surface; on conflict: orchestrator serializes, never force-push.
+
+   > *Correction note (2026-08-06): the `src/core/` / `src/cli/` paths in this
+   > drafted §10 refer to the pre-rename layout. Those scaffolds were removed;
+   > core-agent now owns `src/Pdf4QtLibCore/` and cli-agent owns `src/PdfTool/`.
+   > This recommendation is reproduced verbatim as a historical snapshot.*
 5. **New §11 — Environment & gates:** pinned toolchain (GCC/Clang ≥ …, Qt 6.8 LTS, CMake ≥ 3.21, C++20); one canonical build command block incl. ASAN build and `ctest`; clang-tidy gate once added.
 6. **Amend §2:** add rule 9 — **fail-closed**: "If a task is ambiguous or unverifiable, STOP and ask the orchestrator. Do not guess, do not partially claim, do not invent evidence." (vLLM/Ray pattern)
 7. **Amend §6:** add "commit sign-off optional; PR/merge descriptions must include an evidence block (tests run, golden diff summary, DB task ref)". (Ray/vLLM pattern)
