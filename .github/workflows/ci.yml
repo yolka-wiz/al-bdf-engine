@@ -2,9 +2,12 @@
 #
 # Mirrors the local gate (ci/run-ci.sh — the single source of truth) on
 # GitHub-hosted Ubuntu 24.04 runners:
-#   gate    — stage 1+2: Release build + offscreen ctest
-#   asan    — stage 3:   ASAN/UBSAN Debug build + ctest
-#   format  — stage 4:   clang-format gate on authored files
+#   gate       — stage 1+2: Release build + offscreen ctest
+#   asan       — stage 3:   ASAN/UBSAN Debug build + ctest
+#   format     — stage 4:   clang-format gate on authored files
+#   benchmark  — non-gating: scripts/benchmark.sh (1000-page perf smoke,
+#                continue-on-error: true — a regression flags itself in the
+#                uploaded summary instead of blocking the PR)
 # Each job shells out to ci/run-ci.sh with stage-selection flags so the
 # stage logic (compiler flags, sanitizer env, authored-file list) lives in
 # exactly one place.
@@ -86,3 +89,26 @@ jobs:
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
       - name: ci/run-ci.sh stage 4 (clang-format gate)
         run: bash ci/run-ci.sh --only-format
+
+  benchmark:
+    name: Perf benchmark 1000p (non-gating)
+    runs-on: ubuntu-24.04
+    # Informational only: the threshold policy (ALBDF_PERF_THRESHOLD_MS,
+    # default 5000) flags regressions in the uploaded summary; a failure here
+    # never blocks the PR.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-toolchain
+      - name: ci/run-ci.sh stages 1-2 (Release build, offscreen)
+        run: bash ci/run-ci.sh --skip-asan --skip-format
+      - name: Run perf benchmark (1000-page doc, offscreen)
+        run: bash scripts/benchmark.sh --work-dir "$RUNNER_TEMP/albdf-bench"
+      - name: Upload benchmark summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-summary
+          path: ${{ runner.temp }}/albdf-bench/benchmark-summary.txt
