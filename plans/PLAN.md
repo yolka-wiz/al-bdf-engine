@@ -115,6 +115,30 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - [x] CI format gate exempts upstream-derived content-stream builder
 - [x] **Exit:** 11-file corpus (testing-temp) exercised; agent-a interrupted before committing (work lost), agent-b's fix merged
 
+### M9 — Wave 1: extraction fidelity + page ops + infra (merged `30ff948`, 2026-08-06)
+- [x] **P1** ligature degradation in extraction — `/ActualText` overlay in `PDFTextLayoutGenerator` + `replaceCharacters` (writer emits full cluster text) — `800f91e`, `c94f00b`
+- [x] **P2** decomposed-yeh duplication in extraction — same overlay dedups `یی`→`ی` — `800f91e`
+- [x] **R#3** presentation-form NFKC pass pinned by regression test (fails if removed) — `271bfe8`
+- [x] **R#4 documented** — content editor drops `/ActualText` marked content on mixed add-text (future item, do not attempt in P1/P2 wave)
+- [x] **Page ops CLI** — `rotate`, `move-page`, `delete-page` + `UnitTestsPageOps` — `4402b1c`..`411d8f7` (suite 12/12)
+- [x] **W1 hosted CI** — GitHub Actions gate/asan/format jobs + vcpkg binary cache — `88413dc`
+- [x] **W7 packaging** — deterministic `scripts/package.sh` (sha256-reproducible tarball + optional deb) — `78f608d`
+- [x] **W8 tracking** — tracked perf benchmark `scripts/benchmark.sh` (5s threshold, JSON, non-gating CI job) — `b197861`
+- [x] CI fork-base fixed post-history-rewrite (`a52c18c`→`6bf5047`) — `30ff948`
+- [x] **Exit:** Wave-1 merged, DB tasks #21–#27 closed with evidence; hosted CI runs on GitHub (push → main)
+
+### M10 — Wave 2 (queued; depends on M9 landing)
+- [ ] **S#1 cross-LINE search** (rtl-agent, DB #28) — extend joined-visual-string search past the `\n` boundary (currently cross-item only). Depends on P1/P2 extraction fixes (now landed).
+- [ ] **Object-level redaction** (core-agent, DB #29) — wire upstream `redact` as an albdf CLI command. Depends on #24 (CLI registry now free).
+- [ ] **W5 fuzzing** (infra-agent, DB #30) — input fuzz harness for CLI commands. Depends on #25 (run-ci.sh settled, now on hosted CI).
+- **Exit:** Wave-2 merged, full CI green on GitHub, tasks closed.
+
+### M11 — Public exposure & hardening (partially landed `d15f5ee`/`ac6f44b`)
+- [x] History scrubbed of personal emails (filter-repo, all 96 commits → `Yolka <yolka@albdf.local>`); tag 0.1.0 re-pushed
+- [x] SECURITY.md, CONTRIBUTING §3b, docs/branch-protection.md, CODEOWNERS, pre-commit secret scan
+- [ ] **Apply branch protection on GitHub** — needs admin token (API payload in `docs/branch-protection.md`)
+- [ ] First public release notes pass / changelog polish
+
 ---
 
 ## Dependency graph
