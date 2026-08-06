@@ -192,7 +192,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
       -DALBDF_BUILD_TESTS=ON
 cmake --build build
-QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # 10 tests
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # 11 tests
 # Full gate (build + ctest + ASAN/UBSAN + clang-format):
 bash ci/run-ci.sh            # or --skip-asan --skip-format for a fast loop
 ```

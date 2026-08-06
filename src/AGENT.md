@@ -121,7 +121,7 @@ Write path (`add-text --rtl`): FriBidi runs → HarfBuzz shaping → embedded Tr
   `tst_recognizetext.cpp`, `tst_deleteobjecttest.cpp`, `tst_formsignaturetest.cpp`,
   `tst_fontencodingtest.cpp`, `tst_goldentest.cpp`, `tst_imageoptimizertest.cpp`,
   `tst_lexicalanalyzertest.cpp`.
-- `UnitTests/CMakeLists.txt` registers each `tst_*.cpp` as its own CTest target (10 total).
+- `UnitTests/CMakeLists.txt` registers each `tst_*.cpp` as its own CTest target (10 test binaries + `SmokeCli` = 11 total).
 - Test **data** (fixtures, fonts, golden expected files, scripts) lives in `tests/`.
 
 ## Exit-Code Contract
