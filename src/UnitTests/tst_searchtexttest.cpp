@@ -42,6 +42,7 @@ private slots:
     void test_noFalsePositive();
     void test_crossItemPhrase();
     void test_crossItemNoFalsePositive();
+    void test_crossLinePhrase();
     void test_presentationFormSearch();
 
 private:
@@ -390,6 +391,45 @@ void SearchTextTest::test_crossItemNoFalsePositive()
     const auto matches =
         engine.searchFlow(flow, QStringLiteral("hello world"), 0, 0, pdf::PDFTextSearchEngine::Options());
     QCOMPARE(matches.size(), size_t(0));
+}
+
+void SearchTextTest::test_crossLinePhrase()
+{
+    // S#1: a phrase with a space must match across the '\n' line boundary.
+    // Same visual-string conventions as test_crossItemPhrase: the visual
+    // form of "تست نهایی" is "ییاهن تست" (نهایی renders LEFT, تست RIGHT).
+    // Here the phrase is split across TWO lines (different y): the first
+    // line carries the visual-left part "ییاهن", the second line carries
+    // "تست", with a small paragraph-like leading gap (6.5 pt vs ~17 pt line
+    // height). Today the between-line separator is the hard '\n' boundary,
+    // so the query's space can never cross it and the phrase cannot match.
+    pdf::PDFDocumentTextFlow flow;
+
+    pdf::PDFDocumentTextFlow::Item item1;
+    item1.pageIndex = 0;
+    item1.text = QString::fromUtf8("ییاهن"); // visual for نهایی (first line)
+    item1.boundingRect = QRectF(72.0, 700.0, 67.25, 17.53);
+    item1.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item1);
+
+    pdf::PDFDocumentTextFlow::Item item2;
+    item2.pageIndex = 0;
+    item2.text = QString::fromUtf8("تست"); // second line, below item1
+    item2.boundingRect = QRectF(150.0, 724.0, 28.64, 17.06);
+    item2.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item2);
+
+    pdf::PDFTextSearchEngine engine;
+    const auto matches =
+        engine.searchFlow(flow, QString::fromUtf8("تست نهایی"), 0, 0, pdf::PDFTextSearchEngine::Options());
+    QCOMPARE(matches.size(), size_t(1));
+    QCOMPARE(matches.front().spans.size(), size_t(2));
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral(" ")),
+             "matched text must contain the between-line space separator");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("تست")), "matched text must contain the second word");
+    QVERIFY2(matches.front().matchedText.contains(QStringLiteral("اهن")), "matched text must contain the first word");
+    QVERIFY2(matches.front().boundingRect.top() <= 700.0 + 1.0, "bounding rect must start at the first line");
+    QVERIFY2(matches.front().boundingRect.bottom() >= 724.0 + 17.06 - 1.0, "bounding rect must end at the second line");
 }
 
 void SearchTextTest::test_presentationFormSearch()
