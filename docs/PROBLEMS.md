@@ -57,6 +57,7 @@ search and (2) spec-valid PDF over perfect glyph-positioning in v1.
   318.pdf** (Persian financial doc): RTL font lands at F4, original F1/F2/F3 intact.
 - **R#2** — HB≥4 emits RTL runs **leftmost-first**; the engine does NOT reverse glyphs. Re-applying the fpdf2 #1802 reversal *mirrors* the text (fixed in `9d7d710`, regression-tested). Do not "fix" this.
 - **R#3** — Arabic presentation-form shaping in `fribidi_log2vis` (both system and vcpkg 1.0.16) requires a **second NFKC pass after inversion** in search. Removing it breaks Arabic search.
+- **R#4** — the content editor (`PDFPageContentEditorProcessor`/text-flow rewrite) does **not preserve `/ActualText` marked-content** when a second `add-text` (LTR or RTL) rewrites the same page's content stream. Extraction of RTL text added by a *previous* add-text then degrades ligatures (`لا` → `ل`) on that page. The `/ActualText` overlay (P1, `pdftextlayoutgenerator.cpp`) restores full ligatures for RTL-only documents; mixed add-text on one page still degrades. Root cause: the upstream editor model has no marked-content element type. Fixing it is a content-editor change (upstream-derived, format-gate-exempt) — tracked as a future item, do not attempt in the P1/P2 wave.
 
 ### Search limitations
 

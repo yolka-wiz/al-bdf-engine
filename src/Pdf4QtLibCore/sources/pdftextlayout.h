@@ -30,8 +30,8 @@
 #include <QDataStream>
 #include <QPainterPath>
 
-#include <set>
 #include <compare>
+#include <set>
 
 class QMutex;
 
@@ -127,9 +127,18 @@ public:
     /// \param characters
     explicit PDFTextLine(TextCharacters characters);
 
-    const TextCharacters& getCharacters() const { return m_characters; }
-    const QPainterPath& getBoundingBox() const { return m_boundingBox; }
-    const QPointF& getTopLeft() const { return m_topLeft; }
+    const TextCharacters& getCharacters() const
+    {
+        return m_characters;
+    }
+    const QPainterPath& getBoundingBox() const
+    {
+        return m_boundingBox;
+    }
+    const QPointF& getTopLeft() const
+    {
+        return m_topLeft;
+    }
 
     /// Get angle inclination of block
     PDFReal getAngle() const;
@@ -154,9 +163,18 @@ public:
     explicit inline PDFTextBlock() = default;
     explicit inline PDFTextBlock(PDFTextLines textLines);
 
-    const PDFTextLines& getLines() const { return m_lines; }
-    const QPainterPath& getBoundingBox() const { return m_boundingBox; }
-    const QPointF& getTopLeft() const { return m_topLeft; }
+    const PDFTextLines& getLines() const
+    {
+        return m_lines;
+    }
+    const QPainterPath& getBoundingBox() const
+    {
+        return m_boundingBox;
+    }
+    const QPointF& getTopLeft() const
+    {
+        return m_topLeft;
+    }
 
     /// Get angle inclination of block
     PDFReal getAngle() const;
@@ -193,7 +211,10 @@ struct PDFCharacterPointer
     auto operator<=>(const PDFCharacterPointer&) const = default;
 
     /// Returns true, if character pointer is valid and points to the correct location
-    bool isValid() const { return pageIndex > -1; }
+    bool isValid() const
+    {
+        return pageIndex > -1;
+    }
 
     /// Returns true, if character belongs to same block
     bool hasSameBlock(const PDFCharacterPointer& other) const;
@@ -213,18 +234,17 @@ using PDFTextSelectionItems = std::vector<PDFTextSelectionItem>;
 struct PDFTextSelectionColoredItem
 {
     explicit inline PDFTextSelectionColoredItem() = default;
-    explicit inline PDFTextSelectionColoredItem(PDFCharacterPointer start, PDFCharacterPointer end, QColor color) :
-        start(start),
-        end(end),
-        color(color)
-    {
-
-    }
+    explicit inline PDFTextSelectionColoredItem(PDFCharacterPointer start, PDFCharacterPointer end, QColor color)
+        : start(start), end(end), color(color)
+    {}
 
     bool operator==(const PDFTextSelectionColoredItem&) const = default;
     bool operator!=(const PDFTextSelectionColoredItem&) const = default;
 
-    inline bool operator<(const PDFTextSelectionColoredItem& other) const { return std::tie(start, end) < std::tie(other.start, other.end); }
+    inline bool operator<(const PDFTextSelectionColoredItem& other) const
+    {
+        return std::tie(start, end) < std::tie(other.start, other.end);
+    }
 
     PDFCharacterPointer start;
     PDFCharacterPointer end;
@@ -263,10 +283,19 @@ public:
     iterator nextPageRange(iterator currentPageRange) const;
 
     /// Returns true, if text selection is empty
-    bool isEmpty() const { return m_items.empty(); }
+    bool isEmpty() const
+    {
+        return m_items.empty();
+    }
 
-    iterator begin() const { return m_items.cbegin(); }
-    iterator end() const { return m_items.cend(); }
+    iterator begin() const
+    {
+        return m_items.cbegin();
+    }
+    iterator end() const
+    {
+        return m_items.cend();
+    }
 
 private:
     PDFTextSelectionColoredItems m_items;
@@ -296,13 +325,12 @@ using PDFTextFlows = std::vector<PDFTextFlow>;
 class PDF4QTLIBCORESHARED_EXPORT PDFTextFlow
 {
 public:
-
     enum FlowFlag
     {
-        None                = 0x0000,
-        SeparateBlocks      = 0x0001, ///< Create flow for each block
-        RemoveSoftHyphen    = 0x0002, ///< Removes 'soft hyphen' unicode character from end-of-line (character 0x00AD)
-        AddLineBreaks       = 0x0004, ///< Add line break characters to the end of line
+        None = 0x0000,
+        SeparateBlocks = 0x0001,   ///< Create flow for each block
+        RemoveSoftHyphen = 0x0002, ///< Removes 'soft hyphen' unicode character from end-of-line (character 0x00AD)
+        AddLineBreaks = 0x0004,    ///< Add line break characters to the end of line
     };
     Q_DECLARE_FLAGS(FlowFlags, FlowFlag)
 
@@ -316,10 +344,16 @@ public:
     PDFFindResults find(const QRegularExpression& expression) const;
 
     /// Returns whole text for this text flow
-    QString getText() const { return m_text; }
+    QString getText() const
+    {
+        return m_text;
+    }
 
     /// Returns character bounding boxes
-    std::vector<QRectF> getBoundingBoxes() const { return m_characterBoundingBoxes; }
+    std::vector<QRectF> getBoundingBoxes() const
+    {
+        return m_characterBoundingBoxes;
+    }
 
     /// Returns text form character pointers
     /// \param begin Begin character
@@ -330,7 +364,10 @@ public:
     void merge(const PDFTextFlow& next);
 
     /// Returns bounding box of a text flow on the page
-    QRectF getBoundingBox() const { return m_boundingBox; }
+    QRectF getBoundingBox() const
+    {
+        return m_boundingBox;
+    }
 
     /// Creates text flows from text layout, according to creation flags.
     /// \param layout Layout, from which is text flow created
@@ -367,6 +404,22 @@ public:
     /// Adds character to the layout
     void addCharacter(const PDFTextCharacterInfo& info);
 
+    /// Returns the number of characters currently in the layout.
+    size_t getCharacterCount() const
+    {
+        return m_characters.size();
+    }
+
+    /// Replaces \p count characters starting at \p index with the characters
+    /// of \p replacement. The geometry (position, advance, bounding box,
+    /// angle) of each original glyph slot is preserved: replacement char \p j
+    /// reuses the slot of original glyph char min(j, count - 1), so the
+    /// docstrum line detection and the per-character bounding boxes stay
+    /// aligned with the new text. Used by the RTL extraction repair, where
+    /// one glyph can map to several logical characters (lam-alef ligature)
+    /// or several glyphs to one logical character (decomposed yeh base+dot).
+    void replaceCharacters(size_t index, size_t count, const QString& replacement);
+
     /// Performs text layout algorithm
     void perform();
 
@@ -377,7 +430,10 @@ public:
     qint64 getMemoryConsumptionEstimate() const;
 
     /// Returns recognized text blocks
-    const PDFTextBlocks& getTextBlocks() const { return m_blocks; }
+    const PDFTextBlocks& getTextBlocks() const
+    {
+        return m_blocks;
+    }
 
     /// Returns true, if given point is pointing to some text block
     bool isHoveringOverTextBlock(const QPointF& point) const;
@@ -400,7 +456,9 @@ public:
     /// \param itBegin Iterator (begin range)
     /// \param itEnd Iterator (end range)
     /// \param pageIndex Index of the page
-    QString getTextFromSelection(PDFTextSelection::iterator itBegin, PDFTextSelection::iterator itEnd, PDFInteger pageIndex) const;
+    QString getTextFromSelection(PDFTextSelection::iterator itBegin,
+                                 PDFTextSelection::iterator itEnd,
+                                 PDFInteger pageIndex) const;
 
     /// Returns string from text selection
     /// \param selection Text selection
@@ -418,7 +476,8 @@ public:
     /// \param lineIndex Line index
     /// \param pageIndex pageIndex
     /// \param color Selection color
-    PDFTextSelection selectLineInBlock(const size_t blockIndex, const size_t lineIndex, PDFInteger pageIndex, QColor color) const;
+    PDFTextSelection
+    selectLineInBlock(const size_t blockIndex, const size_t lineIndex, PDFInteger pageIndex, QColor color) const;
 
     friend QDataStream& operator<<(QDataStream& stream, const PDFTextLayout& layout);
     friend QDataStream& operator>>(QDataStream& stream, PDFTextLayout& layout);
@@ -467,12 +526,9 @@ private:
 class PDF4QTLIBCORESHARED_EXPORT PDFTextLayoutGetter
 {
 public:
-    explicit inline PDFTextLayoutGetter(PDFTextLayoutCache* cache, PDFInteger pageIndex) :
-        m_cache(cache),
-        m_pageIndex(pageIndex)
-    {
-
-    }
+    explicit inline PDFTextLayoutGetter(PDFTextLayoutCache* cache, PDFInteger pageIndex)
+        : m_cache(cache), m_pageIndex(pageIndex)
+    {}
 
     /// Cast operator, casts to constant reference to PDFTextLayout
     operator const PDFTextLayout&()
@@ -491,12 +547,9 @@ private:
 class PDFTextLayoutStorageGetter
 {
 public:
-    explicit PDFTextLayoutStorageGetter(const PDFTextLayoutStorage* storage, PDFInteger pageIndex) :
-        m_storage(storage),
-        m_pageIndex(pageIndex)
-    {
-
-    }
+    explicit PDFTextLayoutStorageGetter(const PDFTextLayoutStorage* storage, PDFInteger pageIndex)
+        : m_storage(storage), m_pageIndex(pageIndex)
+    {}
 
     /// Cast operator, casts to constant reference to PDFTextLayout
     operator const PDFTextLayout&()
@@ -516,11 +569,7 @@ private:
 class PDF4QTLIBCORESHARED_EXPORT PDFTextSelectionPainter
 {
 public:
-    explicit inline PDFTextSelectionPainter(const PDFTextSelection* selection) :
-        m_selection(selection)
-    {
-
-    }
+    explicit inline PDFTextSelectionPainter(const PDFTextSelection* selection) : m_selection(selection) {}
 
     /// Draws text selection on the painter, using text layout and matrix. If current text selection
     /// doesn't contain items from active page, then text layout is not accessed.
@@ -528,14 +577,21 @@ public:
     /// \param pageIndex Page index
     /// \param textLayoutGetter Text layout getter
     /// \param matrix Matrix which translates from page space to device space
-    void draw(QPainter* painter, PDFInteger pageIndex, PDFTextLayoutGetter& textLayoutGetter, const QTransform& matrix, const PDFColorConvertor& convertor);
+    void draw(QPainter* painter,
+              PDFInteger pageIndex,
+              PDFTextLayoutGetter& textLayoutGetter,
+              const QTransform& matrix,
+              const PDFColorConvertor& convertor);
 
     /// Prepares geometry for text selection drawing, using text layout and matrix.  If current text selection
     /// doesn't contain items from active page, then text layout is not accessed.
     /// \param pageIndex Page index
     /// \param textLayoutGetter Text layout getter
     /// \param matrix Matrix which translates from page space to device space
-    QPainterPath prepareGeometry(PDFInteger pageIndex, PDFTextLayoutGetter& textLayoutGetter, const QTransform& matrix, QPolygonF* quadrilaterals);
+    QPainterPath prepareGeometry(PDFInteger pageIndex,
+                                 PDFTextLayoutGetter& textLayoutGetter,
+                                 const QTransform& matrix,
+                                 QPolygonF* quadrilaterals);
 
 private:
     static constexpr const PDFReal HEIGHT_INCREASE_FACTOR = 0.40;
@@ -552,11 +608,7 @@ class PDF4QTLIBCORESHARED_EXPORT PDFTextLayoutStorage
 {
 public:
     explicit inline PDFTextLayoutStorage() = default;
-    explicit inline PDFTextLayoutStorage(PDFInteger pageCount) :
-        m_offsets(pageCount, 0)
-    {
-
-    }
+    explicit inline PDFTextLayoutStorage(PDFInteger pageCount) : m_offsets(pageCount, 0) {}
 
     /// Returns text layout for particular page. If page index is invalid,
     /// then empty text layout is returned. Function is not thread safe, if
@@ -568,7 +620,10 @@ public:
     /// then empty text layout is returned. Function is not thread safe, if
     /// function \p setTextLayout is called from another thread.
     /// \param pageIndex Page index
-    PDFTextLayoutStorageGetter getTextLayoutLazy(PDFInteger pageIndex) const { return PDFTextLayoutStorageGetter(this, pageIndex); }
+    PDFTextLayoutStorageGetter getTextLayoutLazy(PDFInteger pageIndex) const
+    {
+        return PDFTextLayoutStorageGetter(this, pageIndex);
+    }
 
     /// Sets text layout to the particular index. Index must be valid and from
     /// range 0 to \p pageCount - 1. Function is not thread safe.
@@ -581,7 +636,8 @@ public:
     /// \param text Text to be found
     /// \param caseSensitivity Case sensitivity
     /// \param flowFlags Text flow flags
-    PDFFindResults find(const QString& text, Qt::CaseSensitivity caseSensitivity, PDFTextFlow::FlowFlags flowFlags) const;
+    PDFFindResults
+    find(const QString& text, Qt::CaseSensitivity caseSensitivity, PDFTextFlow::FlowFlags flowFlags) const;
 
     /// Finds regular expression matches in current text flow. All text occurences are returned.
     /// \param expression Regular expression to be matched
@@ -589,14 +645,17 @@ public:
     PDFFindResults find(const QRegularExpression& expression, PDFTextFlow::FlowFlags flowFlags) const;
 
     /// Returns number of pages
-    size_t getCount() const { return m_offsets.size(); }
+    size_t getCount() const
+    {
+        return m_offsets.size();
+    }
 
 private:
     std::vector<int> m_offsets;
     QByteArray m_textLayouts;
 };
 
-}   // namespace pdf
+} // namespace pdf
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(pdf::PDFTextFlow::FlowFlags)
 

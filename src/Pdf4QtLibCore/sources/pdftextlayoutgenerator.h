@@ -37,12 +37,16 @@ public:
                                     const PDFCMS* cms,
                                     const PDFOptionalContentActivity* optionalContentActivity,
                                     QTransform pagePointToDevicePointMatrix,
-                                    const PDFMeshQualitySettings& meshQualitySettings) :
-        BaseClass(page, document, fontCache, cms, optionalContentActivity, pagePointToDevicePointMatrix, meshQualitySettings),
-        m_features(features)
-    {
-
-    }
+                                    const PDFMeshQualitySettings& meshQualitySettings)
+        : BaseClass(page,
+                    document,
+                    fontCache,
+                    cms,
+                    optionalContentActivity,
+                    pagePointToDevicePointMatrix,
+                    meshQualitySettings),
+          m_features(features)
+    {}
 
     /// Creates text layout from the text
     PDFTextLayout createTextLayout();
@@ -51,10 +55,24 @@ protected:
     virtual bool isContentSuppressedByOC(PDFObjectReference ocgOrOcmd) override;
     virtual bool isContentKindSuppressed(ContentKind kind) const override;
     virtual void performOutputCharacter(const PDFTextCharacterInfo& info) override;
+    virtual void performMarkedContentBegin(const QByteArray& tag, const PDFObject& properties) override;
+    virtual void performMarkedContentEnd() override;
 
 private:
+    /// Mirrors the marked-content nesting: every BDC pushes a span, every EMC
+    /// pops one. When the span carries an /ActualText property, its text
+    /// (visual order for RTL runs, see pdfrtltextengine) is the authoritative
+    /// logical text of the glyphs in the span and repairs the degraded
+    /// ToUnicode mapping (DB #21 ligatures, DB #22 decomposed yeh).
+    struct ActualTextSpan
+    {
+        size_t startIndex = 0; ///< Layout character index at BDC time
+        QString actualText;    ///< Decoded /ActualText (empty = no property)
+    };
+
     PDFRenderer::Features m_features;
     PDFTextLayout m_textLayout;
+    std::vector<ActualTextSpan> m_actualTextSpans;
 };
 
-}   // namespace pdf
+} // namespace pdf

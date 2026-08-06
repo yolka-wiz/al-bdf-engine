@@ -116,6 +116,8 @@ class RtlAddTextTest : public QObject
 private slots:
     void test_hebrewRoundTrip();
     void test_persianExtraction();
+    void test_lamAlefFullLigatureExtraction();
+    void test_decomposedYehNoDoubleExtraction();
     void test_rtlFontEmbedded();
     void test_rtlKeepsLtrIntact();
     void test_rtlRenderNoErrors();
@@ -196,11 +198,105 @@ void RtlAddTextTest::test_persianExtraction()
 
     ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
-    // Lam-alef ligature degrades to lam in ToUnicode (2-byte CMap limit).
-    // RTL extracts in visual order: "سلام دنیا" -> reversed runs.
-    // "سلام دنیا" logical -> visual: "ایند ملس" (with لا -> ل: "ایند ملس").
-    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ایند ملس")),
-             "Persian text must extract in visual order with lam-alef degraded");
+    // RTL extracts in visual order: "سلام دنیا" -> reversed runs. The
+    // /ActualText overlay (DB #21) restores the full lam-alef ligature, so
+    // "سلام" -> visual "ملاس" (with ل+ا, not the degraded "ملس").
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ایند ملاس")),
+             "Persian text must extract in visual order with the full lam-alef ligature");
+}
+
+void RtlAddTextTest::test_lamAlefFullLigatureExtraction()
+{
+    // DB #21 (P1): the ToUnicode CMap can only carry one UTF-16 unit per
+    // code, so a lam-alef ligature maps to its first letter ('ل') and
+    // extraction used to degrade the visual glyph 'لا' to 'ل'. The engine
+    // writes /ActualText (exact logical text) around RTL runs; extraction
+    // must recover the full ligature from it.
+    //
+    // Logical "علا" (ع ل ا) shapes to two glyphs in visual order:
+    // [lam-alef ligature, ع]. Extraction must yield "لاع" — the full
+    // ligature at its visual position — NOT the degraded "لع".
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
+
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString outputPath = tmpDir.path() + QStringLiteral("/la.pdf");
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    QString::fromUtf8(TEST_BLANK_PDF),
+                                    outputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("علا"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    QString::fromUtf8(TEST_FONT_PERSIAN),
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("fa")},
+                                   tmpDir.path());
+    QCOMPARE(addResult.exitCode, 0);
+    QVERIFY2(QFile::exists(outputPath), "output document must be created");
+
+    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    QCOMPARE(fetchResult.exitCode, 0);
+    const QString fetched = QString::fromUtf8(fetchResult.stdoutData);
+    QVERIFY2(fetched.contains(QString::fromUtf8("لاع")),
+             "extraction must recover the full lam-alef ligature (لا) at its visual position");
+    QVERIFY2(!fetched.contains(QString::fromUtf8("لع")),
+             "extraction must NOT degrade the lam-alef ligature to its first letter");
+}
+
+void RtlAddTextTest::test_decomposedYehNoDoubleExtraction()
+{
+    // DB #22 (P2): Arabic yeh (U+064A) decomposes into base + dot; both glyphs
+    // share the base's cluster, so extraction used to emit the yeh twice —
+    // 'عليكم' came back as 'علييكم'. The /ActualText overlay (DB #21) carries
+    // the exact logical text, so fetch-text must return the single yeh.
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QVERIFY2(QFile::exists(toolPath), qPrintable(QStringLiteral("albdf binary missing: %1").arg(toolPath)));
+
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString outputPath = tmpDir.path() + QStringLiteral("/yeh.pdf");
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    QString::fromUtf8(TEST_BLANK_PDF),
+                                    outputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("عليكم"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    QString::fromUtf8(TEST_FONT_PERSIAN),
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("fa")},
+                                   tmpDir.path());
+    QCOMPARE(addResult.exitCode, 0);
+    QVERIFY2(QFile::exists(outputPath), "output document must be created");
+
+    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    QCOMPARE(fetchResult.exitCode, 0);
+    const QString fetched = QString::fromUtf8(fetchResult.stdoutData);
+    QVERIFY2(!fetched.contains(QString::fromUtf8("يي")),
+             "extraction must NOT duplicate the decomposed yeh (علييكم artifact)");
+    QVERIFY2(fetched.contains(QString::fromUtf8("ي")), "extraction must still contain the single yeh of عليكم");
 }
 
 void RtlAddTextTest::test_rtlFontEmbedded()
@@ -290,8 +386,12 @@ void RtlAddTextTest::test_rtlKeepsLtrIntact()
     ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), mixedPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains("LTR still OK"), "LTR text must survive RTL add");
-    // Lam-alef ligature degrades to lam in extraction (ToUnicode 2-byte limit).
-    // RTL extracts in visual order: "سلام" -> "ملس" (لا ligature -> ل: "ملس").
+    // RTL extracts in visual order: "سلام" -> "ملس" here (degraded lam-alef).
+    // The /ActualText overlay (DB #21) restores the full ligature for RTL-only
+    // documents, but this test does RTL THEN LTR on the same page: the second
+    // add-text rewrites page content through the content editor, which does
+    // not preserve /ActualText marked-content (upstream editor limitation,
+    // documented in PROBLEMS.md R#4). So this mixed case still degrades.
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ملس")),
              "RTL text must survive LTR add");
 }

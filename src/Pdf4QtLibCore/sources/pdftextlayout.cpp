@@ -21,16 +21,16 @@
 // SOFTWARE.
 
 #include "pdftextlayout.h"
-#include "pdfutils.h"
-#include "pdfexecutionpolicy.h"
 #include "pdfcms.h"
+#include "pdfexecutionpolicy.h"
+#include "pdfutils.h"
 
-#include <QtMath>
-#include <QMutex>
-#include <QPainter>
 #include <QIODevice>
+#include <QMutex>
 #include <QMutexLocker>
+#include <QPainter>
 #include <QRegularExpression>
+#include <QtMath>
 
 #include "pdfdbgheap.h"
 
@@ -45,10 +45,8 @@ namespace pdf
 class PDFTextCharacterSpatialIndex
 {
 public:
-    explicit PDFTextCharacterSpatialIndex(TextCharacters* characters, size_t leafSize) :
-        m_characters(characters),
-        m_leafSize(leafSize),
-        m_epsilon(0.0)
+    explicit PDFTextCharacterSpatialIndex(TextCharacters* characters, size_t leafSize)
+        : m_characters(characters), m_leafSize(leafSize), m_epsilon(0.0)
     {
         m_nodes.reserve(2 * characters->size() / leafSize);
 
@@ -141,12 +139,16 @@ size_t PDFTextCharacterSpatialIndex::build(Iterator it1, Iterator it2)
         if (boundingBox.width() > boundingBox.height())
         {
             // Split using x-axis
-            std::sort(it1, it2, [](const TextCharacter& l, const TextCharacter& r) { return l.position.x() < r.position.x(); });
+            std::sort(it1, it2, [](const TextCharacter& l, const TextCharacter& r) {
+                return l.position.x() < r.position.x();
+            });
         }
         else
         {
             // Split using y-axis
-            std::sort(it1, it2, [](const TextCharacter& l, const TextCharacter& r) { return l.position.y() < r.position.y(); });
+            std::sort(it1, it2, [](const TextCharacter& l, const TextCharacter& r) {
+                return l.position.y() < r.position.y();
+            });
         }
 
         const size_t distance = std::distance(it1, it2);
@@ -199,7 +201,9 @@ size_t PDFTextCharacterSpatialIndex::query(const QRectF& rect, TextCharacters* r
     return 0;
 }
 
-void PDFTextCharacterSpatialIndex::queryNearestEstimate(size_t minimalSize, const TextCharacter& sample, TextCharacters* result) const
+void PDFTextCharacterSpatialIndex::queryNearestEstimate(size_t minimalSize,
+                                                        const TextCharacter& sample,
+                                                        TextCharacters* result) const
 {
     if (m_characters->size() <= minimalSize)
     {
@@ -208,7 +212,8 @@ void PDFTextCharacterSpatialIndex::queryNearestEstimate(size_t minimalSize, cons
     else
     {
         // Query result
-        qreal querySizeEstimate = qMax(qMax(m_nodes[0].boundingBox.width(), m_nodes[0].boundingBox.height()) * 0.01, sample.advance * minimalSize * 0.5);
+        qreal querySizeEstimate = qMax(qMax(m_nodes[0].boundingBox.width(), m_nodes[0].boundingBox.height()) * 0.01,
+                                       sample.advance * minimalSize * 0.5);
 
         QRectF rect(sample.position, QSizeF(querySizeEstimate, querySizeEstimate));
         rect.translate(-querySizeEstimate * 0.5, -querySizeEstimate * 0.5);
@@ -242,10 +247,7 @@ size_t PDFTextCharacterSpatialIndex::queryImpl(size_t nodeIndex, const QRectF& r
     else
     {
         // Jakub Melka: it is a leaf...
-        auto isInside = [&rect](const TextCharacter& character)
-        {
-            return rect.contains(character.position);
-        };
+        auto isInside = [&rect](const TextCharacter& character) { return rect.contains(character.position); };
 
         auto itStart = std::next(m_characters->begin(), node.index1);
         auto itEnd = std::next(m_characters->begin(), node.index2);
@@ -261,10 +263,7 @@ size_t PDFTextCharacterSpatialIndex::queryImpl(size_t nodeIndex, const QRectF& r
     }
 }
 
-PDFTextLayout::PDFTextLayout()
-{
-
-}
+PDFTextLayout::PDFTextLayout() {}
 
 void PDFTextLayout::addCharacter(const PDFTextCharacterInfo& info)
 {
@@ -276,7 +275,9 @@ void PDFTextLayout::addCharacter(const PDFTextCharacterInfo& info)
     character.character = info.character;
     character.position = info.matrix.map(QPointF(0.0, 0.0));
 
-    QLineF testLine(QPointF(0.0, 0.0), QPointF(info.isVerticalWritingSystem ? 0.0 : info.advance, !info.isVerticalWritingSystem ? 0.0 : info.advance));
+    QLineF testLine(
+        QPointF(0.0, 0.0),
+        QPointF(info.isVerticalWritingSystem ? 0.0 : info.advance, !info.isVerticalWritingSystem ? 0.0 : info.advance));
     QLineF mappedLine = info.matrix.map(testLine);
     character.advance = mappedLine.length();
     character.angle = qRound(mappedLine.angle());
@@ -290,6 +291,63 @@ void PDFTextLayout::addCharacter(const PDFTextCharacterInfo& info)
 
     m_characters.emplace_back(qMove(character));
     m_angles.insert(character.angle);
+}
+
+void PDFTextLayout::replaceCharacters(size_t index, size_t count, const QString& replacement)
+{
+    Q_ASSERT(index + count <= m_characters.size());
+
+    if (count == 0 || replacement.isEmpty())
+    {
+        return;
+    }
+
+    const size_t replacementSize = size_t(replacement.size());
+
+    // Fast path: same number of characters, overwrite in place.
+    if (count == replacementSize)
+    {
+        for (size_t j = 0; j < count; ++j)
+        {
+            m_characters[index + j].character = replacement.at(int(j));
+        }
+        return;
+    }
+
+    // The replacement has a different length than the glyph range it maps
+    // onto (lam-alef ligature: one glyph -> two logical characters; decomposed
+    // yeh: base + dot glyphs -> one logical character). Rebuild the character
+    // list so the replaced range holds exactly the replacement characters.
+    // Replacement char j reuses the geometry (position, advance, bounding box,
+    // angle) of original glyph slot min(j, count - 1): extra characters beyond
+    // the glyph count share the last slot, and surplus glyph slots (zero-width
+    // mark glyphs) are dropped. This keeps the docstrum line detection and the
+    // per-character bounding boxes aligned with the drawn glyphs.
+    //
+    // When several replacement characters share one slot (ligature expansion)
+    // or a zero-advance mark slot sits at its base's position (decomposed
+    // yeh), their x-positions would be equal and the docstrum's x-sort
+    // (PDFTextLine ctor, std::sort — not stable) could return them in either
+    // order. Each replacement char therefore gets a tiny j-dependent x nudge
+    // (0.001 pt per overflow position) — far below any docstrum distance
+    // threshold, so line/block detection is unaffected, but the visual reading
+    // order is exact regardless of the sort implementation.
+    TextCharacters newCharacters;
+    newCharacters.reserve(m_characters.size() - count + replacementSize);
+    newCharacters.insert(newCharacters.end(), m_characters.cbegin(), m_characters.cbegin() + ptrdiff_t(index));
+
+    constexpr PDFReal orderEpsilon = 0.001;
+    for (size_t j = 0; j < replacementSize; ++j)
+    {
+        const size_t sourceSlot = std::min(j, count - 1);
+        TextCharacter character = m_characters[index + sourceSlot];
+        character.character = replacement.at(int(j));
+        character.position.setX(character.position.x() + PDFReal(j) * orderEpsilon);
+        newCharacters.push_back(qMove(character));
+    }
+
+    newCharacters.insert(newCharacters.end(), m_characters.cbegin() + ptrdiff_t(index + count), m_characters.cend());
+    m_characters = std::move(newCharacters);
 }
 
 void PDFTextLayout::perform()
@@ -326,7 +384,8 @@ bool PDFTextLayout::isHoveringOverTextBlock(const QPointF& point) const
     return false;
 }
 
-PDFTextSelection PDFTextLayout::createTextSelection(PDFInteger pageIndex, const QPointF& point1, const QPointF& point2, QColor selectionColor, bool strictSelection)
+PDFTextSelection PDFTextLayout::createTextSelection(
+    PDFInteger pageIndex, const QPointF& point1, const QPointF& point2, QColor selectionColor, bool strictSelection)
 {
     PDFTextSelection selection;
 
@@ -362,8 +421,12 @@ PDFTextSelection PDFTextLayout::createTextSelection(PDFInteger pageIndex, const 
             bool isBottomPointBelowText = false;
 
             const PDFTextLines& lines = block.getLines();
-            auto itLineA = std::find_if(lines.cbegin(), lines.cend(), [pointA](const PDFTextLine& line) { return line.getBoundingBox().contains(pointA); });
-            auto itLineB = std::find_if(lines.cbegin(), lines.cend(), [pointB](const PDFTextLine& line) { return line.getBoundingBox().contains(pointB); });
+            auto itLineA = std::find_if(lines.cbegin(), lines.cend(), [pointA](const PDFTextLine& line) {
+                return line.getBoundingBox().contains(pointA);
+            });
+            auto itLineB = std::find_if(lines.cbegin(), lines.cend(), [pointB](const PDFTextLine& line) {
+                return line.getBoundingBox().contains(pointB);
+            });
             if (itLineA == itLineB && itLineA != lines.cend())
             {
                 // Both points are in the same line. We consider point with lesser
@@ -415,14 +478,14 @@ PDFTextSelection PDFTextLayout::createTextSelection(PDFInteger pageIndex, const 
 
                 // We skip lines, which are not in the range (pointB.y(), pointA.y),
                 // i.e. are above or below.
-                if (lineBoundingRect.bottom() < pointB.y() ||
-                    lineBoundingRect.top() > pointA.y())
+                if (lineBoundingRect.bottom() < pointB.y() || lineBoundingRect.top() > pointA.y())
                 {
                     continue;
                 }
 
                 const TextCharacters& characters = line.getCharacters();
-                for (size_t characterId = 0, characterCount = characters.size(); characterId < characterCount; ++characterId)
+                for (size_t characterId = 0, characterCount = characters.size(); characterId < characterCount;
+                     ++characterId)
                 {
                     const TextCharacter& character = characters[characterId];
                     QPointF characterCenter = character.boundingBox.boundingRect().center();
@@ -471,11 +534,11 @@ PDFTextSelection PDFTextLayout::createTextSelection(PDFInteger pageIndex, const 
             {
                 if (ptrA < ptrB)
                 {
-                    selection.addItems({ PDFTextSelectionItem(ptrA, ptrB) }, selectionColor);
+                    selection.addItems({PDFTextSelectionItem(ptrA, ptrB)}, selectionColor);
                 }
                 else
                 {
-                    selection.addItems({ PDFTextSelectionItem(ptrB, ptrA) }, selectionColor);
+                    selection.addItems({PDFTextSelectionItem(ptrB, ptrA)}, selectionColor);
                 }
             }
         }
@@ -518,12 +581,15 @@ PDFTextSelection PDFTextLayout::selectBlock(const size_t blockIndex, PDFInteger 
     ptrB.lineIndex = textBlock.getLines().size() - 1;
     ptrB.characterIndex = textBlock.getLines().back().getCharacters().size() - 1;
 
-    selection.addItems({ PDFTextSelectionItem(ptrA, ptrB) }, color);
+    selection.addItems({PDFTextSelectionItem(ptrA, ptrB)}, color);
     selection.build();
     return selection;
 }
 
-PDFTextSelection PDFTextLayout::selectLineInBlock(const size_t blockIndex, const size_t lineIndex, PDFInteger pageIndex, QColor color) const
+PDFTextSelection PDFTextLayout::selectLineInBlock(const size_t blockIndex,
+                                                  const size_t lineIndex,
+                                                  PDFInteger pageIndex,
+                                                  QColor color) const
 {
     PDFTextSelection selection;
     if (blockIndex >= m_blocks.size())
@@ -550,12 +616,14 @@ PDFTextSelection PDFTextLayout::selectLineInBlock(const size_t blockIndex, const
     ptrB.lineIndex = lineIndex;
     ptrB.characterIndex = textBlock.getLines()[lineIndex].getCharacters().size() - 1;
 
-    selection.addItems({ PDFTextSelectionItem(ptrA, ptrB) }, color);
+    selection.addItems({PDFTextSelectionItem(ptrA, ptrB)}, color);
     selection.build();
     return selection;
 }
 
-QString PDFTextLayout::getTextFromSelection(PDFTextSelection::iterator itBegin, PDFTextSelection::iterator itEnd, PDFInteger pageIndex) const
+QString PDFTextLayout::getTextFromSelection(PDFTextSelection::iterator itBegin,
+                                            PDFTextSelection::iterator itEnd,
+                                            PDFInteger pageIndex) const
 {
     QStringList text;
 
@@ -605,7 +673,10 @@ struct NearestCharacterInfo
     size_t index = std::numeric_limits<size_t>::max();
     PDFReal distance = std::numeric_limits<PDFReal>::infinity();
 
-    inline bool operator<(const NearestCharacterInfo& other) const { return distance < other.distance; }
+    inline bool operator<(const NearestCharacterInfo& other) const
+    {
+        return distance < other.distance;
+    }
 };
 
 void PDFTextLayout::performDoLayout(PDFReal angle)
@@ -641,8 +712,8 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
     const size_t bucketSize = m_settings.samples + 1;
     std::vector<NearestCharacterInfo> nearestCharacters(bucketSize * characters.size(), NearestCharacterInfo());
 
-    auto findNearestCharacters = [this, bucketSize, &characters, &spatialIndex, &nearestCharacters](size_t currentCharacterIndex)
-    {
+    auto findNearestCharacters = [this, bucketSize, &characters, &spatialIndex, &nearestCharacters](
+                                     size_t currentCharacterIndex) {
         // It will be iterator to the start of the nearest neighbour sequence
         auto it = std::next(nearestCharacters.begin(), currentCharacterIndex * bucketSize);
         auto itLast = std::next(it, m_settings.samples);
@@ -717,8 +788,9 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
             PDFReal fontSizeMin = qMin(characters[i].fontSize, characters[info.index].fontSize);
 
             if (info.distance < m_settings.distanceSensitivity * characters[i].advance && // 1)
-                std::fabs(characters[i].position.y() - characters[info.index].position.y()) < fontSizeMin * m_settings.charactersOnLineSensitivity && // 2)
-                fontSizeMax / fontSizeMin < m_settings.fontSensitivity) // 3)
+                std::fabs(characters[i].position.y() - characters[info.index].position.y()) <
+                    fontSizeMin * m_settings.charactersOnLineSensitivity && // 2)
+                fontSizeMax / fontSizeMin < m_settings.fontSensitivity)     // 3)
             {
                 textLinesUF.unify(i, info.index);
             }
@@ -790,8 +862,7 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
     //    - there doesn't exist block c, which is between a,b in y-axis
     //      and moreover, overlaps both a and b in x-axis.
 
-    auto isBeforeByRule1 = [&blocks](const size_t aIndex, const size_t bIndex)
-    {
+    auto isBeforeByRule1 = [&blocks](const size_t aIndex, const size_t bIndex) {
         QRectF aBB = blocks[aIndex].getBoundingBox().boundingRect();
         QRectF bBB = blocks[bIndex].getBoundingBox().boundingRect();
 
@@ -799,8 +870,7 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
         const bool isAoverB = aBB.bottom() > bBB.top();
         return isOverlappedOnHorizontalAxis && isAoverB;
     };
-    auto isBeforeByRule2 = [&blocks](const size_t aIndex, const size_t bIndex)
-    {
+    auto isBeforeByRule2 = [&blocks](const size_t aIndex, const size_t bIndex) {
         QRectF aBB = blocks[aIndex].getBoundingBox().boundingRect();
         QRectF bBB = blocks[bIndex].getBoundingBox().boundingRect();
         QRectF abBB = aBB.united(bBB);
@@ -855,7 +925,10 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
     QTransform invertedAngleMatrix = angleMatrix.inverted();
     while (!workBlocks.empty())
     {
-        auto it = std::min_element(workBlocks.begin(), workBlocks.end(), [&orderingEdges](const size_t l, const size_t r) { return orderingEdges[l].size() < orderingEdges[r].size(); });
+        auto it =
+            std::min_element(workBlocks.begin(), workBlocks.end(), [&orderingEdges](const size_t l, const size_t r) {
+                return orderingEdges[l].size() < orderingEdges[r].size();
+            });
         ordering.push_back(*it);
         for (std::set<size_t>& edges : orderingEdges)
         {
@@ -871,7 +944,10 @@ void PDFTextLayout::performDoLayout(PDFReal angle)
 TextCharacters PDFTextLayout::getCharactersForAngle(PDFReal angle) const
 {
     TextCharacters result;
-    std::copy_if(m_characters.cbegin(), m_characters.cend(), std::back_inserter(result), [angle](const TextCharacter& character) { return character.angle == angle; });
+    std::copy_if(m_characters.cbegin(),
+                 m_characters.cend(),
+                 std::back_inserter(result),
+                 [angle](const TextCharacter& character) { return character.angle == angle; });
     return result;
 }
 
@@ -884,10 +960,11 @@ void PDFTextLayout::applyTransform(TextCharacters& characters, const QTransform&
     }
 }
 
-PDFTextLine::PDFTextLine(TextCharacters characters) :
-    m_characters(qMove(characters))
+PDFTextLine::PDFTextLine(TextCharacters characters) : m_characters(qMove(characters))
 {
-    std::sort(m_characters.begin(), m_characters.end(), [](const TextCharacter& l, const TextCharacter& r) { return l.position.x() < r.position.x(); });
+    std::sort(m_characters.begin(), m_characters.end(), [](const TextCharacter& l, const TextCharacter& r) {
+        return l.position.x() < r.position.x();
+    });
 
     QRectF boundingBox;
     for (const TextCharacter& character : m_characters)
@@ -934,11 +1011,9 @@ QDataStream& operator<<(QDataStream& stream, const PDFTextLine& line)
     return stream;
 }
 
-PDFTextBlock::PDFTextBlock(PDFTextLines textLines) :
-    m_lines(qMove(textLines))
+PDFTextBlock::PDFTextBlock(PDFTextLines textLines) : m_lines(qMove(textLines))
 {
-    auto sortFunction = [](const PDFTextLine& l, const PDFTextLine& r)
-    {
+    auto sortFunction = [](const PDFTextLine& l, const PDFTextLine& r) {
         QRectF bl = l.getBoundingBox().boundingRect();
         QRectF br = r.getBoundingBox().boundingRect();
         const PDFReal xL = bl.x();
@@ -1134,13 +1209,14 @@ void PDFTextLayoutStorage::setTextLayout(PDFInteger pageIndex, const PDFTextLayo
     layoutStream << result;
 }
 
-PDFFindResults PDFTextLayoutStorage::find(const QString& text, Qt::CaseSensitivity caseSensitivity, PDFTextFlow::FlowFlags flowFlags) const
+PDFFindResults PDFTextLayoutStorage::find(const QString& text,
+                                          Qt::CaseSensitivity caseSensitivity,
+                                          PDFTextFlow::FlowFlags flowFlags) const
 {
     PDFFindResults results;
 
     QMutex resultsMutex;
-    auto findImpl = [this, flowFlags, caseSensitivity, &results, &resultsMutex, &text](size_t pageIndex)
-    {
+    auto findImpl = [this, flowFlags, caseSensitivity, &results, &resultsMutex, &text](size_t pageIndex) {
         PDFTextLayout textLayout = getTextLayout(pageIndex);
         PDFTextFlows textFlows = PDFTextFlow::createTextFlows(textLayout, flowFlags, pageIndex);
         for (const PDFTextFlow& textFlow : textFlows)
@@ -1168,8 +1244,7 @@ PDFFindResults PDFTextLayoutStorage::find(const QRegularExpression& expression, 
     PDFFindResults results;
 
     QMutex resultsMutex;
-    auto findImpl = [this, flowFlags, &results, &resultsMutex, &expression](size_t pageIndex)
-    {
+    auto findImpl = [this, flowFlags, &results, &resultsMutex, &expression](size_t pageIndex) {
         PDFTextLayout textLayout = getTextLayout(pageIndex);
         PDFTextFlows textFlows = PDFTextFlow::createTextFlows(textLayout, flowFlags, pageIndex);
         for (const PDFTextFlow& textFlow : textFlows)
@@ -1216,7 +1291,9 @@ QDataStream& operator>>(QDataStream& stream, PDFTextLayoutSettings& settings)
 
 void PDFTextSelection::addItems(const PDFTextSelectionItems& items, QColor color)
 {
-    std::transform(items.cbegin(), items.cend(), std::back_inserter(m_items), [color] (const auto& item) { return PDFTextSelectionColoredItem(item.first, item.second, color); });
+    std::transform(items.cbegin(), items.cend(), std::back_inserter(m_items), [color](const auto& item) {
+        return PDFTextSelectionColoredItem(item.first, item.second, color);
+    });
 }
 
 void PDFTextSelection::build()
@@ -1296,7 +1373,8 @@ PDFFindResults PDFTextFlow::find(const QRegularExpression& expression) const
 {
     PDFFindResults results;
 
-    QRegularExpressionMatchIterator iterator = expression.globalMatch(m_text, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
+    QRegularExpressionMatchIterator iterator =
+        expression.globalMatch(m_text, 0, QRegularExpression::NormalMatch, QRegularExpression::NoMatchOption);
     while (iterator.hasNext())
     {
         QRegularExpressionMatch match = iterator.next();
@@ -1338,8 +1416,10 @@ void PDFTextFlow::merge(const PDFTextFlow& next)
 {
     m_text += next.m_text;
     m_boundingBox = m_boundingBox.united(next.m_boundingBox);
-    m_characterPointers.insert(m_characterPointers.end(), next.m_characterPointers.cbegin(), next.m_characterPointers.cend());
-    m_characterBoundingBoxes.insert(m_characterBoundingBoxes.end(), next.m_characterBoundingBoxes.cbegin(), next.m_characterBoundingBoxes.cend());
+    m_characterPointers.insert(
+        m_characterPointers.end(), next.m_characterPointers.cbegin(), next.m_characterPointers.cend());
+    m_characterBoundingBoxes.insert(
+        m_characterBoundingBoxes.end(), next.m_characterBoundingBoxes.cbegin(), next.m_characterBoundingBoxes.cend());
 }
 
 PDFTextFlows PDFTextFlow::createTextFlows(const PDFTextLayout& layout, FlowFlags flags, PDFInteger pageIndex)
@@ -1392,7 +1472,8 @@ PDFTextFlows PDFTextFlow::createTextFlows(const PDFTextLayout& layout, FlowFlags
                     // Euclidean check: its characters carry real advances.)
                     const TextCharacter& previousCharacter = characters[i - 1];
                     if (!previousCharacter.character.isSpace() && !qFuzzyIsNull(previousCharacter.advance) &&
-                        QLineF(previousCharacter.position, currentCharacter.position).length() > previousCharacter.advance * 1.2)
+                        QLineF(previousCharacter.position, currentCharacter.position).length() >
+                            previousCharacter.advance * 1.2)
                     {
                         currentFlow.m_text += QChar(' ');
                         currentFlow.m_characterPointers.emplace_back();
@@ -1412,7 +1493,8 @@ PDFTextFlows PDFTextFlow::createTextFlows(const PDFTextLayout& layout, FlowFlags
             }
 
             // Remove soft hyphen, if it is enabled
-            if (flags.testFlag(RemoveSoftHyphen) && !characters.empty() && currentFlow.m_text.back() == QChar(QChar::SoftHyphen))
+            if (flags.testFlag(RemoveSoftHyphen) && !characters.empty() &&
+                currentFlow.m_text.back() == QChar(QChar::SoftHyphen))
             {
                 currentFlow.m_text.chop(1);
                 currentFlow.m_characterPointers.pop_back();
@@ -1428,8 +1510,10 @@ PDFTextFlows PDFTextFlow::createTextFlows(const PDFTextLayout& layout, FlowFlags
 
             // Add line break
             currentFlow.m_text += lineBreak;
-            currentFlow.m_characterPointers.insert(currentFlow.m_characterPointers.end(), lineBreak.length(), PDFCharacterPointer());
-            currentFlow.m_characterBoundingBoxes.insert(currentFlow.m_characterBoundingBoxes.end(), lineBreak.length(), QRectF());
+            currentFlow.m_characterPointers.insert(
+                currentFlow.m_characterPointers.end(), lineBreak.length(), PDFCharacterPointer());
+            currentFlow.m_characterBoundingBoxes.insert(
+                currentFlow.m_characterBoundingBoxes.end(), lineBreak.length(), QRectF());
 
             ++textLineIndex;
         }
@@ -1484,7 +1568,8 @@ QString PDFTextFlow::getContext(size_t index, size_t length) const
     Q_ASSERT(length > 0);
 
     const PDFCharacterPointer& frontComparatorItem = m_characterPointers[index];
-    while (index > 0 && (m_characterPointers[index - 1].hasSameLine(frontComparatorItem) || !m_characterPointers[index - 1].isValid()))
+    while (index > 0 && (m_characterPointers[index - 1].hasSameLine(frontComparatorItem) ||
+                         !m_characterPointers[index - 1].isValid()))
     {
         --index;
         ++length;
@@ -1493,7 +1578,8 @@ QString PDFTextFlow::getContext(size_t index, size_t length) const
     size_t currentEnd = index + length - 1;
     size_t last = m_characterPointers.size() - 1;
     const PDFCharacterPointer& backComparatorItem = m_characterPointers[currentEnd];
-    while (currentEnd < last && (m_characterPointers[currentEnd + 1].hasSameLine(backComparatorItem) || !m_characterPointers[currentEnd + 1].isValid()))
+    while (currentEnd < last && (m_characterPointers[currentEnd + 1].hasSameLine(backComparatorItem) ||
+                                 !m_characterPointers[currentEnd + 1].isValid()))
     {
         ++currentEnd;
         ++length;
@@ -1576,7 +1662,10 @@ void PDFTextSelectionPainter::draw(QPainter* painter,
     painter->restore();
 }
 
-QPainterPath PDFTextSelectionPainter::prepareGeometry(PDFInteger pageIndex, PDFTextLayoutGetter& textLayoutGetter, const QTransform& matrix, QPolygonF* quadrilaterals)
+QPainterPath PDFTextSelectionPainter::prepareGeometry(PDFInteger pageIndex,
+                                                      PDFTextLayoutGetter& textLayoutGetter,
+                                                      const QTransform& matrix,
+                                                      QPolygonF* quadrilaterals)
 {
     QPainterPath path;
 
@@ -1672,7 +1761,10 @@ QPainterPath PDFTextSelectionPainter::prepareGeometry(PDFInteger pageIndex, PDFT
 
                 if (quadrilaterals)
                 {
-                    currentPolygon.append({ boundingBox.topLeft(), boundingBox.topRight(), boundingBox.bottomLeft(), boundingBox.bottomRight() });
+                    currentPolygon.append({boundingBox.topLeft(),
+                                           boundingBox.topRight(),
+                                           boundingBox.bottomLeft(),
+                                           boundingBox.bottomRight()});
                 }
             }
         }
@@ -1692,13 +1784,9 @@ QPainterPath PDFTextSelectionPainter::prepareGeometry(PDFInteger pageIndex, PDFT
     return path;
 }
 
-PDFTextLayoutCache::PDFTextLayoutCache(std::function<PDFTextLayout (PDFInteger)> textLayoutGetter) :
-    m_textLayoutGetter(qMove(textLayoutGetter)),
-    m_pageIndex(-1),
-    m_layout()
-{
-
-}
+PDFTextLayoutCache::PDFTextLayoutCache(std::function<PDFTextLayout(PDFInteger)> textLayoutGetter)
+    : m_textLayoutGetter(qMove(textLayoutGetter)), m_pageIndex(-1), m_layout()
+{}
 
 void PDFTextLayoutCache::clear()
 {
@@ -1717,4 +1805,4 @@ const PDFTextLayout& PDFTextLayoutCache::getTextLayout(PDFInteger pageIndex)
     return m_layout;
 }
 
-}   // namespace pdf
+} // namespace pdf
