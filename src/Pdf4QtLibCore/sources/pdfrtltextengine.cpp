@@ -414,28 +414,20 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
 
         if (run.isRTL)
         {
-            // /ActualText: logical string, UTF-16BE with BOM.
+            // /ActualText: UTF-16BE with BOM, built from each glyph's FULL
+            // cluster text IN GLYPH (visual, leftmost-first) ORDER — not the
+            // logical run text. A lam-alef ligature glyph thus carries its
+            // whole "لا" sequence at its visual position, and a decomposed
+            // yeh contributes its yeh twice (base + dot mark share the
+            // cluster). Extraction (PDFTextLayoutGenerator) reads this string
+            // back and repairs the ToUnicode degradation, which is limited to
+            // one UTF-16 unit per glyph (DB #21 lam-alef, DB #22 yeh dedup).
             QByteArray actualText;
             actualText.append(char(0xFE));
             actualText.append(char(0xFF));
-            for (size_t ci = run.begin; ci < run.end; ++ci)
+            for (const ShapedGlyph& glyph : run.glyphs)
             {
-                const char32_t cp = char32_t(textBuffer.units[ci]);
-                if (cp <= 0xFFFF)
-                {
-                    actualText.append(char(0xFF & (cp >> 8)));
-                    actualText.append(char(0xFF & cp));
-                }
-                else
-                {
-                    const char32_t v = cp - 0x10000;
-                    const char16_t hi = char16_t(0xD800 + (v >> 10));
-                    const char16_t lo = char16_t(0xDC00 + (v & 0x3FF));
-                    actualText.append(char(0xFF & (hi >> 8)));
-                    actualText.append(char(0xFF & hi));
-                    actualText.append(char(0xFF & (lo >> 8)));
-                    actualText.append(char(0xFF & lo));
-                }
+                actualText.append(glyph.unicode);
             }
             content += QStringLiteral("/Span << /ActualText <%1> >> BDC\n")
                            .arg(QString::fromLatin1(actualText.toHex().toUpper()));
