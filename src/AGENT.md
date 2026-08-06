@@ -11,7 +11,7 @@ standard in [`/workspace/albdf/docs/coding-standard.md`](../docs/coding-standard
 - [Directory Layout](#directory-layout)
 - [Build System (CMake + vcpkg)](#build-system-cmake--vcpkg)
 - [Build & Test Commands](#build--test-commands)
-- [The CLI Binary (albdf)](#the-cli-binary-pdftool)
+- [The CLI Binary (albdf)](#the-cli-binary-albdf)
 - [Our 4 Custom CLI Tools](#our-4-custom-cli-tools)
 - [The RTL Pipeline](#the-rtl-pipeline)
 - [Test Structure](#test-structure)
@@ -36,17 +36,16 @@ standard in [`/workspace/albdf/docs/coding-standard.md`](../docs/coding-standard
 | `vcpkg.json` | vcpkg manifest (deps: tbb, openssl, lcms, zlib, openjpeg, freetype, libjpeg-turbo, libpng, blend2d, **harfbuzz**, **fribidi**). |
 | `vcpkg/` | vcpkg **overlays** only (no manifest here). |
 | `Pdf4QtLibCore/` | **The core PDF library** — the real code lives here. See `Pdf4QtLibCore/AGENT.md`. |
-| `albdf/` | The CLI. `main.cpp` + `pdftool*.{h,cpp}` per command (~30 upstream + our 4). |
+| `PdfTool/` | The CLI. `main.cpp` + `pdftool*.{h,cpp}` per command (~30 upstream + our 4). |
 | `UnitTests/` | Our test suite (`tst_*.cpp`, golden tests, smoke.sh). |
 | `tests/` | Test **data** (`fixtures/`, `fonts/`, `golden/`, `scripts/`). |
 | `build/` | Release build dir (Ninja). |
 | `build-asan/` | Debug + AddressSanitizer build dir. |
-| `cli/` | **EMPTY** legacy scaffold. Do not use. |
-| `core/` | **EMPTY** legacy scaffold. Do not use. |
 
-> **Traps:** `cli/` and `core/` look like they hold the CLI/core but they are **empty
-> legacy scaffolds**. The real code is in **`Pdf4QtLibCore/`** (library) and
-> **`albdf/`** (CLI). Never create new files there.
+> **Trap:** there is **no `src/albdf/`, `src/cli/`, or `src/core/`** — the old
+> `cli/`/`core/` scaffolds were removed. The real code is in **`Pdf4QtLibCore/`**
+> (library) and **`PdfTool/`** (CLI, binary name `albdf`). Never create those
+> directories.
 
 ## Build System (CMake + vcpkg)
 
@@ -87,7 +86,7 @@ bash /workspace/albdf/ci/run-ci.sh
 
 ## Our 4 Custom CLI Tools
 
-These are the project's differentiators. All live in `albdf/` and are registered like
+These are the project's differentiators. All live in `PdfTool/` and are registered like
 the upstream tools:
 
 | Command | Class files | Purpose |
@@ -119,8 +118,9 @@ Write path (`add-text --rtl`): FriBidi runs → HarfBuzz shaping → embedded Tr
 
 - `UnitTests/` contains the test targets and runner (`tst_*.cpp`), driven by CTest.
 - Key tests: `tst_addtexttest.cpp`, `tst_rtladdtexttest.cpp`, `tst_searchtexttest.cpp`,
-  `tst_recognizetext.cpp`, `tst_deleteobjecttest.cpp`, `tst_fontencodingtest.cpp`,
-  `tst_goldentest.cpp`, `tst_imageoptimizertest.cpp`, `tst_lexicalanalyzertest.cpp`.
+  `tst_recognizetext.cpp`, `tst_deleteobjecttest.cpp`, `tst_formsignaturetest.cpp`,
+  `tst_fontencodingtest.cpp`, `tst_goldentest.cpp`, `tst_imageoptimizertest.cpp`,
+  `tst_lexicalanalyzertest.cpp`.
 - `UnitTests/CMakeLists.txt` registers each `tst_*.cpp` as its own CTest target (10 total).
 - Test **data** (fixtures, fonts, golden expected files, scripts) lives in `tests/`.
 
@@ -143,8 +143,8 @@ without updating the contract in AGENTS.md.
 
 ## Common Pitfalls
 
-- **Editing empty scaffolds:** don't put code in `src/cli/` or `src/core/` — they are legacy
-  stubs. Real code is in `Pdf4QtLibCore/` + `albdf/`.
+- **Editing the wrong directory:** there is no `src/cli/` or `src/core/` (removed) and no
+  `src/albdf/`. Real code is in `Pdf4QtLibCore/` (library) + `PdfTool/` (CLI).
 - **New source not in CMakeLists.txt:** files aren't globbed — forgetting to register a new
   `.cpp`/`.h` causes silent missing symbols or link failures.
 - **Forgetting `QT_QPA_PLATFORM=offscreen`:** tests that touch Qt GUI/rendering fail or hang
