@@ -24,6 +24,11 @@ Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
 
 # pdfedit 0.1.0 — release notes
 
+> Historical record. This release was tagged **before** the rename to `albdf`
+> (see the post-0.1.0 entry above); the CLI was still `PdfTool` and the project
+> `pdfedit` at this point. The source layout (`src/PdfTool/`, binary `albdf`)
+> applies only to later builds.
+
 Date: 2026-08-04
 Branch: `main` (local-only hosting)
 
