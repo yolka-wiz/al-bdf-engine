@@ -1,0 +1,88 @@
+# albdf — hosted CI gate.
+#
+# Mirrors the local gate (ci/run-ci.sh — the single source of truth) on
+# GitHub-hosted Ubuntu 24.04 runners:
+#   gate    — stage 1+2: Release build + offscreen ctest
+#   asan    — stage 3:   ASAN/UBSAN Debug build + ctest
+#   format  — stage 4:   clang-format gate on authored files
+# Each job shells out to ci/run-ci.sh with stage-selection flags so the
+# stage logic (compiler flags, sanitizer env, authored-file list) lives in
+# exactly one place.
+#
+# Dependency strategy:
+#   - vcpkg is pinned to a release tag (ALBDF_VCPKG_REF) and its binary
+#     cache is persisted via actions/cache, keyed on the manifest +
+#     overlay hashes. First run on a fresh cache builds the 11 manifest
+#     deps (~30-60 min); every run after that restores them in seconds.
+#   - Qt 6.8 (qtbase + qtsvg) comes from the official Qt archives
+#     (install-qt-action) because the project requires Qt >= 6.8 and the
+#     ubuntu-24.04 apt Qt is 6.4. CMAKE_PREFIX_PATH is exported so the
+#     plain `cmake` invocations inside ci/run-ci.sh find it.
+#   - clang-format is pinned to the dev-container version (21.1.8) via pip.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The local dev container runs this exact tag (vcpkg version 2026-07-27);
+  # 2026.07.29 is the closest upstream release tag. Pinning keeps port
+  # versions (and therefore vcpkg ABI hashes) stable across CI runs so the
+  # binary cache hits.
+  ALBDF_VCPKG_REF: 2026.07.29
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  # vcpkg binary cache: files source under the workspace, persisted by the
+  # actions/cache step in .github/actions/setup-toolchain.
+  VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-bincache,readwrite
+  # blend2d/asmjit overlay (in-repo pin — see docs/PROBLEMS.md). The vcpkg
+  # CMake toolchain reads this env var on every configure.
+  VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/src/vcpkg/overlays
+  QT_QPA_PLATFORM: offscreen
+
+jobs:
+  gate:
+    name: Build + ctest (Release, offscreen)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ci/run-ci.sh's format gate diffs against fork base a52c18c
+      - uses: ./.github/actions/setup-toolchain
+      - name: ci/run-ci.sh stages 1-2 (configure + build, offscreen ctest)
+        run: bash ci/run-ci.sh --skip-asan --skip-format
+
+  asan:
+    name: ASAN/UBSAN build + ctest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-toolchain
+      - name: ci/run-ci.sh stage 3 (ASAN/UBSAN Debug build + ctest)
+        run: bash ci/run-ci.sh --skip-release --skip-format
+
+  format:
+    name: clang-format gate (authored files)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install clang-format 21.1.8 (matches dev container)
+        run: |
+          python3 -m pip install --user --break-system-packages clang-format==21.1.8
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+      - name: ci/run-ci.sh stage 4 (clang-format gate)
+        run: bash ci/run-ci.sh --only-format

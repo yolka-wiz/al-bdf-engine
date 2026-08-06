@@ -1,0 +1,66 @@
+# Composite action: albdf CI toolchain.
+#
+# Sets up the same toolchain the dev container uses, on GitHub-hosted
+# Ubuntu runners:
+#   - vcpkg, pinned to a release tag, with its *binary cache* restored from
+#     actions/cache (keyed on the manifest + overlay hashes + vcpkg ref) so
+#     the 11 manifest deps are built once, not on every run
+#   - cmake + ninja from apt
+#   - Qt 6.8 (qtbase + qtsvg) from the official Qt archives via
+#     install-qt-action — the apt Qt on ubuntu-24.04 is 6.4, which does not
+#     satisfy the project's find_package(Qt6 6.8 REQUIRED)
+#
+# The vcpkg overlay (src/vcpkg/overlays — blend2d/asmjit pin fixes gcc15 +
+# aarch64 CMake recursion bugs, see docs/PROBLEMS.md) is wired via the
+# VCPKG_OVERLAY_PORTS environment variable, which the vcpkg CMake toolchain
+# reads on every configure — matching the local bare-container flow.
+
+name: Setup albdf toolchain
+description: >-
+  Installs the albdf CI toolchain on GitHub-hosted runners: pinned vcpkg
+  with persisted binary cache, cmake+ninja, and Qt 6.8 (qtbase + qtsvg)
+  with CMAKE_PREFIX_PATH exported so plain cmake invocations find it.
+
+inputs:
+  install-qt:
+    description: Install Qt 6.8 via install-qt-action (false for format-only jobs)
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Cache vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/vcpkg-bincache
+        key: vcpkg-${{ runner.os }}-${{ env.ALBDF_VCPKG_REF }}-${{ hashFiles('src/vcpkg.json', 'src/vcpkg/**') }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ env.ALBDF_VCPKG_REF }}-
+
+    - name: Checkout vcpkg (pinned ref)
+      shell: bash
+      run: |
+        git clone --depth 1 --branch "${ALBDF_VCPKG_REF}" https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}"
+        "${VCPKG_ROOT}/vcpkg" version
+
+    - name: Install build tools
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends cmake ninja-build
+
+    - name: Install Qt 6.8 (qtbase + qtsvg, headless)
+      if: inputs.install-qt == 'true'
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.*'
+        arch: 'x64'
+        dir: ${{ runner.temp }}/qt
+        modules: 'qtsvg'
+        install-deps: 'true'
+
+    - name: Point CMake at the installed Qt
+      if: inputs.install-qt == 'true'
+      shell: bash
+      run: echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
