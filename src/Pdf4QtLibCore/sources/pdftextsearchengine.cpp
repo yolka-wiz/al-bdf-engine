@@ -176,7 +176,28 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
         {
             if (li > 0)
             {
-                joinedText += QLatin1Char('\n'); // hard boundary between lines
+                // Soft boundary between lines: a small vertical gap
+                // (paragraph-like leading) joins consecutive lines with a
+                // word space so a phrase can span the line break; a large
+                // gap (column separation) keeps the hard '\n' so far-apart
+                // text never false-matches.
+                const auto& prevLine = lines.at(li - 1);
+                const auto& curLine = lines.at(li);
+                double prevBottom = prevLine.front().item->boundingRect.bottom();
+                double curTop = curLine.front().item->boundingRect.top();
+                double lineHeight = 0.0;
+                for (const FlowRef& ref : prevLine)
+                {
+                    prevBottom = qMax(prevBottom, ref.item->boundingRect.bottom());
+                    lineHeight = qMax(lineHeight, ref.item->boundingRect.height());
+                }
+                for (const FlowRef& ref : curLine)
+                {
+                    curTop = qMin(curTop, ref.item->boundingRect.top());
+                    lineHeight = qMax(lineHeight, ref.item->boundingRect.height());
+                }
+                const double vGap = curTop - prevBottom;
+                joinedText += (vGap <= 0.5 * lineHeight) ? QLatin1Char(' ') : QLatin1Char('\n');
                 joinedMap.push_back(Origin{0, -1});
             }
             const auto& line = lines.at(li);
@@ -221,7 +242,8 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
             PDFRTLTextNormalizer::normalize(joinedText, options.normalizer, &globalCharMap);
 
         // 4. Substring match (repeated, to find all occurrences). Matches can
-        //    never cross a '\n' boundary because the query contains none.
+        //    cross soft ' ' boundaries (word/line separators) but never a hard
+        //    '\n' boundary (column separation), because the query contains none.
         int from = 0;
         while (true)
         {
