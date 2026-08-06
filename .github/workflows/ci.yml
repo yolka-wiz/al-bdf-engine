@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # ci/run-ci.sh's format gate diffs against fork base a52c18c
+          fetch-depth: 0   # ci/run-ci.sh's format gate diffs against fork base 6bf5047
       - uses: ./.github/actions/setup-toolchain
       - name: ci/run-ci.sh stages 1-2 (configure + build, offscreen ctest)
         run: bash ci/run-ci.sh --skip-asan --skip-format

@@ -48,7 +48,7 @@ step() { echo; echo "=== $1 ==="; }
 # whole file would destroy cherry-pick diffs. We keep our own added lines styled
 # to match the surrounding code instead.
 AUTHORED_FILES="$(
-    cd "$REPO_DIR" && git diff --name-only a52c18c..HEAD -- '*.cpp' '*.h' \
+    cd "$REPO_DIR" && git diff --name-only 6bf5047..HEAD -- '*.cpp' '*.h' \
         | grep -vE '^src/PdfTool/pdftoolabstractapplication\.(cpp|h)$' \
         | grep -vE '^src/PdfTool/main\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
