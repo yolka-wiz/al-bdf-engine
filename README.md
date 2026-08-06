@@ -19,6 +19,7 @@ The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text w
   - [search-text (RTL-aware)](#search-text)
   - [Forms & signatures](#forms--signatures)
   - [Other commands](#other-commands)
+- [For humans contributing](#for-humans-contributing)
 - [For AI agents contributing](#for-ai-agents-contributing)
   - [Start here](#start-here-required-reading)
   - [Repo layout](#repo-layout)
@@ -139,6 +140,14 @@ back. `verify-signatures` then validates it — and detects any tampering of the
 signed bytes.
 
 ---
+
+## For humans contributing
+
+- **`CONTRIBUTING.md`** — the five binding rules: branch per task, docs as you
+  go, no direct push to main, update the problem list, no secrets/junk.
+- **`SECURITY.md`** — how to report a vulnerability (privately).
+- **`docs/branch-protection.md`** — how `main` is guarded (PR + review + CI).
+- `.github/CODEOWNERS` — default reviewers per subsystem.
 
 ## For AI agents contributing
 

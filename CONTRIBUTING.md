@@ -41,7 +41,9 @@ context) as the human/agent standard.
 
 ## 3. Do not push to main until fully tested
 
-- Work happens on branches. **Never push straight to main.**
+- Work happens on branches. **Never push straight to main.** The only
+  exception is an emergency hotfix, and even then it must go through a
+  review immediately after.
 - Before merging to main, the full gate must be green:
   ```bash
   bash ci/run-ci.sh        # Release build + ctest + ASAN/UBSAN + clang-format
@@ -53,6 +55,26 @@ context) as the human/agent standard.
   tests that fail before the feature lands.
 - The orchestrator (or a reviewer) verifies claims — never mark a task done
   without a real `git log` + passing test as evidence.
+
+## 3b. Pushing & merging — hard rules
+
+- **Protected branch:** `main` is protected (see `docs/branch-protection.md`).
+  Direct pushes are rejected by the remote; changes land only via PR + review
+  + green CI.
+- **PR checklist** (required for every pull request):
+  1. Branch off the latest `main`; rebase before opening.
+  2. Title/description in Conventional Commits style; link the task (DB #).
+  3. `ci/run-ci.sh` green (or the hosted CI job green) on your branch.
+  4. Docs updated (`PROBLEMS.md`, man page, ADR, DB — as applicable).
+  5. **No secrets** in the diff — the pre-commit hook scans; the hosted CI
+     re-scans. A secret that was ever pushed must be rotated, not just
+     deleted from the branch.
+  6. At least one review approval from someone who did not write the change.
+- **Force-push policy:** `--force-with-lease` only, and only on your own
+  feature branch. Never force-push `main`. History rewrites require the
+  orchestrator's explicit sign-off (used for secret scrubbing).
+- **Merge strategy:** rebase-merge to keep history linear; squash only on
+  explicit instruction.
 
 ## 4. Update the problem list your code change made
 

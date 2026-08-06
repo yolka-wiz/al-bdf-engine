@@ -5,6 +5,8 @@
 #    so the committed map always reflects the committed tree.
 # 2. Runs the markdown structure gate on STAGED .md files (except README.md
 #    and vendored skills/), enforcing the "structured, not minimal" doc rule.
+# 3. Scans staged files for high-signal secret patterns (API keys, tokens,
+#    private keys). Fails the commit if found.
 #
 # Install:  scripts/install-hooks.sh   (sets core.hooksPath to .githooks)
 # Skip:     git commit --no-verify      (or SKIP=1 git commit ...)
@@ -33,6 +35,33 @@ if [ -n "$STAGED_MD" ]; then
         echo "pre-commit: markdown structure gate FAILED (staged .md files above)."
         echo "Fix the doc (add an H1 title + sections) or stage only intended files."
         echo "To bypass: git commit --no-verify"
+        exit 1
+    fi
+fi
+
+# ---- 3. Secret scan on staged files ----------------------------------------
+# High-signal patterns only: private key blocks and common long-lived token
+# formats. Low-signal words (password=, token=) are NOT scanned to avoid
+# false positives on PDF4QT's encryption code and docs.
+STAGED="$(git -C "$REPO_DIR" diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)"
+if [ -n "$STAGED" ]; then
+    LEAKED="$(grep -rInE \
+        --exclude-dir=.git --exclude-dir=build --exclude-dir=build-asan \
+        --exclude='*.ttf' --exclude='*.png' --exclude='*.pdf' --exclude='*.bin' \
+        -e '-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----' \
+        -e 'ghp_[A-Za-z0-9]{36}' \
+        -e 'gho_[A-Za-z0-9]{36}' \
+        -e 'github_pat_[A-Za-z0-9_]{22,}' \
+        -e 'AKIA[0-9A-Z]{16}' \
+        -e 'sk-[A-Za-z0-9]{20,}' \
+        -e 'xox[baprs]-[A-Za-z0-9-]{10,}' \
+        $STAGED 2>/dev/null || true)"
+    if [ -n "$LEAKED" ]; then
+        echo
+        echo "pre-commit: SECRET SCAN FAILED — possible credential in staged files:"
+        echo "$LEAKED"
+        echo "Remove the secret (or rotate it if it was ever pushed) and re-commit."
+        echo "To bypass (NOT recommended): git commit --no-verify"
         exit 1
     fi
 fi

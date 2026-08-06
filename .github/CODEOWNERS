@@ -1,0 +1,13 @@
+# CODEOWNERS — default reviewers for pull requests.
+# Format: <path> <owner>. Owners are the maintainers (replace with the
+# actual GitHub handle of the primary maintainer before public launch).
+
+# Everything: primary maintainer reviews all changes by default.
+* @yolka-wiz
+
+# Sensitive subsystems get an explicit owner review on top of the default.
+src/Pdf4QtLibCore/        @yolka-wiz   # core PDF library + RTL engine
+src/PdfTool/              @yolka-wiz   # CLI surface, command registry
+src/UnitTests/            @yolka-wiz   # test suites
+.github/                  @yolka-wiz   # CI workflows
+SECURITY.md               @yolka-wiz
