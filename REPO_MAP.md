@@ -56,10 +56,11 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 |---|---|---|
 | `AGENTS.md` | AGENTS.md — Binding contract for every agent working in this repo | > Read this file completely before doing anything. It overrides general coding habits. > If a task conflicts with this file, STOP and ask the orchestrator (Yolka) — do not… |
 | `CONTRIBUTING.md` | CONTRIBUTING.md — albdf contribution rules | > These are the binding rules for every contributor — human or AI agent. > The short version is also summarized in `REPO_MAP.md`; this file is the > full contract. If a task… |
+| `REPORT.md` | 005 — External Agent Review: albdf Project Health & Roadmap Critique | **Status:** informational (not an ADR — no decision is being made here) **Author:** external reviewing agent (no prior session context, no write access to this repo) **Date:**… |
 | `REPO_MAP.md` | REPO_MAP.md — albdf repository orientation index | > **Purpose:** one-page orientation for humans and AI agents: what this > repo is, how to build/test it, and where every document lives. This > file is **auto-generated** by… |
 | `agents/roles/README.md` | Agent Roles | This project is written by an agent team. Each role is a **contract**: when the orchestrator dispatches a subagent for a task, the subagent receives the role definition + task +… |
 | `agents/roles/cli-agent.md` | Role: cli-agent | **Mission:** own the CLI surface (fork of upstream PDF4QT `PdfTool`, shipped as the `albdf` binary) — command dispatch, output formatting, determinism, and the user-facing… |
-| `agents/roles/core-agent.md` | Role: core-agent | **Mission:** own the PDF core library — the PDF4QT fork under `src/` — and deliver text recognition, object deletion, and add-text. **Scope (may touch):** `src/core/`,… |
+| `agents/roles/core-agent.md` | Role: core-agent | **Mission:** own the PDF core library — the PDF4QT fork under `src/` — and deliver text recognition, object deletion, and add-text. **Scope (may touch):** `src/Pdf4QtLibCore/`,… |
 | `agents/roles/orchestrator.md` | Role: orchestrator (Yolka) | **Mission:** run the project — planning, dispatch, review, tracking, and keeping every agent unblocked. This role is executed by the primary agent (Yolka) in this session, not by… |
 | `agents/roles/research-agent.md` | Role: research-agent (Rosetta) | **Mission:** deep research that unblocks feature agents — API discovery, library evaluation, spec reading, skill sourcing. Runs as a separate research sandbox (hermes-sandbox),… |
 | `agents/roles/rtl-agent.md` | Role: rtl-agent | **Mission:** the differentiator — correct Arabic/Persian/Hebrew **write + search** in PDF. This is the most research-heavy role: it turns the RTL pipeline in ADR-0003 into code.… |
@@ -119,41 +120,10 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 
 ## Tracking DB status
 
-```text
-== Components ==
-  [32mdone[0m add-text               Add text (LTR + RTL) via CLI
-                owner: core-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m cli                    CLI surface (albdf binary)
-                owner: cli-agent  dir: src/PdfTool/
-  [32mdone[0m fork-base              PDF4QT fork: Pdf4QtLibCore + PdfTool
-                owner: core-agent  dir: src/
-  [32mdone[0m forms-signatures       Forms (AcroForm) + digital signatures
-                owner: core-agent  dir: src/PdfTool/
-  [32mdone[0m object-deletion        Whole-object deletion (text runs, images, elements)
-                owner: core-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m research               Research stream (Rosetta)
-                owner: rosetta  dir: docs/research/
-  [32mdone[0m rtl-search             RTL-aware search
-                owner: rtl-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m rtl-writer             RTL write pipeline (Arabic/Persian/Hebrew)
-                owner: rtl-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m tests                  Test infrastructure: unit + golden + CLI
-                owner: test-agent  dir: src/tests/
-  [32mdone[0m text-recognition       Text recognition as objects
-                owner: core-agent  dir: src/Pdf4QtLibCore/
+_DB not present (gitignored). Rebuild:_
 
-== Tasks ==
-  #1    [32mdone[0m [fork-base] Vendor PDF4QT fork into src/, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad)
-        evidence: a52c18c
-  #2    [32mdone[0m [fork-base] Verify albdf headless run: QT_QPA_PLATFORM=offscreen build + fetch-text smoke test
-        evidence: 9ca9c38
-  #3    [32mdone[0m [cli] Add delete-object CLI command (wire TextFlowEditor::removeItem + write-back)
-        evidence: f354005
-  #4    [32mdone[0m [cli] Add add-text CLI command (LTR)
-        evidence: 327061b
-  #5    [32mdone[0m [object-deletion] Image XObject reference-counting + Form XObject nesting for deletion
-        evidence: f354005
-  #6    [32mdone[0m [rtl-writer] Add HarfBuzz + FriBi
+```bash
+python3 scripts/db.py init && python3 db/seed.py
 ```
 
 ## Contributing rules (summary)

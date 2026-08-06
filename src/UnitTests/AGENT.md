@@ -17,15 +17,17 @@ Read [`AGENTS.md`](../../AGENTS.md) and
 ## 1. What this directory is
 - Hosts all Qt Test suites for the fork. Each suite is one `tst_*.cpp` file:
   `tst_addtexttest`, `tst_deleteobjecttest`, `tst_fontencodingtest`,
-  `tst_goldentest`, `tst_imageoptimizertest`, `tst_lexicalanalyzertest`,
-  `tst_recognizetext`, `tst_rtladdtexttest`, `tst_searchtexttest`.
+  `tst_formsignaturetest`, `tst_goldentest`, `tst_imageoptimizertest`,
+  `tst_lexicalanalyzertest`, `tst_recognizetext`, `tst_rtladdtexttest`,
+  `tst_searchtexttest`.
 - Registration lives **entirely in `src/UnitTests/CMakeLists.txt`** — there is no
   central test aggregator. Each `tst_*.cpp` becomes its **own `add_executable`**
   and its **own `add_test`** ctest target.
-- **10 ctest targets total**: `UnitTests`, `UnitTestsImageOptimizer`,
+- **11 ctest targets total**: `UnitTests`, `UnitTestsImageOptimizer`,
   `UnitTestsFontEncoding`, `UnitTestsRecognizeText`, `UnitTestsDeleteObject`,
   `UnitTestsAddText`, `UnitTestsRtlAddText`, `UnitTestsSearchText`,
-  `UnitTestsGolden`, and `SmokeCli` (the last runs `src/tests/smoke.sh`).
+  `UnitTestsGolden`, `UnitTestsFormSignature`, and `SmokeCli` (the last runs
+  `src/tests/smoke.sh`).
 - Many suites are **integration tests**: they launch the `albdf` binary via
   `QProcess` and assert on its stdout/exit code.
 
