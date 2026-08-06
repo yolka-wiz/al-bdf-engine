@@ -214,6 +214,29 @@ set_tests_properties(UnitTestsFormSignature PROPERTIES ENVIRONMENT "QT_QPA_PLATF
 
 add_dependencies(UnitTestsFormSignature albdf)
 
+# Page-ops integration test: runs albdf rotate / move-page / delete-page
+# against the deterministic multipage fixture (5 pages, distinct text per
+# page) and asserts geometry changes, content relocation, page-count
+# reduction, byte-deterministic output and clean round-trip reopening.
+add_executable(UnitTestsPageOps
+	tst_pageopstest.cpp
+)
+
+target_link_libraries(UnitTestsPageOps PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsPageOps PRIVATE TEST_MULTIPAGE_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/multipage.pdf")
+
+set_target_properties(UnitTestsPageOps PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsPageOps COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPageOps")
+set_tests_properties(UnitTestsPageOps PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsPageOps albdf)
+
 # CLI smoke test: exercises fetch-text/render/info/unite on the fixtures
 # (and recognize-text/delete-object when present) and asserts invariants.
 find_program(BASH_PROGRAM bash)
