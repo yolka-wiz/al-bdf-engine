@@ -235,6 +235,30 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("rect-h", "Visible widget height (PDF points).", "number"));
     }
 
+    if (optionFlags.testFlag(Rotate))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("page", "Page number (1-based) to rotate (repeatable).", "number"));
+        parser->addOption(QCommandLineOption("angle", "Rotation angle in degrees (90, 180 or 270).", "number"));
+    }
+
+    if (optionFlags.testFlag(MovePage))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("from", "Source page number (1-based) to move.", "number"));
+        parser->addOption(QCommandLineOption("to", "Target position (1-based) of the moved page.", "number"));
+    }
+
+    if (optionFlags.testFlag(DeletePage))
+    {
+        parser->addPositionalArgument("outputdocument", "Output document filename.");
+        parser->addOption(QCommandLineOption("page", "Page number (1-based) to delete (repeatable).", "number"));
+        parser->addOption(
+            QCommandLineOption("page-select",
+                               "Page selection to delete, e.g. '1,3' or '2-4' (mutually exclusive with --page).",
+                               "selection"));
+    }
+
     if (optionFlags.testFlag(DeleteObject))
     {
         parser->addPositionalArgument("outputdocument", "Output document filename.");
@@ -677,6 +701,27 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.signW = parser->value("rect-w");
         options.signH = parser->value("rect-h");
         options.signOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(Rotate))
+    {
+        options.rotatePages = parser->values("page");
+        options.rotateAngle = parser->value("angle");
+        options.rotateOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(MovePage))
+    {
+        options.movePageFrom = parser->value("from");
+        options.movePageTo = parser->value("to");
+        options.movePageOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+    }
+
+    if (optionFlags.testFlag(DeletePage))
+    {
+        options.deletePagePages = parser->values("page");
+        options.deletePageSelection = parser->value("page-select");
+        options.deletePageOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
     }
 
     if (optionFlags.testFlag(AddText))

@@ -32,6 +32,8 @@ add_executable(albdf
     pdftooldiff.cpp 
     pdftooldeleteobject.cpp
     pdftooldeleteobject.h
+    pdftooldeletepage.cpp
+    pdftooldeletepage.h
     pdftooladdtext.cpp
     pdftooladdtext.h
     pdftoolencrypt.cpp 
@@ -53,12 +55,16 @@ add_executable(albdf
     pdftoolinfopageboxes.cpp 
     pdftoolinfostructuretree.cpp 
     pdftoolinkcoverage.cpp 
+    pdftoolmovepage.cpp
+    pdftoolmovepage.h
     pdftooloptimize.cpp 
     pdftoolrender.cpp 
     pdftoolremoveexternallinks.cpp
     pdftoolremoveexternallinks.h
     pdftoolrecognizetext.cpp
     pdftoolrecognizetext.h
+    pdftoolrotate.cpp
+    pdftoolrotate.h
     pdftoolsearchtext.cpp
     pdftoolsearchtext.h
     pdftoolseparate.cpp 

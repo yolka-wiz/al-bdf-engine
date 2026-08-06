@@ -214,6 +214,21 @@ struct PDFToolOptions
     QString encryptionOwnerPassword;
     uint32_t encryptionPermissions = 0;
 
+    // For option 'Rotate'
+    QStringList rotatePages;      ///< Page numbers (1-based) to rotate
+    QString rotateAngle;          ///< Rotation angle in degrees: 90, 180 or 270 (clockwise)
+    QString rotateOutputDocument; ///< Output document filename
+
+    // For option 'MovePage'
+    QString movePageFrom;           ///< Source page number (1-based)
+    QString movePageTo;             ///< Target position (1-based)
+    QString movePageOutputDocument; ///< Output document filename
+
+    // For option 'DeletePage'
+    QStringList deletePagePages;      ///< Page numbers (1-based) to delete
+    QString deletePageSelection;      ///< Page selection, e.g. '1,3' or '2-4'
+    QString deletePageOutputDocument; ///< Output document filename
+
     /// Returns page range. If page range is invalid, then \p errorMessage is empty.
     /// \param pageCount Page count
     /// \param[out] errorMessage Error message
@@ -306,6 +321,9 @@ public:
         SearchText = 0x10000000,                    ///< Settings for SearchText tool
         FormFill = 0x20000000,                      ///< Settings for FormFill tool
         Sign = 0x40000000,                          ///< Settings for Sign tool
+        Rotate = 0x80000000,                        ///< Settings for Rotate tool
+        MovePage = 0x100000000,                     ///< Settings for MovePage tool
+        DeletePage = 0x200000000,                   ///< Settings for DeletePage tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 
