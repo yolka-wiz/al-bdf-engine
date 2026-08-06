@@ -104,7 +104,7 @@ def section_quickstart():
         "source ~/.bashrc",
         "cd src",
         "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\",
-        "    -DCMAKE_TOOLCHAIN_FILE=/home/agent/vcpkg-cache/vcpkg/scripts/buildsystems/vcpkg.cmake \\",
+        "    -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \\\\",
         "    -DVCPKG_OVERLAY_PORTS=$PWD/vcpkg/overlays -DALBDF_BUILD_TESTS=ON",
         "cmake --build build -j$(nproc)",
         "QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure",
@@ -113,7 +113,7 @@ def section_quickstart():
         "```",
         "",
         "> Build dir is `src/build` (repo root has no CMakeLists). vcpkg manifest",
-        "> deps: `/home/agent/vcpkg-cache/vcpkg`. Aliyun mirrors everywhere.",
+        "> deps: `$VCPKG_ROOT` (vcpkg manifest mode). Aliyun mirrors everywhere.",
         "> Headless: `QT_QPA_PLATFORM=offscreen` is mandatory for all Qt runs.",
         "",
     ]

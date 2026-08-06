@@ -2,9 +2,9 @@
 
 Guide to `Pdf4QtLibCore/` — the fork of the MIT-licensed **PDF4QT** core, packaged as a
 shared library. This is where the PDF document model, text flow, fonts, and our RTL
-extensions live. Read [`/workspace/albdf/AGENTS.md`](../../AGENTS.md) (binding contract)
-and [`/workspace/albdf/docs/coding-standard.md`](../../docs/coding-standard.md) first.
-Top-level tree guide: [`/workspace/albdf/src/AGENT.md`](../AGENT.md).
+extensions live. Read [`../../AGENTS.md`](../../AGENTS.md) (binding contract)
+and [`../../docs/coding-standard.md`](../../docs/coding-standard.md) first.
+Top-level tree guide: [`../AGENT.md`](../AGENT.md).
 
 ## Table of Contents
 - [What This Library Is](#what-this-library-is)

@@ -12,7 +12,7 @@ content-stream emitter, without breaking extraction, search, or golden images.
 356–357 capture `yOffset`, 467–474 discard it; TJ is horizontal-only).
 
 **Tech stack:** C++20, Qt 6.8, CMake + Ninja, vcpkg manifest
-(`/home/agent/vcpkg-cache/vcpkg`), HarfBuzz/FriBidi, ctest offscreen.
+(`$VCPKG_ROOT`), HarfBuzz/FriBidi, ctest offscreen.
 
 ---
 
@@ -68,7 +68,7 @@ the CIDToGIDMap emission is fixed. Fix order is therefore:
 | PROBLEMS.md | P3 row updated → fix planned pointer |
 
 **Environment for subagents:** `source ~/.bashrc`; vcpkg toolchain at
-`/home/agent/vcpkg-cache/vcpkg/scripts/buildsystems/vcpkg.cmake`; overlay
+`$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake`; overlay
 `src/vcpkg/overlays`; `QT_QPA_PLATFORM=offscreen` mandatory for all Qt runs.
 Configure from `src/` (repo-root has no CMakeLists):
 `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release

@@ -17,7 +17,7 @@
 source ~/.bashrc
 cd src
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=/home/agent/vcpkg-cache/vcpkg/scripts/buildsystems/vcpkg.cmake \
+    -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \\
     -DVCPKG_OVERLAY_PORTS=$PWD/vcpkg/overlays -DALBDF_BUILD_TESTS=ON
 cmake --build build -j$(nproc)
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
@@ -26,7 +26,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 ```
 
 > Build dir is `src/build` (repo root has no CMakeLists). vcpkg manifest
-> deps: `/home/agent/vcpkg-cache/vcpkg`. Aliyun mirrors everywhere.
+> deps: `$VCPKG_ROOT` (vcpkg manifest mode). Aliyun mirrors everywhere.
 > Headless: `QT_QPA_PLATFORM=offscreen` is mandatory for all Qt runs.
 
 ## Top-level directory map
@@ -56,6 +56,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 |---|---|---|
 | `AGENTS.md` | AGENTS.md — Binding contract for every agent working in this repo | > Read this file completely before doing anything. It overrides general coding habits. > If a task conflicts with this file, STOP and ask the orchestrator (Yolka) — do not… |
 | `CONTRIBUTING.md` | CONTRIBUTING.md — albdf contribution rules | > These are the binding rules for every contributor — human or AI agent. > The short version is also summarized in `REPO_MAP.md`; this file is the > full contract. If a task… |
+| `HANDOFF.md` | albdf — Compressed Context Handoff (2026-08-06) | > Purpose: full state so any agent/session can resume without re-reading the repo. > Author: Yolka. Update this file at every major checkpoint. - Repo: `/workspace/pdfedit` (clone… |
 | `REPO_MAP.md` | REPO_MAP.md — albdf repository orientation index | > **Purpose:** one-page orientation for humans and AI agents: what this > repo is, how to build/test it, and where every document lives. This > file is **auto-generated** by… |
 | `agents/roles/README.md` | Agent Roles | This project is written by an agent team. Each role is a **contract**: when the orchestrator dispatches a subagent for a task, the subagent receives the role definition + task +… |
 | `agents/roles/cli-agent.md` | Role: cli-agent | **Mission:** own the CLI surface (fork of upstream PDF4QT `PdfTool`, shipped as the `albdf` binary) — command dispatch, output formatting, determinism, and the user-facing… |
@@ -89,7 +90,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `plans/P3-execution.md` | P3 Execution Plan — Vertical Mark Offsets (Orchestrated) | > **For Hermes:** orchestrated development via subagents. Each phase is a > self-contained delegate_task with its own RED/GREEN gate and commit. > Status:… |
 | `plans/P3-vertical-mark-offsets.md` | P3 — Vertical mark offsets (diacritics above the baseline) | Status: **RESOLVED** (2026-08-05) · Owner: rtl-agent · Effort: **M** Fixed by `109a4af` (Ts emission) + `9a4587d` (flow phantom-space guard) + `4ed7ab2` (kasra band calibration);… |
 | `plans/PLAN.md` | albdf — Master Project Plan (v2, finalized 2026-08-04) | > **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/albdf.db` > (`python3 scripts/db.py status`). Implementation is delegated to agent roles in >… |
-| `src/AGENT.md` | AGENT.md — albdf Source Tree Guide | Onboarding guide for AI agents working in `/workspace/albdf/src`. This is the buildable source tree of the **albdf** project — a fork of MIT-licensed **PDF4QT** delivering a… |
+| `src/AGENT.md` | AGENT.md — albdf Source Tree Guide | Onboarding guide for AI agents working in `src/`. This is the buildable source tree of the **albdf** project — a fork of MIT-licensed **PDF4QT** delivering a headless PDF editing… |
 | `src/Pdf4QtLibCore/AGENT.md` | AGENT.md — Pdf4QtLibCore (Core PDF Library) | Guide to `Pdf4QtLibCore/` — the fork of the MIT-licensed **PDF4QT** core, packaged as a shared library. This is where the PDF document model, text flow, fonts, and our RTL… |
 | `src/Pdf4QtLibCore/liberation-fonts-ttf/README.md` | src/Pdf4QtLibCore/liberation-fonts-ttf/README.md | Liberation Fonts ================= The Liberation Fonts is font collection which aims to provide document layout compatibility as usage of Times New Roman, Arial, Courier New.… |
 | `src/PdfTool/AGENT.md` | AGENT.md — albdf CLI (`src/PdfTool/`) | Onboarding guide for AI agents adding or modifying CLI commands in the `albdf` fork. Read [`AGENTS.md`](../../AGENTS.md) (binding contract) and… |
@@ -119,10 +120,41 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 
 ## Tracking DB status
 
-_DB not present (gitignored). Rebuild:_
+```text
+== Components ==
+  [32mdone[0m add-text               Add text (LTR + RTL) via CLI
+                owner: core-agent  dir: src/Pdf4QtLibCore/
+  [32mdone[0m cli                    CLI surface (albdf binary)
+                owner: cli-agent  dir: src/PdfTool/
+  [32mdone[0m fork-base              PDF4QT fork: Pdf4QtLibCore + PdfTool
+                owner: core-agent  dir: src/
+  [32mdone[0m forms-signatures       Forms (AcroForm) + digital signatures
+                owner: core-agent  dir: src/PdfTool/
+  [32mdone[0m object-deletion        Whole-object deletion (text runs, images, elements)
+                owner: core-agent  dir: src/Pdf4QtLibCore/
+  [32mdone[0m research               Research stream (Rosetta)
+                owner: rosetta  dir: docs/research/
+  [32mdone[0m rtl-search             RTL-aware search
+                owner: rtl-agent  dir: src/Pdf4QtLibCore/
+  [32mdone[0m rtl-writer             RTL write pipeline (Arabic/Persian/Hebrew)
+                owner: rtl-agent  dir: src/Pdf4QtLibCore/
+  [32mdone[0m tests                  Test infrastructure: unit + golden + CLI
+                owner: test-agent  dir: src/tests/
+  [32mdone[0m text-recognition       Text recognition as objects
+                owner: core-agent  dir: src/Pdf4QtLibCore/
 
-```bash
-python3 scripts/db.py init && python3 db/seed.py
+== Tasks ==
+  #1    [32mdone[0m [fork-base] Vendor PDF4QT fork into src/, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad)
+        evidence: a52c18c
+  #2    [32mdone[0m [fork-base] Verify albdf headless run: QT_QPA_PLATFORM=offscreen build + fetch-text smoke test
+        evidence: 9ca9c38
+  #3    [32mdone[0m [cli] Add delete-object CLI command (wire TextFlowEditor::removeItem + write-back)
+        evidence: f354005
+  #4    [32mdone[0m [cli] Add add-text CLI command (LTR)
+        evidence: 327061b
+  #5    [32mdone[0m [object-deletion] Image XObject reference-counting + Form XObject nesting for deletion
+        evidence: f354005
+  #6    [32mdone[0m [rtl-writer] Add HarfBuzz + FriBi
 ```
 
 ## Contributing rules (summary)

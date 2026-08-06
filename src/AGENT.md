@@ -1,10 +1,10 @@
 # AGENT.md — albdf Source Tree Guide
 
-Onboarding guide for AI agents working in `/workspace/albdf/src`. This is the buildable
+Onboarding guide for AI agents working in `src/`. This is the buildable
 source tree of the **albdf** project — a fork of MIT-licensed **PDF4QT** delivering a
 headless PDF editing **library + CLI** for Linux (no GUI in v1). Parallel work is governed
-by the binding contract in [`/workspace/albdf/AGENTS.md`](../AGENTS.md) and the coding
-standard in [`/workspace/albdf/docs/coding-standard.md`](../docs/coding-standard.md).
+by the binding contract in [`../AGENTS.md`](../AGENTS.md) and the coding
+standard in [`../docs/coding-standard.md`](../docs/coding-standard.md).
 
 ## Table of Contents
 - [Repository & Conventions](#repository--conventions)
@@ -58,7 +58,7 @@ standard in [`/workspace/albdf/docs/coding-standard.md`](../docs/coding-standard
 ## Build & Test Commands
 
 ```bash
-cd /workspace/albdf/src
+cd src
 # Configure (Release, Ninja, vcpkg toolchain, tests on)
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
@@ -72,12 +72,12 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 
 # Full CI gate (4 stages: build → ctest → ASAN/UBSAN → clang-format on authored files only)
-bash /workspace/albdf/ci/run-ci.sh
+bash ci/run-ci.sh
 ```
 
 ## The CLI Binary (albdf)
 
-- Binary: **`/workspace/albdf/src/build/bin/albdf`**.
+- Binary: **`src/build/bin/albdf`**.
 - Usage: `albdf <command> [options]`.
 - Dispatch: `main.cpp` resolves `<command>` via `pdftool::PDFToolApplicationStorage::getApplicationByCommand()`;
   unknown commands fall back to the default application.

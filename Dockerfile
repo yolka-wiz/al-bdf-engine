@@ -19,7 +19,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV QT_QPA_PLATFORM=offscreen
 ENV VCPKG_ROOT=/workspace/vcpkg
-# Aliyun mirrors (faster from Iran): apt + PyPI.
+# Aliyun mirrors for faster dependency downloads: apt + PyPI.
 # NOTE: Aliyun does NOT mirror vcpkg's GitHub repo — that clone stays upstream.
 ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV PIP_TRUSTED_HOST=mirrors.aliyun.com

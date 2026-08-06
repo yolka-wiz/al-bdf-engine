@@ -117,24 +117,22 @@ docs, 309-page and 100-page books).
 
 ### Container is ephemeral
 
-- The yolka dev container's OS layer (apt Qt6, build tools, fonts, nodejs) is **wiped on restart**; only `/workspace`, `/workspace/vcpkg`, `/workspace/.venv` survive. `/tmp` is wiped too.
-- After a restart: run `/workspace/scripts-tmp/reinstall-toolchain.sh` (re-applies apt mirror + Qt + tools + fonts). sshd auto-restores; **IP may change** (Apple DHCP) — if SSH breaks, check `container list` and update `terminal.ssh_host`.
-- Everything lives in `/workspace/albdf` (bind mount) — no code is lost on restart, only tooling.
+- The dev container's OS layer (apt Qt6, build tools, fonts, nodejs) is **wiped on restart**; only `/workspace` (the repo checkout + vcpkg + venv) survives. `/tmp` is wiped too.
+- After a restart, re-run the toolchain restore script (re-applies apt mirror + Qt + tools + fonts). sshd auto-restores; the container **IP may change** — if SSH breaks, check the container manager and update the SSH host.
+- Everything lives in the repo checkout (bind mount) — no code is lost on restart, only tooling.
 
-### Lifecycle guard crashes (Hermes)
+### Lifecycle guard crashes (agent tooling)
 
-The Hermes lifecycle guard (`_read_referenced_script`) crashes with exit -1 on inline terminal commands that reference:
-- a **literal binary path** in the command (reads the ELF as a script — same bug as `/workspace/vcpkg/vcpkg`), e.g. `/usr/bin/time`, `src/build/bin/qt_ref`
+The agent runtime's lifecycle guard crashes with exit -1 on inline terminal commands that reference:
+- a **literal binary path** in the command (reads the ELF as a script), e.g. `/usr/bin/time`, `src/build/bin/qt_ref`
 - **inline `$(...)` command substitution**
 - **non-ASCII bytes** (Hebrew) in referenced scripts
 
-**Workarounds:** variable indirection (`B=/path; $B`), `\u`-escaped pure-ASCII scripts, or drive via `execute_code` + `hermes_tools`. **Rule:** put any complex command in a script file under `/workspace/scripts-tmp/` and run `bash script.sh`.
+**Workarounds:** variable indirection (`B=/path; $B`), `\u`-escaped pure-ASCII scripts, or drive via `execute_code` + `hermes_tools`. **Rule:** put any complex command in a script file under a scratch dir and run `bash script.sh`.
 
 ### vcpkg / toolchain traps
 
-- **Never** write `/workspace/vcpkg/vcpkg` literally inline (guard crash). Use `V="$VCPKG_ROOT/vcpkg"; $V install`.
 - blend2d has CMake recursion bugs on gcc15 + aarch64 — must come from the **vcpkg overlay** (PDF4QT pins blend2d + asmjit commits).
-- The apt `socks5` proxy breaks apt; the mirror is `http://mirror.iranserver.com/ubuntu/` (via `99direct`). pip needs the proxy env **unset** + `--index-url https://mirror2.chabokan.net/pypi/simple/`.
 - FriBidi ships only pkg-config (no CMake config); HarfBuzz ships CONFIG. Both in `src/vcpkg.json` (manifest mode).
 - ASAN builds need `-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON` or vcpkg's install hook rejects the RPATH relink under Ninja (see `ci/run-ci.sh`).
 
