@@ -56,7 +56,6 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 |---|---|---|
 | `AGENTS.md` | AGENTS.md — Binding contract for every agent working in this repo | > Read this file completely before doing anything. It overrides general coding habits. > If a task conflicts with this file, STOP and ask the orchestrator (Yolka) — do not… |
 | `CONTRIBUTING.md` | CONTRIBUTING.md — albdf contribution rules | > These are the binding rules for every contributor — human or AI agent. > The short version is also summarized in `REPO_MAP.md`; this file is the > full contract. If a task… |
-| `REPORT.md` | 005 — External Agent Review: albdf Project Health & Roadmap Critique | **Status:** informational (not an ADR — no decision is being made here) **Author:** external reviewing agent (no prior session context, no write access to this repo) **Date:**… |
 | `REPO_MAP.md` | REPO_MAP.md — albdf repository orientation index | > **Purpose:** one-page orientation for humans and AI agents: what this > repo is, how to build/test it, and where every document lives. This > file is **auto-generated** by… |
 | `agents/roles/README.md` | Agent Roles | This project is written by an agent team. Each role is a **contract**: when the orchestrator dispatches a subagent for a task, the subagent receives the role definition + task +… |
 | `agents/roles/cli-agent.md` | Role: cli-agent | **Mission:** own the CLI surface (fork of upstream PDF4QT `PdfTool`, shipped as the `albdf` binary) — command dispatch, output formatting, determinism, and the user-facing… |
