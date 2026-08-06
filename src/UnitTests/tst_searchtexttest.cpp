@@ -42,6 +42,7 @@ private slots:
     void test_noFalsePositive();
     void test_crossItemPhrase();
     void test_crossItemNoFalsePositive();
+    void test_presentationFormSearch();
 
 private:
     struct ToolResult
@@ -389,6 +390,32 @@ void SearchTextTest::test_crossItemNoFalsePositive()
     const auto matches =
         engine.searchFlow(flow, QStringLiteral("hello world"), 0, 0, pdf::PDFTextSearchEngine::Options());
     QCOMPARE(matches.size(), size_t(0));
+}
+
+void SearchTextTest::test_presentationFormSearch()
+{
+    // R#3 (DB #23): Arabic presentation-form shaping in fribidi_log2vis
+    // requires a second NFKC pass after inversion in search. Without it,
+    // Arabic search breaks. Pin the behavior: a query in base letters must
+    // match a flow whose item text uses presentation forms (or vice versa)
+    // — the NFKC pass is what folds the forms back to base.
+    //
+    // 'لام' logical (ل ا م) shapes to [لا ligature, م]; visual order left-to-
+    // right is 'م' then the lam-alef ligature: "\u0645\uFEFB". The base-letter
+    // query 'لام' (U+0644 U+0627 U+0645) must match it.
+    pdf::PDFDocumentTextFlow flow;
+
+    pdf::PDFDocumentTextFlow::Item item1;
+    item1.pageIndex = 0;
+    item1.text = QString::fromUtf8("\u0645\uFEFB"); // م + لا ligature (visual order)
+    item1.boundingRect = QRectF(72.0, 700.0, 40.0, 17.0);
+    item1.flags = pdf::PDFDocumentTextFlow::Text;
+    flow.addItem(item1);
+
+    pdf::PDFTextSearchEngine engine;
+    const auto matches =
+        engine.searchFlow(flow, QString::fromUtf8("\u0644\u0627\u0645"), 0, 0, pdf::PDFTextSearchEngine::Options());
+    QVERIFY2(matches.size() >= 1, "presentation-form lam-alef must be found by a base-letter query (NFKC pass, R#3)");
 }
 
 QTEST_GUILESS_MAIN(SearchTextTest)
