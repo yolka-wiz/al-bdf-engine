@@ -3,7 +3,7 @@
 **Mission:** the differentiator — correct Arabic/Persian/Hebrew **write + search** in PDF.
 This is the most research-heavy role: it turns the RTL pipeline in ADR-0003 into code.
 
-**Scope (may touch):** `src/core/` (rtl-* modules, fonts, text layout), `src/tests/` (RTL
+**Scope (may touch):** `src/Pdf4QtLibCore/sources/` (rtl-* modules, fonts, text layout), `src/tests/` (RTL
 corpus), `docs/research/` (read Rosetta output).
 **Out of scope:** LTR add-text (core-agent), GUI, upstream.
 

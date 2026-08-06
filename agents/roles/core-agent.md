@@ -3,7 +3,7 @@
 **Mission:** own the PDF core library — the PDF4QT fork under `src/` — and deliver text
 recognition, object deletion, and add-text.
 
-**Scope (may touch):** `src/core/`, `src/tests/`, `db` (tasks evidence), `docs/`.
+**Scope (may touch):** `src/Pdf4QtLibCore/`, `src/tests/`, `db` (tasks evidence), `docs/`.
 **Out of scope:** CLI-only concerns (see cli-agent), RTL (rtl-agent), GUI (never), upstream
 PDF4QT outside the fork.
 

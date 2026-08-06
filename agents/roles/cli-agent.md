@@ -3,7 +3,7 @@
 **Mission:** own the CLI surface (fork of upstream PDF4QT `PdfTool`, shipped as the `albdf` binary) — command dispatch, output
 formatting, determinism, and the user-facing contract.
 
-**Scope (may touch):** `src/cli/`, `src/core/` (only to add core hooks), `docs/` (CLI docs).
+**Scope (may touch):** `src/PdfTool/`, `src/Pdf4QtLibCore/` (only to add core hooks), `docs/` (CLI docs).
 **Out of scope:** core PDF semantics (core-agent), RTL internals (rtl-agent), GUI (never).
 
 ## Responsibilities
