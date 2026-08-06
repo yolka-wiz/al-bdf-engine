@@ -325,7 +325,60 @@ public:
         MovePage = 0x100000000,                     ///< Settings for MovePage tool
         DeletePage = 0x200000000,                   ///< Settings for DeletePage tool
     };
-    Q_DECLARE_FLAGS(Options, Option)
+
+    // 64-bit flag storage. Qt's QFlags is int-backed (static_assert in Qt 6.10
+    // rejects enums wider than int), and the Option enum now has 34 flags —
+    // bits 32 and 33 (MovePage, DeletePage) overflow QFlags. This class keeps
+    // the QFlags API surface used by the CLI (testFlag, operator|) while
+    // allowing flags above bit 31.
+    class Options
+    {
+    public:
+        constexpr Options() noexcept = default;
+        constexpr Options(Option flag) noexcept : m_flags(static_cast<quint64>(flag)) {}
+
+        constexpr bool testFlag(Option flag) const noexcept
+        {
+            return (m_flags & static_cast<quint64>(flag)) != 0;
+        }
+
+        constexpr bool operator==(const Options& other) const noexcept
+        {
+            return m_flags == other.m_flags;
+        }
+
+        constexpr bool operator!=(const Options& other) const noexcept
+        {
+            return !(*this == other);
+        }
+
+        constexpr Options operator|(Option flag) const noexcept
+        {
+            return Options(m_flags | static_cast<quint64>(flag));
+        }
+
+        constexpr Options operator|(const Options& other) const noexcept
+        {
+            return Options(m_flags | other.m_flags);
+        }
+
+        constexpr Options& operator|=(Option flag) noexcept
+        {
+            m_flags |= static_cast<quint64>(flag);
+            return *this;
+        }
+
+        constexpr Options& operator|=(const Options& other) noexcept
+        {
+            m_flags |= other.m_flags;
+            return *this;
+        }
+
+    private:
+        constexpr explicit Options(quint64 flags) noexcept : m_flags(flags) {}
+
+        quint64 m_flags = 0;
+    };
 
     virtual QString getStandardString(StandardString standardString) const = 0;
     virtual int execute(const PDFToolOptions& options) = 0;
@@ -393,6 +446,26 @@ private:
 
 } // namespace pdftool
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(pdftool::PDFToolAbstractApplication::Options)
+// Free operators so `Option | Option` (e.g. `ConsoleFormat | OpenDocument`)
+// composes like the old QFlags API.
+//
+// IMPORTANT: these must live at GLOBAL scope, NOT inside namespace pdftool.
+// Name lookup inside namespace pdftool walks outward until it finds the first
+// scope declaring `operator|`; a pdftool-scope operator| would SHADOW the
+// QFlags operator| declarations that Qt places at global scope (and that
+// other code in this namespace relies on — e.g. `PDFOptimizer::Flags | Flags`
+// in pdftooldeletepage.cpp). At global scope both coexist and overload
+// resolution picks the exact match.
+inline constexpr pdftool::PDFToolAbstractApplication::Options operator|(pdftool::PDFToolAbstractApplication::Option left,
+                                                                        pdftool::PDFToolAbstractApplication::Option right)
+{
+    return pdftool::PDFToolAbstractApplication::Options(left) | right;
+}
+
+inline constexpr pdftool::PDFToolAbstractApplication::Options operator|(pdftool::PDFToolAbstractApplication::Option left,
+                                                                        const pdftool::PDFToolAbstractApplication::Options& right)
+{
+    return pdftool::PDFToolAbstractApplication::Options(left) | right;
+}
 
 #endif // PDFTOOLABSTRACTAPPLICATION_H
