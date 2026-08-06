@@ -109,7 +109,7 @@ docs, 309-page and 100-page books).
 
 ### Quality backlog
 
-- Perf smoke is manual (`scripts-tmp/m7-perf.sh`); promote to a tracked benchmark.
+- ~~Perf smoke is manual (`scripts-tmp/m7-perf.sh`); promote to a tracked benchmark.~~ **Resolved** `cec5e59`: `scripts/benchmark.sh` is the tracked benchmark — deterministic inline 1000-page fixture, M7 metrics (info/fetch/render/search/delete) with result assertions, `albdf-benchmark-v1` machine-readable summary, and a documented threshold policy (`ALBDF_PERF_THRESHOLD_MS`, default 5000 ms; breaches fail the run). Runs on every PR as a non-gating CI job (`benchmark`, continue-on-error, summary uploaded as artifact); locally: `bash scripts/benchmark.sh`.
 - ~~ASAN job is in CI but not upstreamed to a hosted runner; runs only on the dev container.~~ **Resolved** `d254041`: the ASAN/UBSAN Debug build + ctest now runs as the `asan` job on ubuntu-24.04 hosted runners (`.github/workflows/ci.yml`), driven by `ci/run-ci.sh --skip-release --skip-format`.
 - Golden-image regeneration is manual; document the exact `--image-format png` + commit flow in `src/tests/AGENT.md`.
 
