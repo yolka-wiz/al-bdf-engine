@@ -134,6 +134,20 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 
 ### vcpkg / toolchain traps
 
+- **Qt `QFlags` is 32-bit only until Qt 6.9.** `QFlags<Enum>` static-asserts
+  `sizeof(Enum) <= sizeof(int)` (qflags.h:54). Adding an `Option` enum flag
+  above `0x80000000` (bit 31) breaks the build on Qt 6.8/6.10. CI pins Qt 6.8
+  and the dev container ships 6.8.2 — both reject 64-bit enums. Fix used:
+  `4bb644f` replaced `Q_DECLARE_FLAGS(Options, Option)` with a minimal 64-bit
+  `Options` class (same `testFlag`/`operator|` surface) in
+  `pdftoolabstractapplication.h`. **If you add CLI commands, keep flags within
+  32 bits or extend the Options class — never reintroduce `Q_DECLARE_FLAGS`
+  with wide values.** Also: the page-ops milestone (`4402b1c`) never compiled
+  on this toolchain — a stale pre-merge `albdf` binary can make CI look green
+  locally; always rebuild from clean before trusting a baseline.
+
+### Lifecycle guard crashes (agent tooling)
+
 - blend2d has CMake recursion bugs on gcc15 + aarch64 — must come from the **vcpkg overlay** (PDF4QT pins blend2d + asmjit commits).
 - FriBidi ships only pkg-config (no CMake config); HarfBuzz ships CONFIG. Both in `src/vcpkg.json` (manifest mode).
 - ASAN builds need `-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON` or vcpkg's install hook rejects the RPATH relink under Ninja (see `ci/run-ci.sh`).
