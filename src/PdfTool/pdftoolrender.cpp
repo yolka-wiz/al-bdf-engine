@@ -174,33 +174,6 @@ int PDFToolRenderBase::execute(const PDFToolOptions& options)
         return ErrorInvalidArguments;
     }
 
-    // We are ready to render the document
-    pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
-    pdf::PDFCMSManager cmsManager(nullptr);
-    cmsManager.setDocument(&document);
-    cmsManager.setSettings(options.cmsSettings);
-    pdf::PDFMeshQualitySettings meshQualitySettings;
-    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
-    pdf::PDFModifiedDocument md(&document, &optionalContentActivity);
-    fontCache.setDocument(md);
-    fontCache.setCacheShrinkEnabled(nullptr, false);
-
-    m_pageInfo.resize(document.getCatalog()->getPageCount());
-    pdf::PDFRasterizerPool rasterizerPool(&document, &fontCache, &cmsManager,
-                                          &optionalContentActivity, options.renderFeatures, meshQualitySettings,
-                                          pdf::PDFRasterizerPool::getCorrectedRasterizerCount(options.renderRasterizerCount),
-                                          options.renderUseSoftwareRendering ? pdf::RendererEngine::QPainter : pdf::RendererEngine::Blend2D_SingleThread, nullptr);
-
-    auto onRenderError = [this](pdf::PDFInteger pageIndex, pdf::PDFRenderError error)
-    {
-        if (pageIndex != pdf::PDFCatalog::INVALID_PAGE_INDEX)
-        {
-            m_pageInfo[pageIndex].errors.emplace_back(qMove(error));
-        }
-    };
-    QObject holder;
-    QObject::connect(&rasterizerPool, &pdf::PDFRasterizerPool::renderError, &holder, onRenderError, Qt::DirectConnection);
-
     auto imageSizeGetter = [&options](const pdf::PDFPage* page) -> QSize
     {
         Q_ASSERT(page);
@@ -229,6 +202,62 @@ int PDFToolRenderBase::execute(const PDFToolOptions& options)
 
         return QSize();
     };
+
+    // F#2: reject renders whose image size exceeds the maximum supported
+    // pixel resolution *before* allocating anything. The --image-res-dpi
+    // clamp (72..6000) alone is not enough: 6000 dpi on a Letter page is a
+    // 51000x66000 px (~13.5 GB RGBA) image, which exhausts memory and hangs
+    // the process. Pixel resolution mode already caps at
+    // getMaxPixelResolution() per dimension; apply the same envelope here.
+    const int maxImageDimension = pdf::PDFPageImageExportSettings::getMaxPixelResolution();
+    for (const pdf::PDFInteger pageIndex : pageIndices)
+    {
+        const pdf::PDFPage* page = document.getCatalog()->getPage(static_cast<size_t>(pageIndex));
+        if (page == nullptr)
+        {
+            continue;
+        }
+
+        const QSize imageSize = imageSizeGetter(page);
+        if (imageSize.width() > maxImageDimension || imageSize.height() > maxImageDimension)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Rendered image size %1x%2 for page %3 exceeds the maximum supported size %4x%5. Use a lower --image-res-dpi value.")
+                                       .arg(imageSize.width())
+                                       .arg(imageSize.height())
+                                       .arg(pageIndex + 1)
+                                       .arg(maxImageDimension)
+                                       .arg(maxImageDimension),
+                                   options.outputCodec);
+            return ErrorInvalidArguments;
+        }
+    }
+
+    // We are ready to render the document
+    pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
+    pdf::PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(&document);
+    cmsManager.setSettings(options.cmsSettings);
+    pdf::PDFMeshQualitySettings meshQualitySettings;
+    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    pdf::PDFModifiedDocument md(&document, &optionalContentActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+
+    m_pageInfo.resize(document.getCatalog()->getPageCount());
+    pdf::PDFRasterizerPool rasterizerPool(&document, &fontCache, &cmsManager,
+                                          &optionalContentActivity, options.renderFeatures, meshQualitySettings,
+                                          pdf::PDFRasterizerPool::getCorrectedRasterizerCount(options.renderRasterizerCount),
+                                          options.renderUseSoftwareRendering ? pdf::RendererEngine::QPainter : pdf::RendererEngine::Blend2D_SingleThread, nullptr);
+
+    auto onRenderError = [this](pdf::PDFInteger pageIndex, pdf::PDFRenderError error)
+    {
+        if (pageIndex != pdf::PDFCatalog::INVALID_PAGE_INDEX)
+        {
+            m_pageInfo[pageIndex].errors.emplace_back(qMove(error));
+        }
+    };
+    QObject holder;
+    QObject::connect(&rasterizerPool, &pdf::PDFRasterizerPool::renderError, &holder, onRenderError, Qt::DirectConnection);
 
     QElapsedTimer timer;
     timer.start();

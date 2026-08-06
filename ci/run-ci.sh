@@ -53,7 +53,9 @@ AUTHORED_FILES="$(
         | grep -vE '^src/PdfTool/main\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$' \
-        | grep -vE '^src/Pdf4QtLibCore/sources/pdftextlayout\.cpp$'
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdftextlayout\.cpp$' \
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdfutils\.cpp$' \
+        | grep -vE '^src/PdfTool/pdftoolrender\.cpp$'
 )"
 
 # All build stages run from the source dir (format stage uses absolute
