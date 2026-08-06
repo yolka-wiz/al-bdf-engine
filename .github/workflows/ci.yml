@@ -8,6 +8,9 @@
 #   benchmark  — non-gating: scripts/benchmark.sh (1000-page perf smoke,
 #                continue-on-error: true — a regression flags itself in the
 #                uploaded summary instead of blocking the PR)
+#   fuzz       — non-gating: scripts/fuzz.sh (deterministic seeded CLI fuzz
+#                harness — crashes/hangs flag themselves in the uploaded
+#                summary + reproducer files instead of blocking the PR)
 # Each job shells out to ci/run-ci.sh with stage-selection flags so the
 # stage logic (compiler flags, sanitizer env, authored-file list) lives in
 # exactly one place.
@@ -112,3 +115,30 @@ jobs:
         with:
           name: benchmark-summary
           path: ${{ runner.temp }}/albdf-bench/benchmark-summary.txt
+
+  fuzz:
+    name: CLI fuzz harness (non-gating)
+    runs-on: ubuntu-24.04
+    # Informational only: scripts/fuzz.sh exits 1 when the harness finds a
+    # crash or hang (reproducers are saved under the work-dir and listed in
+    # the summary); a failure here never blocks the PR (continue-on-error).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-toolchain
+      - name: ci/run-ci.sh stages 1-2 (Release build, offscreen)
+        run: bash ci/run-ci.sh --skip-asan --skip-format
+      - name: Run CLI fuzz harness (seeded, offscreen, time-bounded)
+        run: bash scripts/fuzz.sh --iterations 200 --max-time 240 --work-dir "$RUNNER_TEMP/albdf-fuzz"
+      - name: Upload fuzz summary + cases + reproducers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-summary
+          path: |
+            ${{ runner.temp }}/albdf-fuzz/fuzz-summary.txt
+            ${{ runner.temp }}/albdf-fuzz/fuzz-cases.tsv
+            ${{ runner.temp }}/albdf-fuzz/fail
+          if-no-files-found: ignore
