@@ -27,6 +27,7 @@
 #include "pdfcompiler.h"
 #include "pdfdocument.h"
 #include "pdfdrawspacecontroller.h"
+#include "pdfwidgetrtlsearch.h"
 
 #include <QMessageBox>
 
@@ -287,9 +288,25 @@ void PDFAdvancedFindWidget::performSearch()
     const pdf::PDFTextLayoutStorage* textLayoutStorage = compiler->getTextLayoutStorage();
     if (!useRegularExpression)
     {
-        // Use simple text search
+        // Use simple text search. albdf: route plain-text queries through the
+        // RTL-aware engine (normalization + visual inversion + cross-item
+        // joining — see pdfwidgetrtlsearch.h); the legacy storage find cannot
+        // match Arabic/Persian/Hebrew. Regex/whole-word/wildcard stay on the
+        // legacy path below.
         Qt::CaseSensitivity caseSensitivity = m_parameters.isCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
-        m_findResults = textLayoutStorage->find(expression, caseSensitivity, flowFlags);
+        if (m_document && m_document->getCatalog() && m_document->getCatalog()->getPageCount() > 0)
+        {
+            m_findResults = pdf::searchDocumentPlainTextRTL(m_document,
+                                                            textLayoutStorage,
+                                                            expression,
+                                                            caseSensitivity,
+                                                            0,
+                                                            m_document->getCatalog()->getPageCount() - 1);
+        }
+        else
+        {
+            m_findResults.clear();
+        }
     }
     else
     {

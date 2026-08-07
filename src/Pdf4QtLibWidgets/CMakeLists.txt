@@ -73,6 +73,8 @@ add_library(Pdf4QtLibWidgets SHARED
     sources/pdfcertificatelisthelper.h
     sources/pdfcertificatelisthelper.cpp
     sources/pdfpagecontenteditorediteditemsettings.h sources/pdfpagecontenteditorediteditemsettings.cpp sources/pdfpagecontenteditorediteditemsettings.ui
+    sources/pdfwidgetrtlsearch.h
+    sources/pdfwidgetrtlsearch.cpp
 )
 
 include(GenerateExportHeader)
