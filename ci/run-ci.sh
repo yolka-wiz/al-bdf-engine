@@ -67,7 +67,12 @@ AUTHORED_FILES="$(
         | grep -vE '^src/Pdf4QtLibCore/sources/pdftextlayout\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfdocumentbuilder\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfutils\.cpp$' \
-        | grep -vE '^src/PdfTool/pdftoolrender\.cpp$'
+        | grep -vE '^src/PdfTool/pdftoolrender\.cpp$' \
+        | grep -vE '^src/Pdf4QtLibGui/' \
+        | grep -vE '^src/Pdf4QtLibWidgets/' \
+        | grep -vE '^src/Pdf4QtEditor/' \
+        | grep -vE '^src/Pdf4QtViewer/' \
+        | grep -vE '^src/Pdf4QtPageMaster/'
 )"
 
 # All build stages run from the source dir (format stage uses absolute
