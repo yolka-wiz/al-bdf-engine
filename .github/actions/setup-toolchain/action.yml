@@ -57,11 +57,35 @@ runs:
             libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
             libgl1-mesa-dev
 
+    - name: Build ICU 73 (Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
+      if: inputs.install-qt == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The Qt 6.8.3 online binaries are built against ICU 73, but
+        # ubuntu-24.04 ships ICU 74 (ABI-incompatible: libQt6Core needs
+        # ucnv_reset_73). No distro packages ICU 73, so build it from the ICU
+        # upstream release (~1 min). MUST run BEFORE the Qt install: aqt's
+        # post-install check executes qmake, which needs ICU 73 on
+        # LD_LIBRARY_PATH (verified: without it qmake fails with
+        # "libicui18n.so.73: cannot open shared object file").
+        curl -sL "https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz" -o /tmp/icu73.tgz
+        tar xzf /tmp/icu73.tgz -C /tmp
+        cd /tmp/icu/source
+        ./configure --prefix=/tmp/icu-build --disable-tests --disable-samples --disable-dyload >/dev/null
+        make -j"$(nproc)" >/dev/null
+        make install >/dev/null
+        echo "ICU_BUILD=/tmp/icu-build" >> "${GITHUB_ENV}"
+        echo "LD_LIBRARY_PATH=/tmp/icu-build/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+
     - name: Install Qt 6.8.3 (qtbase + qtsvg, headless) with retry
       if: inputs.install-qt == 'true'
       shell: bash
       run: |
         set -euo pipefail
+        # GITHUB_ENV from the ICU step is applied to this step's environment,
+        # so LD_LIBRARY_PATH already includes /tmp/icu-build/lib here — aqt's
+        # post-install qmake verification needs it.
         python3 -m pip install --quiet "aqtinstall==3.3.*"
         # aqt resolves the base Qt package through an Updates.xml fetch that is
         # flaky on GH runners ("The packages ['qt_base'] were not found while
@@ -87,21 +111,5 @@ runs:
         QT_ROOT_DIR="$(dirname "$(dirname "${QMAKE}")")"
         echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
         echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
-
-    - name: Build ICU 73 (Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
-      if: inputs.install-qt == 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-        # The Qt 6.8.3 online binaries are built against ICU 73, but
-        # ubuntu-24.04 ships ICU 74 (ABI-incompatible: libQt6Core needs
-        # ucnv_reset_73). No distro packages ICU 73, so build it from the ICU
-        # upstream release (takes ~1 min). Export LD_LIBRARY_PATH so rcc and
-        # the other Qt tools find it at build time.
-        curl -sL "https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz" -o /tmp/icu73.tgz
-        tar xzf /tmp/icu73.tgz -C /tmp
-        cd /tmp/icu/source
-        ./configure --prefix=/tmp/icu-build --disable-tests --disable-samples --disable-dyload >/dev/null
-        make -j"$(nproc)" >/dev/null
-        make install >/dev/null
-        echo "LD_LIBRARY_PATH=/tmp/icu-build/lib:${QT_DIR}/6.8.3/gcc_64/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+        # Ensure the Qt lib dir is also on LD_LIBRARY_PATH for the build steps.
+        echo "LD_LIBRARY_PATH=${QT_ROOT_DIR}/lib:/tmp/icu-build/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
