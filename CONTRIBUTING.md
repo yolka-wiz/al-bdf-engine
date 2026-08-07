@@ -47,6 +47,7 @@ context) as the human/agent standard.
 - Before merging to main, the full gate must be green:
   ```bash
   bash ci/run-ci.sh        # Release build + ctest + ASAN/UBSAN + clang-format
+  bash ci/run-ci.sh --gui  # optional: vendored GUI build + headless smoke (non-gating)
   ```
 - Plus, for behavior changes: the CLI smoke suite
   `QT_QPA_PLATFORM=offscreen bash src/tests/smoke.sh ...` and any

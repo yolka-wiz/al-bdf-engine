@@ -1,13 +1,18 @@
 #!/bin/bash
 # albdf CI gate — run on a bare container after reinstall-toolchain.sh.
 #
-#   ci/run-ci.sh [--skip-asan] [--skip-format] [--skip-release] [--only-format]
+#   ci/run-ci.sh [--skip-asan] [--skip-format] [--skip-release] [--only-format] [--gui]
 #
 # Stages:
 #   1. configure + build (Release, offscreen-capable)
 #   2. ctest (offscreen)
 #   3. ASAN/UBSAN build + ctest (Debug + sanitizers)
 #   4. clang-format gate (authored files only — vendored upstream is exempt)
+#   gui. optional GUI stage (non-gating): configure + build the vendored
+#        PDF4QT GUI layer (ALBDF_BUILD_GUI=ON) into src/build-gui, then the
+#        headless GUI smoke (src/tests/gui-smoke.sh, offscreen -> xvfb
+#        fallback). Runs INSTEAD of the four headless stages — the headless
+#        gate is never touched when --gui is used.
 #
 # Stage-selection flags (backward compatible — the bare invocation still
 # runs all four stages, as the local bare-container flow expects):
@@ -16,6 +21,8 @@
 #   --skip-asan     skip stage 3
 #   --skip-format   skip stage 4
 #   --only-format   run only stage 4 (used by the hosted-CI format job)
+#   --gui           run only the GUI stage (used by the hosted-CI gui job);
+#                   also selectable via the ALBDF_CI_STAGE=gui env var
 #
 # Exit code: 0 = all green; 1 = any stage failed.
 set -u
@@ -26,14 +33,18 @@ SKIP_ASAN=0
 SKIP_FORMAT=0
 SKIP_RELEASE=0
 ONLY_FORMAT=0
+GUI=0
 for arg in "$@"; do
     case "$arg" in
         --skip-asan) SKIP_ASAN=1 ;;
         --skip-format) SKIP_FORMAT=1 ;;
         --skip-release) SKIP_RELEASE=1 ;;
         --only-format) ONLY_FORMAT=1 ;;
+        --gui) GUI=1 ;;
     esac
 done
+# Env-var alternative for the stage selector (same as --gui).
+if [ "${ALBDF_CI_STAGE:-}" = "gui" ]; then GUI=1; fi
 
 export VCPKG_ROOT="${VCPKG_ROOT:-/workspace/vcpkg}"
 VCPKG_TOOLCHAIN="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
@@ -67,6 +78,37 @@ AUTHORED_FILES="$(
 # All build stages run from the source dir (format stage uses absolute
 # paths, so it is unaffected by cwd).
 cd "$SRC_DIR"
+
+# --- GUI stage (non-gating) -------------------------------------------------
+# Optional vendored GUI layer (M12): configure + build the 5 PDF4QT GUI
+# targets into src/build-gui (separate build dir — the headless build/ and
+# build-asan/ are never touched), then the headless smoke of the viewer.
+# Selected via --gui (or ALBDF_CI_STAGE=gui); when selected this stage runs
+# INSTEAD of the four headless stages and exits — the headless gate is
+# untouched by the hosted-CI gui job.
+if [ "$GUI" -eq 1 ]; then
+    step "gui: configure + build (Release, ALBDF_BUILD_GUI=ON)"
+    cmake -S . -B build-gui -G Ninja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
+          -DALBDF_BUILD_GUI=ON > /tmp/ci-gui-build.log 2>&1
+    if [ $? -ne 0 ]; then echo "gui configure FAILED"; tail -20 /tmp/ci-gui-build.log; FAILED=1; fi
+    cmake --build build-gui -j"$(nproc)" >> /tmp/ci-gui-build.log 2>&1
+    if [ $? -ne 0 ]; then echo "gui build FAILED"; tail -20 /tmp/ci-gui-build.log; FAILED=1; fi
+
+    step "gui: smoke (headless — offscreen, xvfb fallback)"
+    QT_QPA_PLATFORM=offscreen bash "$REPO_DIR/src/tests/gui-smoke.sh" > /tmp/ci-gui-smoke.log 2>&1
+    if [ $? -ne 0 ]; then echo "gui smoke FAILED"; tail -20 /tmp/ci-gui-smoke.log; FAILED=1; else
+        cat /tmp/ci-gui-smoke.log
+    fi
+
+    echo
+    if [ "$FAILED" -eq 0 ]; then
+        echo "CI: ALL GREEN"
+    else
+        echo "CI: FAILED"
+    fi
+    exit "$FAILED"
+fi
 
 if [ "$ONLY_FORMAT" -eq 0 ]; then
     if [ "$SKIP_RELEASE" -eq 0 ]; then
