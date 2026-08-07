@@ -2,7 +2,7 @@
 # v1 scope: Pdf4QtLibCore + albdf + UnitTests. NO GUI (ADR-0002).
 cmake_minimum_required(VERSION 3.16)
 
-set(ALBDF_VERSION 0.1.0)
+set(ALBDF_VERSION 0.2.0)
 set(PDF4QT_VERSION 1.6.0.0)   # kept for upstream compatibility in vendored CMake
 project(albdf VERSION ${ALBDF_VERSION} LANGUAGES CXX)
 

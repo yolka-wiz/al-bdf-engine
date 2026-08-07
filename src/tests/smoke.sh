@@ -53,7 +53,7 @@ command_present() {
 
 echo "== version =="
 expect_exit 0 "version exits 0" "$PDFTOOL" --version
-if "$PDFTOOL" --version 2>/dev/null | grep -qE "albdf (0\.1\.0|1\.6\.0\.0)"; then
+if "$PDFTOOL" --version 2>/dev/null | grep -qE "albdf (0\.[0-9]+\.[0-9]+|1\.6\.0\.0)"; then
     pass "version string"
 else
     fail "version string (got: $("$PDFTOOL" --version 2>/dev/null | head -1))"

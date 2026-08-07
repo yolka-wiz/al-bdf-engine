@@ -1,5 +1,95 @@
 # albdf — release notes
 
+## albdf 0.2.0 — first public release (M8–M10 + CI on GitHub)
+
+Date: 2026-08-07
+Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
+
+The first albdf-branded public release. Everything after the 0.1.0 (pdfedit)
+tag: the rename, forms & signatures, the wave-1 (M9) extraction-fidelity and
+page-ops work, wave-2 (M10) search/redaction/fuzzing, and a fully green
+GitHub-hosted CI.
+
+### M8 — Forms & signatures
+
+- `form-list`, `form-fill`, `sign` (PKCS#7 detached, PAdES byte-range),
+  `verify-signatures`; round-trip + tamper tests. Suite 11/11 (`3b3e563`,
+  `b8efe4a`, `02b8719`, `6a2a325`).
+
+### M9 — Wave 1: extraction fidelity + page ops + infra
+
+- **P1/P2 — RTL extraction fidelity.** Writer emits `/ActualText` as the full
+  cluster text in glyph (visual) order per ligature glyph (lam-alef `لا` no
+  longer degrades to `ل`); reader overlays `/ActualText` spans onto the layout
+  (`pdftextlayoutgenerator` + `PDFTextLayout::replaceCharacters`) and dedups
+  decomposed yeh. `800f91e`, `c94f00b`.
+- **R#3 pinned** — presentation-form NFKC pass regression test (`271bfe8`).
+- **Page-ops CLI** — `rotate`, `move-page`, `delete-page` + `UnitTestsPageOps`
+  (12/12). `delete-page` runs a full optimizer pass (unused objects +
+  shrink). `4402b1c`..`411d8f7`.
+- **Hosted CI (W1)** — GitHub Actions `gate`/`asan`/`format` jobs shell out to
+  `ci/run-ci.sh`; vcpkg pinned + binary-cached; Qt 6.8 from official archives.
+  `88413dc`.
+- **Release packaging (W7)** — deterministic `scripts/package.sh`
+  (SOURCE_DATE_EPOCH, `gzip -n`, `$ORIGIN` RPATH check, sha256 sidecar,
+  optional `.deb`). `78f608d`.
+- **Perf benchmark (W8)** — tracked `scripts/benchmark.sh` (1000-page doc,
+  `albdf-benchmark-v1` summary, 5000 ms threshold, non-gating CI job).
+  `b197861`.
+
+### M10 — Wave 2: search, redaction, fuzzing, render fixes
+
+- **S#1 cross-line search** — phrases can match across a line break when the
+  vertical gap is paragraph-like (≤ 0.5× line height); column separation keeps
+  the hard `\n` boundary so no false matches. `0cf3338`.
+- **Redaction verified + tested** — upstream `PDFRedact` wired and proven:
+  annotation-only regions (no `--page` flag), pixel-verified solid-black bars,
+  round-trip, byte-determinism. Fixture `redact-annotated.pdf` +
+  `tst_redacttest.cpp`. `3a7568b`, `4dcdb32`.
+- **Determinism fix (core)** — `PDFDocumentBuilder` no longer stamps
+  `QDateTime::currentDateTime()` into `CreationDate`/`ModDate`; uses
+  `SOURCE_DATE_EPOCH` else a fixed epoch, so every rebuild is
+  byte-reproducible (was breaking redact/unite/page-ops determinism).
+  `e79bc06`.
+- **CLI fuzz harness** — deterministic seeded `scripts/fuzz.sh` (10 commands,
+  timeouts, `albdf-fuzz-v1` summary) + non-gating CI job. Found real bugs
+  (below). `8d935a1`, `4726c93`.
+- **F#1/F#2 render arg validation** — `--page-first 0` / `--page-last
+  999999999` no longer SIGABRT (page range now enforced in
+  `PDFClosedIntervalSet::parse`); `--image-res-dpi 999999` no longer hangs
+  (image size pre-check at 16384×16384). `7a70767` + `UnitTestsRender`.
+- **QFlags 32-bit fix** — page-ops flags overflowed `QFlags`' int storage,
+  breaking every build on Qt 6.8/6.10; replaced with a 64-bit `Options`
+  class. `4bb644f`.
+
+### CI on GitHub — all green (2026-08-07)
+
+Run 31165712432: `gate`/`asan`/`format` required checks + `benchmark` +
+`fuzz` all pass. Toolchain traps fixed and documented (PROBLEMS.md):
+vcpkg bootstrap, aqt archives-vs-modules + retry, ICU 73 built before Qt
+install, fontconfig/freetype headers, benchmark comma-thousands parse.
+
+### Quality gates (0.2.0, verified)
+
+- 14/14 ctest targets (unit, font-encoding, recognize, delete, add-text, RTL
+  add-text, RTL search, golden render, forms/signatures, page-ops, redaction,
+  render-args, CLI smoke) — Release and ASAN/UBSAN.
+- clang-format gate green (40+ authored files; vendored upstream exempt).
+- Benchmark PASS (5/5 ops, max < 100 ms on GH runners vs 5000 ms threshold).
+- Fuzz harness PASS on the release tree.
+
+### Known limitations (carried from v1, documented)
+
+- R#4 — content editor drops `/ActualText` marked content when a second
+  `add-text` rewrites a page (mixed add-text degrades ligatures on that page;
+  RTL-only documents are fine). Future content-editor change.
+- Vertical mark offsets (diacritic height) have rendering caveats on some
+  foreign PDFs; search and spec-valid output are prioritized over perfect
+  glyph positioning in v1.
+- GUI deliberately deferred (ADR-0002).
+
+---
+
 ## Wave 1 infra (unreleased, feature/wave1-infra) — hosted CI, release packaging, perf benchmark
 
 Date: 2026-08-06

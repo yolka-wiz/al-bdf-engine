@@ -133,11 +133,11 @@ TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
 - [ ] **W5 fuzzing** (infra-agent, DB #30) — input fuzz harness for CLI commands. Depends on #25 (run-ci.sh settled, now on hosted CI).
 - **Exit:** Wave-2 merged, full CI green on GitHub, tasks closed.
 
-### M11 — Public exposure & hardening (partially landed `d15f5ee`/`ac6f44b`)
+### M11 — Public exposure & hardening (landed 2026-08-07)
 - [x] History scrubbed of personal emails (filter-repo, all 96 commits → `Yolka <yolka@albdf.local>`); tag 0.1.0 re-pushed
 - [x] SECURITY.md, CONTRIBUTING §3b, docs/branch-protection.md, CODEOWNERS, pre-commit secret scan
-- [ ] **Apply branch protection on GitHub** — needs admin token (API payload in `docs/branch-protection.md`)
-- [ ] First public release notes pass / changelog polish
+- [x] **Apply branch protection on GitHub** — ruleset `pr check` active (PR + 1 approval, no deletions, no non-fast-forward; admin bypass for the owner)
+- [x] First public release notes pass / changelog polish — **albdf 0.2.0** (docs/RELEASES.md, tag 0.2.0, GitHub release)
 
 ---
 
