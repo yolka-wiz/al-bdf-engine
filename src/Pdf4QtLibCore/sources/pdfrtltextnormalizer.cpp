@@ -74,10 +74,9 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
         // "لا" must also match extracted "ل". In VISUAL order (extracted PDF
         // text) the ligature appears as the reversed pair `ال` (ا then ل);
         // collapse that spelling too so logical-order queries match.
-        const bool lamAlefLogical = cp == 0x0644 && i + 1 < composed.size() &&
-                                    composed.at(i + 1).unicode() == 0x0627;
-        const bool lamAlefVisual = options.visualOrder && cp == 0x0627 && i + 1 < composed.size() &&
-                                   composed.at(i + 1).unicode() == 0x0644;
+        const bool lamAlefLogical = cp == 0x0644 && i + 1 < composed.size() && composed.at(i + 1).unicode() == 0x0627;
+        const bool lamAlefVisual =
+            options.visualOrder && cp == 0x0627 && i + 1 < composed.size() && composed.at(i + 1).unicode() == 0x0644;
         if (options.collapseLamAlef && (lamAlefLogical || lamAlefVisual))
         {
             result.append(QChar(0x0644));
@@ -256,11 +255,8 @@ QString PDFRTLTextNormalizer::invertToLogical(const QString& visual)
     // Auto-detect the base direction from the visual content, mirroring the
     // search engine's invertToVisual (FRIBIDI_PAR_ON).
     FriBidiParType baseDir = FRIBIDI_PAR_ON;
-    const FriBidiLevel maxLevel = fribidi_get_par_embedding_levels_ex(bidiTypes.data(),
-                                                                      nullptr,
-                                                                      static_cast<FriBidiStrIndex>(visualChars.size()),
-                                                                      &baseDir,
-                                                                      levels.data());
+    const FriBidiLevel maxLevel = fribidi_get_par_embedding_levels_ex(
+        bidiTypes.data(), nullptr, static_cast<FriBidiStrIndex>(visualChars.size()), &baseDir, levels.data());
     if (maxLevel == 0)
     {
         // No reordering (pure LTR or error) — return the input unchanged.

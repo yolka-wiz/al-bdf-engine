@@ -244,8 +244,7 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
         std::vector<int> globalCharMap;
         PDFRTLTextNormalizer::Options flowOptions = options.normalizer;
         flowOptions.visualOrder = true;
-        const QString normalizedJoined =
-            PDFRTLTextNormalizer::normalize(joinedText, flowOptions, &globalCharMap);
+        const QString normalizedJoined = PDFRTLTextNormalizer::normalize(joinedText, flowOptions, &globalCharMap);
 
         // 4. Substring match (repeated, to find all occurrences). Matches can
         //    cross soft ' ' boundaries (word/line separators) but never a hard

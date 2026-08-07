@@ -56,7 +56,8 @@ void RtlNormalizerTest::test_invertToLogical_keepsLtrUntouched()
 void RtlNormalizerTest::test_invertToLogical_mixedBidi()
 {
     // LTR-leading mixed text: the RTL run is reversed in place.
-    QCOMPARE(pdf::PDFRTLTextNormalizer::invertToLogical(QString::fromUtf8("abc مالس def")), QString::fromUtf8("abc سلام def"));
+    QCOMPARE(pdf::PDFRTLTextNormalizer::invertToLogical(QString::fromUtf8("abc مالس def")),
+             QString::fromUtf8("abc سلام def"));
 }
 
 void RtlNormalizerTest::test_invertToLogical_rtlWithDigits()
