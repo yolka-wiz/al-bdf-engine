@@ -1,5 +1,6 @@
 # albdf — headless PDF editing library + CLI (fork of PDF4QT, MIT)
-# v1 scope: Pdf4QtLibCore + albdf + UnitTests. NO GUI (ADR-0002).
+# v1 scope: Pdf4QtLibCore + albdf + UnitTests. NO GUI by default (ADR-0002);
+# optional GUI layer (vendored PDF4QT apps) behind ALBDF_BUILD_GUI=ON (M12).
 cmake_minimum_required(VERSION 3.16)
 
 set(ALBDF_VERSION 0.2.0)
@@ -14,6 +15,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ALBDF_BUILD_TESTS "Build UnitTests" ON)
 option(ALBDF_INSTALL_INCLUDE "Install include headers" ON)
+# OPTIONAL GUI layer (M12): builds the 5 vendored PDF4QT GUI dirs
+# (Pdf4QtLibWidgets, Pdf4QtLibGui, Pdf4QtEditor, Pdf4QtViewer, Pdf4QtPageMaster).
+# OFF by default — the headless contract (ADR-0002) stands: core + CLI + tests
+# never depend on GUI code and must stay deterministic and display-free.
+option(ALBDF_BUILD_GUI "Build the optional vendored PDF4QT GUI libs + apps" OFF)
 
 # vcpkg toolchain (deps: tbb openssl lcms zlib openjpeg freetype libjpeg-turbo
 # libpng blend2d — see vcpkg.json; blend2d MUST come from vcpkg, see baseline doc)
@@ -21,8 +27,15 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "vcpkg toolchain")
 endif()
 
-# Qt components used by core + CLI (no Widgets — headless)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Xml Svg Test)
+# Qt components: core + CLI only need Core/Gui/Xml/Svg/Test (headless).
+# Widgets/PrintSupport/Concurrent are required by the OPTIONAL GUI layer
+# (ALBDF_BUILD_GUI=ON); they ship in qt6-base-dev, so the headless default is
+# unaffected. Do NOT add TextToSpeech (patched out — fork divergence).
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Xml Svg Test Widgets PrintSupport Concurrent)
+
+# Needed by the vendored GUI dirs so their self-includes resolve to the source
+# dir (upstream gets this via qt_standard_project_setup, which we don't use).
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # Deps required by the vendored core (upstream list, permissive only — ADR-0004)
 find_package(OpenSSL REQUIRED)
@@ -93,6 +106,19 @@ add_subdirectory(PdfTool)   # dir keeps upstream name; target produces the albdf
 if(ALBDF_BUILD_TESTS)
     enable_testing()
     add_subdirectory(UnitTests)
+endif()
+
+if(ALBDF_BUILD_GUI)
+    # Vendored PDF4QT GUI layer (upstream v1.6.0.0, see ADR-0002 addendum).
+    # Order matters: LibWidgets before LibGui (LibGui links it by name);
+    # the 3 apps sit on top. Pdf4QtEditorPlugins is intentionally NOT wired
+    # (runtime-loaded, degrades gracefully); Pdf4QtLibGui/main.cpp is not in
+    # upstream's source list and stays out.
+    add_subdirectory(Pdf4QtLibWidgets)
+    add_subdirectory(Pdf4QtLibGui)
+    add_subdirectory(Pdf4QtEditor)
+    add_subdirectory(Pdf4QtViewer)
+    add_subdirectory(Pdf4QtPageMaster)
 endif()
 
 # ---------------------------------------------------------------------------

@@ -7,8 +7,12 @@
 
 - **What we build:** `albdf` — a headless PDF editing **library** + **CLI** for Linux,
   focused on Middle Eastern languages (Arabic/Persian/Hebrew RTL).
-- **What we do NOT build (yet):** any GUI. No QWidgets, no QML, no web frontend.
-  All work must be testable from a terminal with no display.
+- **What we do NOT build by default:** any GUI. The headless default (no QWidgets, no
+  QML, no web frontend) is preserved. Since M12 a **vendored, optional GUI** exists:
+  the PDF4QT GUI dirs (`Pdf4QtLibWidgets`, `Pdf4QtLibGui`, `Pdf4QtEditor`,
+  `Pdf4QtViewer`, `Pdf4QtPageMaster`) build only with `-DALBDF_BUILD_GUI=ON`, and
+  **core + CLI + tests must stay headless and deterministic regardless of that flag**
+  (see ADR-0002 addendum). All work must be testable from a terminal with no display.
 - **Base:** fork of PDF4QT (`Pdf4QtLibCore` + `PdfTool`, CLI shipped as `albdf`), MIT. We extend it, we don't
   rewrite it. Our fork lives under `src/`; upstream is a git remote.
 - **Differentiators:** RTL (Arabic/Persian/Hebrew) write + search; object deletion; add-text.
