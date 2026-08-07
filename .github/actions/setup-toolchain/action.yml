@@ -61,7 +61,10 @@ runs:
         version: '6.8.*'
         arch: 'x64'
         dir: ${{ runner.temp }}/qt
-        modules: 'qtsvg'
+        # NOTE: no `modules:` here. For Qt 6.8, qtsvg ships inside the qtbase
+        # archive; passing `modules: qtsvg` makes install-qt-action fail with
+        # "The packages ['qt_base', 'qtsvg'] were not found while parsing XML
+        # of package information!" (same trap as `aqt -m qtsvg`).
         install-deps: 'true'
 
     - name: Point CMake at the installed Qt
