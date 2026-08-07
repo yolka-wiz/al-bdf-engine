@@ -47,7 +47,10 @@
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QPainter>
+// albdf: text-to-speech not provisioned (fork divergence, see pdftexttospeech.cpp)
+#if defined(QT_TEXTTOSPEECH_LIB)
 #include <QTextToSpeech>
+#endif
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QDialog>
@@ -393,6 +396,7 @@ void PDFSidebarWidget::selectPage(Page page)
     if (page == Speech && ui->speechVoiceComboBox->count() == 0)
     {
         // Check, if speech engine is properly set
+#if defined(QT_TEXTTOSPEECH_LIB)
         QStringList speechEngines = QTextToSpeech::availableEngines();
         if (speechEngines.isEmpty())
         {
@@ -402,6 +406,10 @@ void PDFSidebarWidget::selectPage(Page page)
         {
             QMessageBox::critical(this, tr("Error"), tr("The speech feature is available, but its options are not properly set. Please check the speech settings in the options dialog."));
         }
+#else
+        Q_UNUSED(ui)
+        QMessageBox::critical(this, tr("Error"), tr("Speech feature is unavailable in this build."));
+#endif
     }
 }
 

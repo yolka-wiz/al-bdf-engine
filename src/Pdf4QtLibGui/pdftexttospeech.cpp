@@ -20,7 +20,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// ALBDF FORK DIVERGENCE (2026-08-07): Text-to-speech is compiled out.
+//
+// The upstream file used Qt6::TextToSpeech, which is not provisioned in the
+// albdf toolchain (no qt6-texttospeech-dev package on the build box, and the
+// GUI is an optional build target). Rather than link an unavailable module,
+// this TU provides a no-op implementation of the same class API:
+//   - isValid() returns false, so the sidebar Speech page is hidden
+//   - initializeUI() populates the controls with a "disabled" state
+//   - all playback/settings methods are inert
+// Keep the class shape identical to upstream so the rest of the GUI compiles
+// unchanged; if Qt6::TextToSpeech is later provisioned, restore this file from
+// upstream tag v1.6.0.0 (src/Pdf4QtLibGui/pdftexttospeech.cpp).
+
 #include "pdftexttospeech.h"
+
 #include "pdfviewersettings.h"
 #include "pdfdrawspacecontroller.h"
 #include "pdfcompiler.h"
@@ -32,136 +46,57 @@
 #include <QComboBox>
 #include <QToolButton>
 #include <QTextBrowser>
-#include <QTextToSpeech>
 
 #include "pdfdbgheap.h"
 
 namespace pdfviewer
 {
 
-PDFTextToSpeech::PDFTextToSpeech(QObject* parent) :
-    BaseClass(parent),
-    m_textToSpeech(nullptr),
-    m_document(nullptr),
-    m_proxy(nullptr),
-    m_state(Invalid),
-    m_initialized(false),
-    m_speechLocaleComboBox(nullptr),
-    m_speechVoiceComboBox(nullptr),
-    m_speechRateEdit(nullptr),
-    m_speechVolumeEdit(nullptr),
-    m_speechPitchEdit(nullptr),
-    m_speechPlayButton(nullptr),
-    m_speechPauseButton(nullptr),
-    m_speechStopButton(nullptr),
-    m_speechSynchronizeButton(nullptr),
-    m_speechRateValueLabel(nullptr),
-    m_speechPitchValueLabel(nullptr),
-    m_speechVolumeValueLabel(nullptr),
-    m_speechActualTextBrowser(nullptr)
+PDFTextToSpeech::PDFTextToSpeech(QObject* parent)
+    : QObject(parent)
+    , m_textToSpeech(nullptr)
+    , m_document(nullptr)
+    , m_proxy(nullptr)
+    , m_state(Invalid)
+    , m_initialized(false)
+    , m_speechLocaleComboBox(nullptr)
+    , m_speechVoiceComboBox(nullptr)
+    , m_speechRateEdit(nullptr)
+    , m_speechVolumeEdit(nullptr)
+    , m_speechPitchEdit(nullptr)
+    , m_speechPlayButton(nullptr)
+    , m_speechPauseButton(nullptr)
+    , m_speechStopButton(nullptr)
+    , m_speechSynchronizeButton(nullptr)
+    , m_speechRateValueLabel(nullptr)
+    , m_speechPitchValueLabel(nullptr)
+    , m_speechVolumeValueLabel(nullptr)
+    , m_speechActualTextBrowser(nullptr)
 {
-
+    // No-op: text to speech is not compiled into albdf (fork divergence).
 }
 
 bool PDFTextToSpeech::isValid() const
 {
-    return m_document != nullptr;
+    return false;
 }
 
 void PDFTextToSpeech::setDocument(const pdf::PDFModifiedDocument& document)
 {
-    if (m_document != document)
-    {
-        stop();
-        m_document = document;
-
-        if (m_textToSpeech)
-        {
-            m_state = m_document ? Ready : NoDocument;
-        }
-        else
-        {
-            // Set state to invalid, speech engine is not set
-            m_state = Invalid;
-        }
-
-        updateUI();
-    }
-}
-
-void PDFTextToSpeech::updateVoices()
-{
-    QVector<QVoice> voices = m_textToSpeech->availableVoices();
-    m_speechVoiceComboBox->setUpdatesEnabled(false);
-    m_speechVoiceComboBox->clear();
-    for (const QVoice& voice : voices)
-    {
-        m_speechVoiceComboBox->addItem(QString("%1 (%2, %3)").arg(voice.name(), QVoice::genderName(voice.gender()), QVoice::ageName(voice.age())), voice.name());
-    }
-    m_speechVoiceComboBox->setUpdatesEnabled(true);
+    Q_UNUSED(document)
+    // No-op.
 }
 
 void PDFTextToSpeech::setSettings(const PDFViewerSettings* viewerSettings)
 {
-    Q_ASSERT(viewerSettings);
-
-    if (!m_initialized)
-    {
-        // This object is not initialized yet
-        return;
-    }
-
-    // First, stop the engine
-    stop();
-
-    delete m_textToSpeech;
-    m_textToSpeech = nullptr;
-
-    const PDFViewerSettings::Settings& settings = viewerSettings->getSettings();
-    if (!settings.m_speechEngine.isEmpty())
-    {
-        m_textToSpeech = new QTextToSpeech(settings.m_speechEngine, this);
-        m_textToSpeech->setLocale(QLocale(settings.m_speechLocale));
-        connect(m_textToSpeech, &QTextToSpeech::stateChanged, this, &PDFTextToSpeech::updatePlay);
-        m_state = m_document ? Ready : NoDocument;
-
-        QVector<QLocale> locales = m_textToSpeech->availableLocales();
-        m_speechLocaleComboBox->setUpdatesEnabled(false);
-        m_speechLocaleComboBox->clear();
-        for (const QLocale& locale : locales)
-        {
-            m_speechLocaleComboBox->addItem(QString("%1 (%2)").arg(locale.nativeLanguageName(), locale.nativeTerritoryName()), locale.name());
-        }
-        m_speechLocaleComboBox->setUpdatesEnabled(true);
-
-        updateVoices();
-    }
-    else
-    {
-        // Set state to invalid, speech engine is not set
-        m_state = Invalid;
-
-        m_speechLocaleComboBox->clear();
-        m_speechVoiceComboBox->clear();
-    }
-
-    if (m_textToSpeech)
-    {
-        setLocale(settings.m_speechLocale);
-        setVoice(settings.m_speechVoice);
-        setRate(settings.m_speechRate);
-        setPitch(settings.m_speechPitch);
-        setVolume(settings.m_speechVolume);
-    }
-
-    updateUI();
+    Q_UNUSED(viewerSettings)
+    // No-op.
 }
 
 void PDFTextToSpeech::setProxy(pdf::PDFDrawWidgetProxy* proxy)
 {
-    m_proxy = proxy;
-    pdf::PDFAsynchronousTextLayoutCompiler* compiler = m_proxy->getTextLayoutCompiler();
-    connect(compiler, &pdf::PDFAsynchronousTextLayoutCompiler::textLayoutChanged, this, &PDFTextToSpeech::updatePlay);
+    Q_UNUSED(proxy)
+    // No-op.
 }
 
 void PDFTextToSpeech::initializeUI(QComboBox* speechLocaleComboBox,
@@ -178,16 +113,6 @@ void PDFTextToSpeech::initializeUI(QComboBox* speechLocaleComboBox,
                                    QLabel* speechVolumeValueLabel,
                                    QTextBrowser* speechActualTextBrowser)
 {
-    Q_ASSERT(speechLocaleComboBox);
-    Q_ASSERT(speechVoiceComboBox);
-    Q_ASSERT(speechRateEdit);
-    Q_ASSERT(speechVolumeEdit);
-    Q_ASSERT(speechPitchEdit);
-    Q_ASSERT(speechPlayButton);
-    Q_ASSERT(speechPauseButton);
-    Q_ASSERT(speechStopButton);
-    Q_ASSERT(speechSynchronizeButton);
-
     m_speechLocaleComboBox = speechLocaleComboBox;
     m_speechVoiceComboBox = speechVoiceComboBox;
     m_speechRateEdit = speechRateEdit;
@@ -202,355 +127,151 @@ void PDFTextToSpeech::initializeUI(QComboBox* speechLocaleComboBox,
     m_speechVolumeValueLabel = speechVolumeValueLabel;
     m_speechActualTextBrowser = speechActualTextBrowser;
 
-    connect(m_speechLocaleComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &PDFTextToSpeech::onLocaleChanged);
-    connect(m_speechVoiceComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &PDFTextToSpeech::onVoiceChanged);
-    connect(m_speechRateEdit, &QSlider::valueChanged, this, &PDFTextToSpeech::onRateChanged);
-    connect(m_speechPitchEdit, &QSlider::valueChanged, this, &PDFTextToSpeech::onPitchChanged);
-    connect(m_speechVolumeEdit, &QSlider::valueChanged, this, &PDFTextToSpeech::onVolumeChanged);
-    connect(m_speechPlayButton, &QToolButton::clicked, this, &PDFTextToSpeech::onPlayClicked);
-    connect(m_speechPauseButton, &QToolButton::clicked, this, &PDFTextToSpeech::onPauseClicked);
-    connect(m_speechStopButton, &QToolButton::clicked, this, &PDFTextToSpeech::onStopClicked);
+    // Populate controls with a disabled "no engine" state.
+    if (m_speechLocaleComboBox)
+    {
+        m_speechLocaleComboBox->addItem(tr("Unavailable"), QString());
+        m_speechLocaleComboBox->setEnabled(false);
+    }
+    if (m_speechVoiceComboBox)
+    {
+        m_speechVoiceComboBox->addItem(tr("Unavailable"), QString());
+        m_speechVoiceComboBox->setEnabled(false);
+    }
+    if (m_speechRateEdit)
+    {
+        m_speechRateEdit->setEnabled(false);
+    }
+    if (m_speechPitchEdit)
+    {
+        m_speechPitchEdit->setEnabled(false);
+    }
+    if (m_speechVolumeEdit)
+    {
+        m_speechVolumeEdit->setEnabled(false);
+    }
+    if (m_speechPlayButton)
+    {
+        m_speechPlayButton->setEnabled(false);
+    }
+    if (m_speechPauseButton)
+    {
+        m_speechPauseButton->setEnabled(false);
+    }
+    if (m_speechStopButton)
+    {
+        m_speechStopButton->setEnabled(false);
+    }
+    if (m_speechSynchronizeButton)
+    {
+        m_speechSynchronizeButton->setEnabled(false);
+    }
+    if (m_speechActualTextBrowser)
+    {
+        m_speechActualTextBrowser->setPlainText(tr("Text to speech is not available in this build."));
+        m_speechActualTextBrowser->setEnabled(false);
+    }
 
     m_initialized = true;
 }
 
 void PDFTextToSpeech::updateUI()
 {
-    bool enableControls = false;
-    bool enablePlay = false;
-    bool enablePause = false;
-    bool enableStop = false;
-
-    switch (m_state)
-    {
-        case pdfviewer::PDFTextToSpeech::Invalid:
-        {
-            enableControls = false;
-            enablePlay = false;
-            enablePause = false;
-            enableStop = false;
-            break;
-        }
-
-        case pdfviewer::PDFTextToSpeech::NoDocument:
-        {
-            enableControls = true;
-            enablePlay = false;
-            enablePause = false;
-            enableStop = false;
-            break;
-        }
-
-        case pdfviewer::PDFTextToSpeech::Ready:
-        {
-            enableControls = true;
-            enablePlay = true;
-            enablePause = false;
-            enableStop = false;
-            break;
-        }
-
-        case pdfviewer::PDFTextToSpeech::Playing:
-        {
-            enableControls = true;
-            enablePlay = false;
-            enablePause = true;
-            enableStop = true;
-            break;
-        }
-
-        case pdfviewer::PDFTextToSpeech::Paused:
-        {
-            enableControls = true;
-            enablePlay = true;
-            enablePause = false;
-            enableStop = true;
-            break;
-        }
-
-        case pdfviewer::PDFTextToSpeech::Error:
-        {
-            enableControls = false;
-            enablePlay = false;
-            enablePause = false;
-            enableStop = false;
-            break;
-        }
-
-        default:
-            Q_ASSERT(false);
-            break;
-    }
-
-    m_speechLocaleComboBox->setEnabled(enableControls && m_speechLocaleComboBox->count() > 0);
-    m_speechVoiceComboBox->setEnabled(enableControls && m_speechVoiceComboBox->count() > 0);
-    m_speechRateEdit->setEnabled(enableControls);
-    m_speechVolumeEdit->setEnabled(enableControls);
-    m_speechPitchEdit->setEnabled(enableControls);
-    m_speechPlayButton->setEnabled(enablePlay);
-    m_speechPauseButton->setEnabled(enablePause);
-    m_speechStopButton->setEnabled(enableStop);
-    m_speechSynchronizeButton->setEnabled(enableControls);
+    // No-op.
 }
 
 void PDFTextToSpeech::stop()
 {
-    switch (m_state)
-    {
-        case Playing:
-        case Paused:
-        {
-            m_textToSpeech->stop();
-            m_currentTextFlowIndex = 0;
-            m_currentPage = 0;
-            m_currentTextLayout = pdf::PDFTextLayout();
-            m_textFlows = pdf::PDFTextFlows();
-            m_state = Ready;
-            break;
-        }
-
-        default:
-            break;
-    }
-
-    updateUI();
+    // No-op.
 }
 
 void PDFTextToSpeech::setLocale(const QString& locale)
 {
-    m_speechLocaleComboBox->setCurrentIndex(m_speechLocaleComboBox->findData(locale));
+    Q_UNUSED(locale)
+    // No-op.
 }
 
 void PDFTextToSpeech::setVoice(const QString& voice)
 {
-    m_speechVoiceComboBox->setCurrentIndex(m_speechVoiceComboBox->findData(voice));
+    Q_UNUSED(voice)
+    // No-op.
 }
 
 void PDFTextToSpeech::setRate(const double rate)
 {
-    pdf::PDFLinearInterpolation<double> interpolation(-1.0, 1.0, m_speechRateEdit->minimum(), m_speechRateEdit->maximum());
-    m_speechRateEdit->setValue(qRound(interpolation(rate)));
-    onRateChanged(m_speechRateEdit->value());
+    Q_UNUSED(rate)
+    // No-op.
 }
 
 void PDFTextToSpeech::setPitch(const double pitch)
 {
-    pdf::PDFLinearInterpolation<double> interpolation(-1.0, 1.0, m_speechPitchEdit->minimum(), m_speechPitchEdit->maximum());
-    m_speechPitchEdit->setValue(qRound(interpolation(pitch)));
-    onPitchChanged(m_speechPitchEdit->value());
+    Q_UNUSED(pitch)
+    // No-op.
 }
 
 void PDFTextToSpeech::setVolume(const double volume)
 {
-    pdf::PDFLinearInterpolation<double> interpolation(0.0, 1.0, m_speechVolumeEdit->minimum(), m_speechVolumeEdit->maximum());
-    m_speechVolumeEdit->setValue(qRound(interpolation(volume)));
-    onVolumeChanged(m_speechVolumeEdit->value());
+    Q_UNUSED(volume)
+    // No-op.
 }
 
 void PDFTextToSpeech::onLocaleChanged()
 {
-    if (m_textToSpeech)
-    {
-        m_textToSpeech->setLocale(QLocale(m_speechLocaleComboBox->currentData().toString()));
-        updateVoices();
-
-        if (m_speechVoiceComboBox->currentIndex() == -1)
-        {
-            m_speechVoiceComboBox->setCurrentIndex(0);
-        }
-    }
+    // No-op.
 }
 
 void PDFTextToSpeech::onVoiceChanged()
 {
-    if (m_textToSpeech)
-    {
-        QString voice = m_speechVoiceComboBox->currentData().toString();
-        for (const QVoice& voiceObject : m_textToSpeech->availableVoices())
-        {
-            if (voiceObject.name() == voice)
-            {
-                m_textToSpeech->setVoice(voiceObject);
-            }
-        }
-    }
+    // No-op.
 }
 
 void PDFTextToSpeech::onRateChanged(int rate)
 {
-    if (m_textToSpeech)
-    {
-        pdf::PDFLinearInterpolation<double> interpolation(m_speechRateEdit->minimum(), m_speechRateEdit->maximum(), -1.0, 1.0);
-        double value = interpolation(rate);
-        m_textToSpeech->setRate(value);
-        m_speechRateValueLabel->setText(QString::number(value, 'f', 2));
-    }
+    Q_UNUSED(rate)
+    // No-op.
 }
 
 void PDFTextToSpeech::onPitchChanged(int pitch)
 {
-    if (m_textToSpeech)
-    {
-        pdf::PDFLinearInterpolation<double> interpolation(m_speechPitchEdit->minimum(), m_speechPitchEdit->maximum(), -1.0, 1.0);
-        double value = interpolation(pitch);
-        m_textToSpeech->setPitch(pitch);
-        m_speechPitchValueLabel->setText(QString::number(value, 'f', 2));
-    }
+    Q_UNUSED(pitch)
+    // No-op.
 }
 
 void PDFTextToSpeech::onVolumeChanged(int volume)
 {
-    if (m_textToSpeech)
-    {
-        pdf::PDFLinearInterpolation<double> interpolation(m_speechVolumeEdit->minimum(), m_speechVolumeEdit->maximum(), 0.0, 1.0);
-        double value = interpolation(volume);
-        m_textToSpeech->setVolume(value);
-        m_speechVolumeValueLabel->setText(QString::number(value, 'f', 2));
-    }
+    Q_UNUSED(volume)
+    // No-op.
 }
 
 void PDFTextToSpeech::onPlayClicked()
 {
-    switch (m_state)
-    {
-        case Paused:
-        {
-            m_textToSpeech->resume();
-            m_state = Playing;
-            if (m_textToSpeech->state() == QTextToSpeech::Ready)
-            {
-                updatePlay();
-            }
-            break;
-        }
-
-        case Ready:
-        {
-            m_state = Playing;
-            m_currentTextFlowIndex = std::numeric_limits<size_t>::max();
-            m_currentPage = -1;
-            updatePlay();
-            break;
-        }
-
-        default:
-            break;
-    }
-
-    updateUI();
+    // No-op.
 }
 
 void PDFTextToSpeech::onPauseClicked()
 {
-    Q_ASSERT(m_state == Playing);
-
-    if (m_state == Playing)
-    {
-        m_textToSpeech->pause();
-        m_state = Paused;
-        updateUI();
-    }
+    // No-op.
 }
 
 void PDFTextToSpeech::onStopClicked()
 {
-    stop();
+    // No-op.
 }
 
 void PDFTextToSpeech::updatePlay()
 {
-    if (m_state != Playing)
-    {
-        return;
-    }
+    // No-op.
+}
 
-    Q_ASSERT(m_proxy);
-    Q_ASSERT(m_document);
-
-    // Jakub Melka: Check, if we have text layout. If not, then create it and return immediately.
-    // Otherwise, check, if we have something to say.
-    pdf::PDFAsynchronousTextLayoutCompiler* compiler = m_proxy->getTextLayoutCompiler();
-    if (!compiler->isTextLayoutReady())
-    {
-        compiler->makeTextLayout();
-        return;
-    }
-
-    QTextToSpeech::State state = m_textToSpeech->state();
-    if (state == QTextToSpeech::Ready)
-    {
-        if (m_currentPage == -1)
-        {
-            // Handle starting of document reading
-            std::vector<pdf::PDFInteger> currentPages = m_proxy->getWidget()->getDrawWidget()->getCurrentPages();
-            if (!currentPages.empty())
-            {
-                updateToNextPage(currentPages.front());
-            }
-        }
-        else if (++m_currentTextFlowIndex >= m_textFlows.size())
-        {
-            // Handle transition to next page
-            updateToNextPage(m_currentPage + 1);
-        }
-
-        if (m_currentTextFlowIndex < m_textFlows.size())
-        {
-            // Say next thing
-            const pdf::PDFTextFlow& textFlow = m_textFlows[m_currentTextFlowIndex];
-            QString text = textFlow.getText();
-            m_textToSpeech->say(text);
-            m_speechActualTextBrowser->setText(text);
-        }
-        else
-        {
-            // We are finished the reading
-            m_state = Ready;
-        }
-    }
-    else if (state == QTextToSpeech::Error)
-    {
-        m_state = Error;
-    }
-
-    updateUI();
+void PDFTextToSpeech::updateVoices()
+{
+    // No-op.
 }
 
 void PDFTextToSpeech::updateToNextPage(pdf::PDFInteger pageIndex)
 {
-    Q_ASSERT(m_document);
-    Q_ASSERT(m_state = Playing);
-
-    m_currentPage = pageIndex;
-    const pdf::PDFInteger pageCount = m_document->getCatalog()->getPageCount();
-
-    pdf::PDFAsynchronousTextLayoutCompiler* compiler = m_proxy->getTextLayoutCompiler();
-    Q_ASSERT(compiler->isTextLayoutReady());
-
-    m_currentTextLayout = pdf::PDFTextLayout();
-    m_textFlows.clear();
-    m_speechActualTextBrowser->clear();
-
-    // Find first nonempty page
-    while (m_currentPage < pageCount)
-    {
-        m_currentTextLayout = compiler->getTextLayout(m_currentPage);
-        m_textFlows = pdf::PDFTextFlow::createTextFlows(m_currentTextLayout, pdf::PDFTextFlow::SeparateBlocks | pdf::PDFTextFlow::RemoveSoftHyphen, m_currentPage);
-
-        if (!m_textFlows.empty())
-        {
-            break;
-        }
-
-        ++m_currentPage;
-    }
-
-    if (m_currentPage < pageCount && m_speechSynchronizeButton->isChecked())
-    {
-        m_proxy->goToPage(m_currentPage);
-    }
-
-    m_currentTextFlowIndex = 0;
+    Q_UNUSED(pageIndex)
+    // No-op.
 }
 
 }   // namespace pdfviewer
