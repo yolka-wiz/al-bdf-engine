@@ -87,3 +87,21 @@ runs:
         QT_ROOT_DIR="$(dirname "$(dirname "${QMAKE}")")"
         echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
         echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
+
+    - name: Build ICU 73 (Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
+      if: inputs.install-qt == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The Qt 6.8.3 online binaries are built against ICU 73, but
+        # ubuntu-24.04 ships ICU 74 (ABI-incompatible: libQt6Core needs
+        # ucnv_reset_73). No distro packages ICU 73, so build it from the ICU
+        # upstream release (takes ~1 min). Export LD_LIBRARY_PATH so rcc and
+        # the other Qt tools find it at build time.
+        curl -sL "https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz" -o /tmp/icu73.tgz
+        tar xzf /tmp/icu73.tgz -C /tmp
+        cd /tmp/icu/source
+        ./configure --prefix=/tmp/icu-build --disable-tests --disable-samples --disable-dyload >/dev/null
+        make -j"$(nproc)" >/dev/null
+        make install >/dev/null
+        echo "LD_LIBRARY_PATH=/tmp/icu-build/lib:${QT_DIR}/6.8.3/gcc_64/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
