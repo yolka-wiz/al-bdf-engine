@@ -2,7 +2,9 @@
 
 Onboarding guide for AI agents working in `src/`. This is the buildable
 source tree of the **albdf** project — a fork of MIT-licensed **PDF4QT** delivering a
-headless PDF editing **library + CLI** for Linux (no GUI in v1). Parallel work is governed
+headless PDF editing **library + CLI** for Linux. The GUI is **optional** since M12:
+the vendored PDF4QT GUI dirs build only with `-DALBDF_BUILD_GUI=ON`; the default
+build stays headless (no GUI in v1, ADR-0002). Parallel work is governed
 by the binding contract in [`../AGENTS.md`](../AGENTS.md) and the coding
 standard in [`../docs/coding-standard.md`](../docs/coding-standard.md).
 
@@ -21,8 +23,14 @@ standard in [`../docs/coding-standard.md`](../docs/coding-standard.md).
 
 ## Repository & Conventions
 
-- **Language/tooling:** C++20, Qt 6.10 (Core/Gui/Xml/Svg/Test **only** — NO Widgets/QML),
-  CMake + Ninja, vcpkg manifest mode.
+- **Language/tooling:** C++20, Qt 6 (Core/Gui/Xml/Svg/Test for the headless
+  core+CLI; Widgets/PrintSupport/Concurrent are declared in `find_package` but used
+  **only** by the optional GUI layer), CMake + Ninja, vcpkg manifest mode.
+- **GUI is OPTIONAL (`-DALBDF_BUILD_GUI=ON`).** The vendored PDF4QT GUI dirs
+  (`Pdf4QtLibWidgets`, `Pdf4QtLibGui`, `Pdf4QtEditor`, `Pdf4QtViewer`,
+  `Pdf4QtPageMaster`) build only when that option is on. The **headless default is
+  preserved**: core + CLI + tests never link or include GUI code and must remain
+  deterministic and display-free regardless of the flag.
 - **Headless only.** All tests run under `QT_QPA_PLATFORM=offscreen`.
 - **Determinism is sacred.** No timestamps, no random IDs, no unstable ordering in any
   generated output — output must be **byte-stable** across runs.
@@ -38,6 +46,11 @@ standard in [`../docs/coding-standard.md`](../docs/coding-standard.md).
 | `Pdf4QtLibCore/` | **The core PDF library** — the real code lives here. See `Pdf4QtLibCore/AGENT.md`. |
 | `PdfTool/` | The CLI. `main.cpp` + `pdftool*.{h,cpp}` per command (~30 upstream + our 4). |
 | `UnitTests/` | Our test suite (`tst_*.cpp`, golden tests, smoke.sh). |
+| `Pdf4QtLibWidgets/` | **Vendored GUI (optional, `ALBDF_BUILD_GUI=ON`)** — shared widget lib; links LibCore. |
+| `Pdf4QtLibGui/` | **Vendored GUI (optional)** — shared lib (dialogs, main window); links LibCore + LibWidgets. |
+| `Pdf4QtEditor/` | **Vendored GUI (optional)** — page-content editor app (exe). |
+| `Pdf4QtViewer/` | **Vendored GUI (optional)** — PDF viewer app (exe). |
+| `Pdf4QtPageMaster/` | **Vendored GUI (optional)** — page master app (exe; links LibCore + LibWidgets, **no** LibGui). |
 | `tests/` | Test **data** (`fixtures/`, `fonts/`, `golden/`, `scripts/`). |
 | `build/` | Release build dir (Ninja). |
 | `build-asan/` | Debug + AddressSanitizer build dir. |
@@ -53,6 +66,9 @@ standard in [`../docs/coding-standard.md`](../docs/coding-standard.md).
 - Dependencies are declared in `vcpkg.json`; vcpkg resolves them in **manifest mode**
   (a `vcpkg.json` present in the tree = auto-build of deps).
 - `-DALBDF_BUILD_TESTS=ON` enables the test targets.
+- `-DALBDF_BUILD_GUI=ON` (default OFF) additionally builds the vendored PDF4QT GUI
+  layer: `Pdf4QtLibWidgets`, `Pdf4QtLibGui`, `Pdf4QtEditor`, `Pdf4QtViewer`,
+  `Pdf4QtPageMaster`. It never changes what the headless core/CLI/tests build or how.
 - New sources must be added to the matching `CMakeLists.txt` or they silently won't compile/link.
 
 ## Build & Test Commands
@@ -151,5 +167,7 @@ without updating the contract in AGENTS.md.
   headlessly without it.
 - **Non-deterministic output:** a timestamp or random ID slips in and breaks golden tests / CI.
 - **Wrong exit code:** return `7` for invalid args, not a generic error code.
-- **Qt module scope:** only Core/Gui/Xml/Svg/Test are available — any Widgets/QML include
-  will not build.
+- **Qt module scope:** the headless core+CLI only use Core/Gui/Xml/Svg/Test — any
+  Widgets/QML include there will not build. Widgets/PrintSupport/Concurrent exist in
+  `find_package` only for the optional GUI layer (`ALBDF_BUILD_GUI=ON`); keep GUI
+  includes out of core/CLI/tests so the headless default stays deterministic.
