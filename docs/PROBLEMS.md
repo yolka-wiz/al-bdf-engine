@@ -13,6 +13,7 @@
   - [RTL extraction / ToUnicode limitations](#rtl-extraction--tounicode-limitations)
   - [RTL rendering limitations](#rtl-rendering-limitations)
   - [Search limitations](#search-limitations)
+  - [CLI robustness (fuzz harness findings)](#cli-robustness-fuzz-harness-findings)
 - [What the future holds](#what-the-future-holds)
   - [Planned (post-M7)](#planned-post-m7)
   - [Design debts to repay](#design-debts-to-repay)
@@ -64,6 +65,23 @@ search and (2) spec-valid PDF over perfect glyph-positioning in v1.
 
 - **S#1** — ~~matches within a single text item only (no cross-item/cross-line spans)~~ **Resolved (2026-08-05, `6b26d14`):** the engine now searches a per-page joined visual string built from the text flow — items clustered into lines by y-center, sorted by x ascending (visual order), joined with a geometry-aware separator (touching runs `""` for mid-word splits, word-sized gaps `" "`, lines/columns `"\n"` as a hard boundary). Matches map back to `(itemIndex, charBegin..charEnd)` spans; `Match::spans` carries them and the CLI Item column shows `first+last` (e.g. `2+3`). Far-apart items cannot false-match (guarded by the `\n` boundary + word-gap threshold; regression test `test_crossItemNoFalsePositive`). Cross-**line** spans remain out of scope (a `\n` boundary); cross-item word-splits now work. **Field context:** observed 2026-08-04 that our own `add-text --rtl` output can split at a word boundary on dense pages — the Layout flow algorithm (upstream `PDFDocumentTextFlowFactory`) merges the first word of the added run into the surrounding column item (reading-order continuity) while the rest forms its own item; symptom was `search-text "تست نهایی"` = 0 matches on modified `کالا.pdf` / `پروژه نهایی.pdf` while each word matched. Deterministic regression lives in `UnitTestsSearchText::test_crossItemPhrase` via the `searchFlow()` test seam (CLI add-text cannot force a 2-item split on synthetic pages — docstrum merges adjacent runs).
 - **S#2** — mixed LTR+RTL same-run handled, but the cluster-to-char mapping relies on `hb_buffer_add_utf16(item_offset=run.begin)` returning **absolute** clusters — the engine must NOT re-add `run.begin`. This was a real data-loss bug (`aa92bee`).
+
+### CLI robustness (fuzz harness findings)
+
+Found by `scripts/fuzz.sh` (M10 wave-2, DB #30; seed 20260806, 2026-08-06).
+Both are reproducible on **valid** input with abusive CLI args — none of the
+500 corpus-mutation cases (truncation/zero-fill/flips/garbage/empty/junk)
+crashed any command; the parser and library are robust to malformed bytes.
+Do **not** fix these in a fuzz-harness dispatch — they are a separate fix task.
+Reproducers: run the harness with `--keep` and read `fail/*.cmd` + `fail/*.log`.
+
+| # | Finding | Repro command (on any valid PDF) | Evidence |
+|---|---|---|---|
+| F#1 | `render` aborts (SIGABRT) on out-of-range page numbers | `albdf render doc.pdf --page-first 0 --page-last 1 --image-format png --image-res-dpi 72 --image-output-dir <dir>` — also `--page-last 999999999` with a valid `--page-first` | exit 134; stderr: "Qt Concurrent has caught an exception thrown from a worker thread … `std::out_of_range` … `vector::_M_range_check: __n (which is 18446744073709551615) >= this->size() (which is 5)`". Page 0 becomes `(size_t)-1` via an unchecked page-index decrement; an out-of-range `--page-last` trips the same `at()`/range check inside a Qt Concurrent worker, where the exception cannot be caught → `terminate`. |
+| F#2 | `render` never completes at extreme DPI (resource exhaustion) | `albdf render doc.pdf --page-first 1 --page-last 1 --image-format png --image-res-dpi 10000 --image-output-dir <dir>` (999999 DPI also hangs) | 612×792 pt page at 10000 dpi ≈ 85k×110k px; 999999 dpi ≈ 94 GP. No size sanity check before allocating/render — effectively a hang/OOM (DoS via CLI). Harness classifies as HANG (exit 124). |
+
+`--page-first -1` and `--image-res-dpi 0`/negative are rejected or tolerated
+without crashing; only the above two shapes are findings.
 
 ---
 

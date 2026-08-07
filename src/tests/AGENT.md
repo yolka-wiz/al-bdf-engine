@@ -12,7 +12,8 @@ Onboarding guide for agents working with the deterministic test corpus of the
 - [4. Golden images (`golden/`)](#4-golden-images-golden)
 - [5. Test-source generators (`scripts/`)](#5-test-source-generators-scripts)
 - [6. `smoke.sh`](#6-smokesh)
-- [7. Rules & pitfalls](#7-rules--pitfalls)
+- [7. Fuzzing (`scripts/fuzz.sh`)](#7-fuzzing-scriptsfuzzsh)
+- [8. Rules & pitfalls](#8-rules--pitfalls)
 
 ## 1. Layout overview
 ```
@@ -100,7 +101,69 @@ QT_QPA_PLATFORM=offscreen src/tests/smoke.sh <albdf> <fixtures-dir>
   when you change a fixture. A fixture is skipped (not failed) when its file is
   absent. Exit code 0 = all checks passed.
 
-## 7. Rules & pitfalls
+## 7. Fuzzing (`scripts/fuzz.sh`)
+
+The CLI fuzz harness (M10, DB #30) lives at **`scripts/fuzz.sh`** (repo root,
+next to `scripts/benchmark.sh`). It is a deterministic, seeded, headless input
+fuzzer: it regenerates the fixture corpus (the `make-*.pdf.py` generators, so
+no committed fixture is touched), derives mutations, and runs every key CLI
+command against each mutation with a per-invocation timeout.
+
+```sh
+bash scripts/fuzz.sh                                   # defaults: seed 20260806, 50 iterations
+bash scripts/fuzz.sh --iterations 200 --seed 7 --work-dir /tmp/fz
+bash scripts/fuzz.sh --max-time 240 --keep             # wall-clock budget / retain work-dir
+ALBDF_FUZZ_SEED=7 ALBDF_FUZZ_ITERATIONS=200 bash scripts/fuzz.sh
+```
+
+- **Corpus:** `multipage`, `image-doc`, `overlap-text` (regenerated via
+  `scripts/make-*.pdf.py` and hash-checked against the committed fixtures —
+  `generator_reproducible=` in the summary) plus the committed `blank.pdf` and
+  `test-baseline.pdf`.
+- **Mutations (10 types):** truncation, zero-fill, bit flips, garbage headers,
+  appended garbage, xor-region, empty file, junk-only file, self-concatenation,
+  prepended junk — all derived from `random.Random(seed)` (stable across
+  platforms), so **same seed → same corpus → same results**.
+- **Commands fuzzed:** `info`, `fetch-text`, `search-text`, `add-text`,
+  `delete-object`, `delete-page`, `rotate`, `move-page`, `redact`, `render` —
+  plus a fixed set of abusive CLI-arg cases (oversized/negative/empty args on
+  valid docs).
+- **Crash policy** (per the exit-code contract): only a signal death
+  (exit ≥ 128: SEGV/ABRT) or a timeout kill (124/137 = hang) is a *finding*.
+  Nonzero exits on corrupt input (e.g. 4 = read error, 7 = invalid args) are
+  legitimate contract behavior and are recorded, not failed. The run continues
+  after crashes (all findings collected in one pass) and stops after
+  `--max-hangs` (default 3) hangs.
+- **Output:** `albdf-fuzz-v1` key=value summary on stdout and in
+  `<work-dir>/fuzz-summary.txt`; per-case detail in `<work-dir>/fuzz-cases.tsv`;
+  on findings, reproducers (input `.pdf` + stderr `.log` + exact command `.cmd`)
+  are saved under `<work-dir>/fail/` and the work-dir is retained.
+- **Exit codes:** 0 = no crashes/hangs, 1 = crash/hang/harness error,
+  2 = bad usage.
+- **CI:** non-gating `fuzz` job in `.github/workflows/ci.yml`
+  (`continue-on-error: true`, `--iterations 200 --max-time 240`), uploading the
+  summary + cases + reproducers as an artifact.
+
+**Extending the harness:**
+- Add a command to the `CMDS` array + a branch in `build_argv()`.
+- Add an abusive-arg case: a `cli_*` branch in `cli_case()` + its id in
+  `CLI_IDS` (allowed exit codes are the second `cli_case` argument).
+- Add a mutation type in the Python manifest generator (the heredoc in
+  `scripts/fuzz.sh`): keep it deterministic (use only `rng`), bump
+  `mutation_types=` in the summary, and keep types ≤ 9 (the `t = rng.randrange(10)`
+  dispatch).
+- When you add a fixture, it is picked up automatically only if a generator in
+  `scripts/` produces it and it is added to the `bases` list in the manifest
+  generator (plus the `generator_reproducible` hash check).
+
+**Known findings (2026-08-06, seed 20260806):** see `docs/PROBLEMS.md` →
+"CLI robustness (fuzz harness findings)" — two `render` findings on *valid*
+input: out-of-range `--page-first`/`--page-last` abort via an uncaught
+`std::out_of_range` in a Qt Concurrent worker thread, and `--image-res-dpi`
+≥ 10000 effectively never completes. Do not re-report these; fix them via a
+separate dispatch.
+
+## 8. Rules & pitfalls
 - **Never update goldens to silence a failure.** A mismatch means the renderer
   changed; investigate first. Only re-anchor deliberately and document it.
 - **Never modify committed fixtures/goldens/smoke.sh for a code change** unless
