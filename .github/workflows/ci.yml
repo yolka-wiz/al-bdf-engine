@@ -5,6 +5,10 @@
 #   gate       — stage 1+2: Release build + offscreen ctest
 #   asan       — stage 3:   ASAN/UBSAN Debug build + ctest
 #   format     — stage 4:   clang-format gate on authored files
+#   gui        — non-gating: GUI stage (ALBDF_BUILD_GUI=ON build of the
+#                vendored viewer/editor/page-master + headless smoke;
+#                continue-on-error: true — a GUI regression flags itself
+#                in the job log instead of blocking the PR)
 #   benchmark  — non-gating: scripts/benchmark.sh (1000-page perf smoke,
 #                continue-on-error: true — a regression flags itself in the
 #                uploaded summary instead of blocking the PR)
@@ -92,6 +96,26 @@ jobs:
           echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
       - name: ci/run-ci.sh stage 4 (clang-format gate)
         run: bash ci/run-ci.sh --only-format
+
+  gui:
+    name: GUI build + smoke (non-gating)
+    runs-on: ubuntu-24.04
+    # Informational only: the vendored PDF4QT GUI (ALBDF_BUILD_GUI=ON,
+    # M12) is optional — core + CLI + tests stay headless regardless. A
+    # GUI build/smoke regression flags itself in the job log and never
+    # blocks the PR.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-toolchain
+      - name: Install xvfb (GUI smoke fallback platform)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: ci/run-ci.sh gui stage (GUI build + headless smoke)
+        run: bash ci/run-ci.sh --gui
 
   benchmark:
     name: Perf benchmark 1000p (non-gating)
