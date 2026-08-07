@@ -1,11 +1,19 @@
 # albdf
 
-Headless PDF editing **library + CLI** for Linux — built for **Middle Eastern
-languages** (Arabic, Persian, Hebrew). Fork of
-[PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT, our additions **GPL-3.0-or-later**).
-The reader/editor core behind a future GUI. **RTL (Arabic/Persian/Hebrew) text write + search** is the differentiator.
+**PDF editing that speaks your language — literally.**
 
-**Status:** v0.1.0 released. M0–M8 complete (fork proven, recognize/delete/add-text/RTL-write/RTL-search/forms/signatures shipped, CI green, real-world compatibility fixes merged).
+albdf is a headless PDF editing **library + CLI** for Linux, built with one goal
+in mind: make **Arabic, Persian and Hebrew** (RTL) text work the way it should —
+in write, in search, and in extraction. It's a fork of
+[PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT), with our additions under
+**GPL-3.0-or-later**, and it's the engine behind a future GUI.
+
+**Status:** v0.2.0 released. RTL write + search, forms & signatures, page ops,
+redaction, deterministic builds, CI green, and a working optional GUI (the
+PDF4QT apps now build against our modified core).
+
+> 👋 **New here?** The fastest way to feel albdf is the 60-second demo in
+> [Getting started](#installation) — no GUI, no display needed.
 
 ---
 
