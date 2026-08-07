@@ -11,6 +11,9 @@ OUT_DIR="${OUT_DIR:-$REPO_DIR/dist}"
 VERSION="${VERSION:-0.3.0}"
 
 export VCPKG_ROOT="${VCPKG_ROOT:-/home/agent/vcpkg-cache/vcpkg}"
+# AppImage tools self-mount via FUSE; containers often lack /dev/fuse or
+# fusermount, so force extract-and-run (also faster in CI).
+export APPIMAGE_EXTRACT_AND_RUN=1
 
 # --- locate tools
 LDDEPLOY="$TOOLS_DIR/linuxdeploy-x86_64.AppImage"
