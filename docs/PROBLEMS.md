@@ -164,6 +164,30 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   on this toolchain — a stale pre-merge `albdf` binary can make CI look green
   locally; always rebuild from clean before trusting a baseline.
 
+- **GitHub-hosted CI toolchain traps (all fixed 2026-08-07 in
+  `.github/actions/setup-toolchain/action.yml`):**
+  - vcpkg's `vcpkg` binary is NOT in the git repo — must run
+    `bootstrap-vcpkg.sh` after clone or every job dies with exit 127.
+  - Qt 6.8 aqt install: `modules: qtsvg` is invalid (qtsvg ships in qtbase for
+    6.8); use `--archives qtbase qtsvg` and pin the exact version — the
+    `6.8.*` wildcard intermittently fails with "The packages ['qt_base'] were
+    not found while parsing XML" (miurahr/aqtinstall#769) depending on which
+    mirror edge the runner hits; a 3× retry loop rides through it.
+  - The Qt 6.8.3 online binaries need **ICU 73**, but ubuntu-24.04 ships ICU
+    74 (ABI-incompatible, `ucnv_reset_73` undefined). No distro has ICU 73 —
+    build it from the ICU release tarball (~1 min) **before** the aqt install
+    (aqt's post-install check runs qmake, which needs ICU on LD_LIBRARY_PATH).
+  - The project includes `<fontconfig/fontconfig.h>` (pdffont.cpp) — install
+    `libfontconfig1-dev libfreetype-dev` in the action.
+
+- **Benchmark comma-thousands trap (fixed `d009c4b`):** the 1000-page fixture's
+  `info` output is `Page count 1,000` (locale thousands separator) but
+  `scripts/benchmark.sh` compared the raw awk field against `"1000"` — every
+  op asserted FAIL at ~30-90ms (well under the 5000ms threshold; not a perf
+  regression). Strip commas in the parses. Also: benchmark now defaults
+  `QT_QPA_PLATFORM=offscreen` internally so it never aborts (exit 134) on a
+  headless box.
+
 ### Lifecycle guard crashes (agent tooling)
 
 - blend2d has CMake recursion bugs on gcc15 + aarch64 — must come from the **vcpkg overlay** (PDF4QT pins blend2d + asmjit commits).
