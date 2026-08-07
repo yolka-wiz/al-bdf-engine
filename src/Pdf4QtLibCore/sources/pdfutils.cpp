@@ -463,6 +463,16 @@ PDFClosedIntervalSet PDFClosedIntervalSet::parse(PDFInteger first, PDFInteger la
                 break;
             }
 
+            if (lower < first || upper > last)
+            {
+                *errorMessage = PDFTranslationContext::tr("Closed interval [%1, %2] is out of the range [%3, %4].")
+                                    .arg(lower)
+                                    .arg(upper)
+                                    .arg(first)
+                                    .arg(last);
+                break;
+            }
+
             result.addInterval(lower, upper);
         }
         else
@@ -473,6 +483,12 @@ PDFClosedIntervalSet PDFClosedIntervalSet::parse(PDFInteger first, PDFInteger la
             if (!ok)
             {
                 *errorMessage = PDFTranslationContext::tr("Can't convert '%1' to a number.").arg(part);
+                break;
+            }
+
+            if (value < first || value > last)
+            {
+                *errorMessage = PDFTranslationContext::tr("Value %1 is out of the range [%2, %3].").arg(value).arg(first).arg(last);
                 break;
             }
 

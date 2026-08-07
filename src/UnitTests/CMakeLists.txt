@@ -256,10 +256,39 @@ set_target_properties(UnitTestsRedact PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
+# render CLI regression suite (M10, DB #32 F#1 / DB #33 F#2): fuzz-found
+# abusive render arguments (--page-first 0, --page-last 999999999,
+# --image-res-dpi 999999) must be rejected with the documented error code
+# (7) instead of crashing with SIGABRT or hanging; valid renders must
+# stay byte-deterministic.
+add_executable(UnitTestsRender
+	tst_rendertest.cpp
+)
+
+target_link_libraries(UnitTestsRender PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsRender PRIVATE TEST_MULTIPAGE_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/multipage.pdf")
+
+set_target_properties(UnitTestsRender PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
 add_test(NAME UnitTestsRedact COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRedact")
 set_tests_properties(UnitTestsRedact PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_dependencies(UnitTestsRedact albdf)
+
+add_test(NAME UnitTestsRender COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRender")
+set_tests_properties(UnitTestsRender PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsRender albdf)
 
 # CLI smoke test: exercises fetch-text/render/info/unite on the fixtures
 # (and recognize-text/delete-object when present) and asserts invariants.
