@@ -52,25 +52,38 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends cmake ninja-build
+        sudo apt-get install -y --no-install-recommends cmake ninja-build \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
+            libgl1-mesa-dev
 
-    - name: Install Qt 6.8 (qtbase + qtsvg, headless)
-      if: inputs.install-qt == 'true'
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '6.8.3'
-        arch: 'x64'
-        dir: ${{ runner.temp }}/qt
-        # Install by explicit ARCHIVES, not modules: for Qt 6.8 the base
-        # archive entry (qt_base) is absent from the module XML, so aqt's
-        # module resolution intermittently fails on GH runners with "The
-        # packages ['qt_base'] were not found while parsing XML of package
-        # information!" (miurahr/aqtinstall#769, jurplel/install-qt-action#231).
-        # `--archives qtbase qtsvg` fetches the archives directly and works.
-        archives: qtbase qtsvg
-        install-deps: 'true'
-
-    - name: Point CMake at the installed Qt
+    - name: Install Qt 6.8.3 (qtbase + qtsvg, headless) with retry
       if: inputs.install-qt == 'true'
       shell: bash
-      run: echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
+      run: |
+        set -euo pipefail
+        python3 -m pip install --quiet "aqtinstall==3.3.*"
+        # aqt resolves the base Qt package through an Updates.xml fetch that is
+        # flaky on GH runners ("The packages ['qt_base'] were not found while
+        # parsing XML of package information!", miurahr/aqtinstall#769 /
+        # jurplel/install-qt-action#231) — it depends on which Qt mirror/CDN
+        # edge the runner reaches. Retry across mirrors; aqt rotates mirrors
+        # between attempts. Same command verified working locally.
+        QT_DIR="${RUNNER_TEMP}/qt"
+        for attempt in 1 2 3; do
+          echo "== aqt install attempt ${attempt}/3 =="
+          if python3 -m aqt install-qt linux desktop 6.8.3 linux_gcc_64 \
+              --archives qtbase qtsvg \
+              --outputdir "${QT_DIR}" \
+              --timeout 30; then
+            break
+          fi
+          [ "${attempt}" -lt 3 ] && sleep 10
+        done
+        # Locate qmake the same way install-qt-action does and export the
+        # contract variables the build steps rely on.
+        QMAKE="$(find "${QT_DIR}" -path '*/bin/qmake' -type f | head -1)"
+        [ -n "${QMAKE}" ] || { echo "qmake not found after Qt install"; exit 1; }
+        QT_ROOT_DIR="$(dirname "$(dirname "${QMAKE}")")"
+        echo "QT_ROOT_DIR=${QT_ROOT_DIR}"
+        echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
