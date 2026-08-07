@@ -34,7 +34,10 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QListWidgetItem>
+// albdf: text-to-speech not provisioned (fork divergence, see pdftexttospeech.cpp)
+#if defined(QT_TEXTTOSPEECH_LIB)
 #include <QTextToSpeech>
+#endif
 #include <QDomDocument>
 #include <QStyledItemDelegate>
 
@@ -82,7 +85,11 @@ PDFViewerSettingsDialog::PDFViewerSettingsDialog(const PDFViewerSettings::Settin
 {
     ui->setupUi(this);
 
+#if defined(QT_TEXTTOSPEECH_LIB)
     m_textToSpeechEngines = QTextToSpeech::availableEngines();
+#else
+    m_textToSpeechEngines = QStringList();
+#endif
 
     new QListWidgetItem(QIcon(":/resources/engine.svg"), tr("Engine"), ui->optionsPagesWidget, EngineSettings);
     new QListWidgetItem(QIcon(":/resources/rendering.svg"), tr("Rendering"), ui->optionsPagesWidget, RenderingSettings);
@@ -865,6 +872,7 @@ void PDFViewerSettingsDialog::updatePluginInformation()
 
 void PDFViewerSettingsDialog::setSpeechEngine(const QString& engine, const QString& locale)
 {
+#if defined(QT_TEXTTOSPEECH_LIB)
     if (m_currentSpeechEngine == engine && m_currentSpeechLocale == locale)
     {
         return;
@@ -897,6 +905,11 @@ void PDFViewerSettingsDialog::setSpeechEngine(const QString& engine, const QStri
         ui->speechVoiceComboBox->addItem(QString("%1 (%2, %3)").arg(voice.name(), QVoice::genderName(voice.gender()), QVoice::ageName(voice.age())), voice.name());
     }
     ui->speechVoiceComboBox->setUpdatesEnabled(true);
+#else
+    Q_UNUSED(engine)
+    Q_UNUSED(locale)
+    // Text to speech is not provisioned in this build (fork divergence).
+#endif
 }
 
 bool PDFViewerSettingsDialog::canCloseDialog()
