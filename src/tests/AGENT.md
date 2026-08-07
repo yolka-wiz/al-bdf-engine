@@ -105,8 +105,8 @@ QT_QPA_PLATFORM=offscreen src/tests/smoke.sh <albdf> <fixtures-dir>
 
 ## 6.1. GUI smoke (headless)
 
-Scaffold for verifying the **GUI layer** (vendored from PDF4QT v1.6.0.0, not yet
-built) headlessly, once it exists. Two pieces:
+Scaffold for verifying the **GUI layer** (vendored from PDF4QT v1.6.0.0, built
+with `-DALBDF_BUILD_GUI=ON` since M12 WS5) headlessly. Two pieces:
 
 - **`fixtures/gui-rtl.pdf`** — deterministic 1-page PDF with RTL Arabic text
   `سلام` (contains the lam-alef ligature) added to `blank.pdf` via the core CLI.
@@ -143,8 +143,12 @@ built) headlessly, once it exists. Two pieces:
      window, then exited cleanly on SIGTERM" (or self-exit 0) is the pass
      criterion. Early nonzero exit = startup crash = fail.
   Exit codes: `0` pass, `1` a check failed, `2` viewer not built.
-  Not wired into CTest/CI yet — the GUI isn't built; wire it up when the GUI
-  lands (see `../Pdf4QtViewer/`).
+  Verified green (M12 WS5) against `src/build-gui/bin/Pdf4QtViewer`:
+  `--help` and the 8s open-check both pass under `QT_QPA_PLATFORM=offscreen`
+  (no xvfb fallback needed on this host). The smoke is not wired into
+  CTest/CI yet — CI does not build the GUI by default (`ALBDF_BUILD_GUI` is
+  OFF there); wire it as a CTest target when a GUI job exists
+  (see `../Pdf4QtViewer/`).
 
 ## 7. Fuzzing (`scripts/fuzz.sh`)
 
