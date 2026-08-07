@@ -12,6 +12,7 @@ Onboarding guide for agents working with the deterministic test corpus of the
 - [4. Golden images (`golden/`)](#4-golden-images-golden)
 - [5. Test-source generators (`scripts/`)](#5-test-source-generators-scripts)
 - [6. `smoke.sh`](#6-smokesh)
+- [6.1. GUI smoke (headless)](#61-gui-smoke-headless)
 - [7. Fuzzing (`scripts/fuzz.sh`)](#7-fuzzing-scriptsfuzzsh)
 - [8. Rules & pitfalls](#8-rules--pitfalls)
 
@@ -40,6 +41,7 @@ integration, golden, and smoke tests.
 | `image-doc.pdf` | 2 | Embedded image XObject (40x30 RGB, FlateDecode) + captions. |
 | `overlap-text.pdf` | 1 | Three overlapping/rotated text lines. |
 | `blank.pdf` | 1 | Blank page for add-text / search-text RTL tests. |
+| `gui-rtl.pdf` | 1 | GUI verification fixture: `blank.pdf` + RTL `سلام` (lam-alef ligature) via `add-text --rtl` (see §6.1). **Not** registered in `smoke.sh`/goldens — it exists for the headless GUI smoke. |
 
 Add a new fixture by (a) writing a generator in `scripts/` (or extending
 `pdfgen.py`) that produces byte-deterministic output, (b) committing the generated
@@ -100,6 +102,49 @@ QT_QPA_PLATFORM=offscreen src/tests/smoke.sh <albdf> <fixtures-dir>
 - Fixture expectations are the `PAGES`/`TEXT` associative arrays; add/update rows
   when you change a fixture. A fixture is skipped (not failed) when its file is
   absent. Exit code 0 = all checks passed.
+
+## 6.1. GUI smoke (headless)
+
+Scaffold for verifying the **GUI layer** (vendored from PDF4QT v1.6.0.0, not yet
+built) headlessly, once it exists. Two pieces:
+
+- **`fixtures/gui-rtl.pdf`** — deterministic 1-page PDF with RTL Arabic text
+  `سلام` (contains the lam-alef ligature) added to `blank.pdf` via the core CLI.
+  Regenerate with (the CLI is deterministic — no timestamps; identical output
+  with or without `SOURCE_DATE_EPOCH`):
+  ```sh
+  QT_QPA_PLATFORM=offscreen src/build/bin/albdf add-text \
+      src/tests/fixtures/blank.pdf /tmp/gui-rtl.pdf \
+      --page 1 --x 72 --y 700 --text 'سلام' --size 24 --rtl \
+      --font src/tests/fonts/NotoNaskhArabic-Regular.ttf --lang ar
+  sha256sum /tmp/gui-rtl.pdf   # must equal db787c3005a4a3275ecbbda5da0458d5fd78ad5345b465e37da9577f258f7006
+  cp /tmp/gui-rtl.pdf src/tests/fixtures/gui-rtl.pdf
+  ```
+- **`gui-smoke.sh`** — headless smoke script (bash, no deps beyond the viewer):
+  ```sh
+  bash src/tests/gui-smoke.sh                              # defaults: src/build-gui/bin/Pdf4QtViewer, ./fixtures/gui-rtl.pdf
+  bash src/tests/gui-smoke.sh --viewer <path> --fixture <path>
+  GUI_SMOKE_SECONDS=5 bash src/tests/gui-smoke.sh          # shorter/longer alive-check window
+  ```
+  Behavior:
+  1. **Locate** `Pdf4QtViewer` (`src/build-gui/bin/`, falling back to
+     `src/build/bin/` and root `build*/bin/`). If absent, it **fails with
+     "Viewer not built — run with ALBDF_BUILD_GUI=ON"** (exit 2) — it never
+     silently passes.
+  2. **Hash-check** the fixture against the committed sha256 (determinism
+     guard — a regenerated fixture fails loudly).
+  3. **Start check:** `--help` must exit 0 under `QT_QPA_PLATFORM=offscreen`;
+     if the app refuses offscreen it retries under `xvfb-run -a` (script calls
+     `xvfb-run` if `command -v xvfb-run` finds it; the viewer is then run with
+     `QT_QPA_PLATFORM` unset so xcb uses the virtual display).
+  4. **Open check:** runs the viewer with the fixture as its positional
+     argument under a timeout (`GUI_SMOKE_SECONDS`, default 8) — the viewer
+     has no `--exit` flag and runs an event loop, so "stayed alive the whole
+     window, then exited cleanly on SIGTERM" (or self-exit 0) is the pass
+     criterion. Early nonzero exit = startup crash = fail.
+  Exit codes: `0` pass, `1` a check failed, `2` viewer not built.
+  Not wired into CTest/CI yet — the GUI isn't built; wire it up when the GUI
+  lands (see `../Pdf4QtViewer/`).
 
 ## 7. Fuzzing (`scripts/fuzz.sh`)
 
