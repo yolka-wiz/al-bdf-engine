@@ -58,7 +58,7 @@ runs:
       if: inputs.install-qt == 'true'
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.8.*'
+        version: '6.8.3'
         arch: 'x64'
         dir: ${{ runner.temp }}/qt
         # NOTE: no `modules:` here. For Qt 6.8, qtsvg ships inside the qtbase
