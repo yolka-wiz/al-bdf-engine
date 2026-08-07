@@ -917,7 +917,29 @@ PDFObjectFactory& PDFObjectFactory::operator<<(WrapAnnotationColor color)
 
 PDFObjectFactory& PDFObjectFactory::operator<<(WrapCurrentDateTime)
 {
-    addObject(PDFObject::createString(PDFEncoding::convertDateTimeToString(QDateTime::currentDateTime())));
+    // Deterministic date/time for document output (AGENTS.md §2.1: no
+    // QDateTime::currentDateTime() in document output — byte-deterministic
+    // output for a given input is a non-negotiable contract).
+    //
+    //  - If SOURCE_DATE_EPOCH is set (reproducible-builds convention, same as
+    //    scripts/package.sh), use that instant (UTC).
+    //  - Otherwise use a FIXED epoch (1970-01-01T00:00:00Z), NOT wall-clock
+    //    time. A wall-clock stamp makes two runs of the same input produce
+    //    different bytes (CreationDate/ModDate), which broke redact/unite
+    //    determinism (DB #29; also affects every document the builder
+    //    recreates).
+    QDateTime dateTime;
+    bool epochOk = false;
+    const qlonglong sourceDateEpoch = qEnvironmentVariableIntValue("SOURCE_DATE_EPOCH", &epochOk);
+    if (epochOk)
+    {
+        dateTime = QDateTime::fromSecsSinceEpoch(sourceDateEpoch, Qt::UTC);
+    }
+    else
+    {
+        dateTime = QDateTime::fromSecsSinceEpoch(0, Qt::UTC);
+    }
+    addObject(PDFObject::createString(PDFEncoding::convertDateTimeToString(dateTime)));
     return *this;
 }
 
