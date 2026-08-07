@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=albdf Viewer
+GenericName=PDF Viewer
+Comment=View PDF documents with RTL (Arabic/Persian/Hebrew) support
+Exec=albdf-viewer %F
+Icon=albdf
+Terminal=false
+Categories=Office;Viewer;Graphics;
+MimeType=application/pdf;
+StartupNotify=true
