@@ -55,7 +55,8 @@ runs:
         sudo apt-get install -y --no-install-recommends cmake ninja-build \
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
             libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
-            libgl1-mesa-dev
+            libgl1-mesa-dev \
+            libfontconfig1-dev libfreetype-dev
 
     - name: Build ICU 73 (Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
       if: inputs.install-qt == 'true'
