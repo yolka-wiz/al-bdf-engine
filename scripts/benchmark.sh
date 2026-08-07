@@ -107,7 +107,9 @@ time_op() {
     local label="$1"; shift
     local t0 t1
     t0=$(date +%s%N)
-    OP_OUT="$("$@" 2>&1)"; OP_CODE=$?
+    # Headless by default: without a display the binary aborts (exit 134).
+    # CI sets this at the job level; make the script self-contained too.
+    OP_OUT="$(QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" "$@" 2>&1)"; OP_CODE=$?
     t1=$(date +%s%N)
     OP_MS=$(( (t1 - t0) / 1000000 ))
 }
@@ -129,7 +131,7 @@ record() {
 
 echo "== info (open + info, 1000 pages) =="
 time_op info "$BIN" info "$DOC"
-PAGES="$(printf '%s\n' "$OP_OUT" | awk '/Page count/ {print $3; exit}')"
+PAGES="$(printf '%s\n' "$OP_OUT" | awk '/Page count/ {gsub(/,/, "", $3); print $3; exit}')"
 if [ "$OP_CODE" -eq 0 ] && [ "$PAGES" = "1000" ]; then
     record info 1 "pages=$PAGES"
 else
@@ -153,7 +155,7 @@ fi
 
 echo "== search 'smoke' (all pages) =="
 time_op search "$BIN" search-text "$DOC" smoke
-MATCHES="$(printf '%s\n' "$OP_OUT" | awk '/^[ \t]*[0-9]+[ \t]*$/ {print $1; exit}')"
+MATCHES="$(printf '%s\n' "$OP_OUT" | awk '/^[ \t]*[0-9,]+[ \t]*$/ {gsub(/,/, "", $1); print $1; exit}')"
 if [ "$OP_CODE" -eq 0 ] && [ "$MATCHES" = "1000" ]; then
     record search 1 "matches=$MATCHES"
 else
