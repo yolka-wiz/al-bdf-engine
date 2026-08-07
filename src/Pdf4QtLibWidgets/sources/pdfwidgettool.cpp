@@ -27,6 +27,8 @@
 #include "pdfpainterutils.h"
 #include "pdfcms.h"
 #include "pdfwidgetannotation.h"
+#include "pdfwidgetrtlsearch.h"
+#include "pdfrtltextnormalizer.h"
 
 #include <QLabel>
 #include <QAction>
@@ -605,9 +607,26 @@ void PDFFindTextTool::performSearch()
     const pdf::PDFTextLayoutStorage* textLayoutStorage = compiler->getTextLayoutStorage();
     if (!useRegularExpression)
     {
-        // Use simple text search
+        // Use simple text search. albdf: route plain-text queries through the
+        // RTL-aware engine (normalization + visual inversion + cross-item
+        // joining — see pdfwidgetrtlsearch.h); the legacy storage find cannot
+        // match Arabic/Persian/Hebrew. Regex/whole-word stay on the legacy
+        // path below.
         Qt::CaseSensitivity caseSensitivity = m_parameters.isCaseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
-        m_findResults = textLayoutStorage->find(expression, caseSensitivity, flowFlags);
+        const PDFDocument* document = getDocument();
+        if (document && document->getCatalog() && document->getCatalog()->getPageCount() > 0)
+        {
+            m_findResults = searchDocumentPlainTextRTL(document,
+                                                       textLayoutStorage,
+                                                       expression,
+                                                       caseSensitivity,
+                                                       0,
+                                                       document->getCatalog()->getPageCount() - 1);
+        }
+        else
+        {
+            m_findResults.clear();
+        }
     }
     else
     {
@@ -886,6 +905,14 @@ void PDFSelectTextTool::onActionCopyText()
             }
 
             QString text = result.join("\n\n");
+            // albdf: RTL selections are extracted in visual (glyph) order
+            // (see pdfrtltextengine.cpp /ActualText payload); re-invert to
+            // logical order so the clipboard carries 'سلام' not 'مالس'.
+            // The CLI fetch-text contract is unchanged (still visual order).
+            if (text.isRightToLeft())
+            {
+                text = pdf::PDFRTLTextNormalizer::invertToLogical(text);
+            }
             if (!text.isEmpty())
             {
                 QApplication::clipboard()->setText(text, QClipboard::Clipboard);
