@@ -61,6 +61,11 @@ public:
         bool unifyDigits = true;          ///< ۰-۹/٠-٩ -> 0-9
         bool collapseLamAlef = true;      ///< لا -> ل (ligature degradation)
         bool collapseDuplicateYeh = true; ///< یی -> ی (decomposed-mark artifact)
+        /// Text is in VISUAL order (as extracted from a PDF content stream).
+        /// In visual order the lam-alef ligature appears as the reversed pair
+        /// `ال` (ا then ل), not the logical `لا`; collapse both spellings so a
+        /// logical-order query matches visual-order extraction.
+        bool visualOrder = false;
     };
 
     /// Normalize \p text. Returns the normalized string and (optionally) a map
@@ -70,6 +75,16 @@ public:
 
     /// Normalize \p text with default options.
     static QString normalize(const QString& text, std::vector<int>* charMap = nullptr);
+
+    /// Invert a visual-order string back to LOGICAL order.
+    ///
+    /// PDF content streams store RTL text leftmost-first (visual order), so
+    /// extraction yields e.g. "مالس" for the logical "سلام". This applies
+    /// FriBidi's vis2log algorithm (emulated with the primitives available
+    /// in FriBidi 1.0.x, which removed fribidi_vis2log) so the GUI clipboard
+    /// path can hand out logical-order RTL text. Pure-LTR input (no strong
+    /// RTL characters) is returned unchanged.
+    static QString invertToLogical(const QString& visual);
 };
 
 } // namespace pdf

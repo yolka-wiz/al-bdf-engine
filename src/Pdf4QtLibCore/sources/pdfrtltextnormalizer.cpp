@@ -23,6 +23,10 @@
 
 #include <QStringView>
 
+#include <fribidi.h>
+
+#include <vector>
+
 namespace pdf
 {
 
@@ -67,16 +71,21 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
         // Lam-alef: U+0644 U+0627 -> single lam. NFKC already converted the
         // presentation ligature (FEFB) into this two-char sequence, and PDF
         // ToUnicode maps often degrade the ligature to lam alone, so searching
-        // "لا" must also match extracted "ل".
-        if (options.collapseLamAlef && cp == 0x0644 && i + 1 < composed.size() &&
-            composed.at(i + 1).unicode() == 0x0627)
+        // "لا" must also match extracted "ل". In VISUAL order (extracted PDF
+        // text) the ligature appears as the reversed pair `ال` (ا then ل);
+        // collapse that spelling too so logical-order queries match.
+        const bool lamAlefLogical = cp == 0x0644 && i + 1 < composed.size() &&
+                                    composed.at(i + 1).unicode() == 0x0627;
+        const bool lamAlefVisual = options.visualOrder && cp == 0x0627 && i + 1 < composed.size() &&
+                                   composed.at(i + 1).unicode() == 0x0644;
+        if (options.collapseLamAlef && (lamAlefLogical || lamAlefVisual))
         {
             result.append(QChar(0x0644));
             if (charMap)
             {
                 charMap->push_back(i + 1); // last original char of the pair
             }
-            ++i; // consume the alef
+            ++i; // consume the alef (logical) or lam (visual)
             continue;
         }
 
@@ -213,6 +222,69 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
     if (charMap)
     {
         Q_ASSERT(charMap->size() == result.size());
+    }
+    return result;
+}
+
+QString PDFRTLTextNormalizer::invertToLogical(const QString& visual)
+{
+    if (visual.isEmpty())
+    {
+        return QString();
+    }
+
+    // FriBidi operates on FriBidiChar (uint32). Convert from UTF-16.
+    const std::vector<char16_t> units(visual.utf16(), visual.utf16() + visual.size());
+    std::vector<FriBidiChar> visualChars(units.size());
+    for (size_t i = 0; i < units.size(); ++i)
+    {
+        visualChars[i] = static_cast<FriBidiChar>(units[i]);
+    }
+
+    // Emulate fribidi_vis2log (removed in FriBidi 1.0): compute the bidi
+    // types and embedding levels of the VISUAL string, then apply the L2/L3
+    // reorder (fribidi_reorder_line). The reorder permutation is its own
+    // inverse for a string's own levels, so reordering the visual string
+    // recovers the logical order. positionsLToV is input+output and must
+    // start as the identity (logical position == visual position).
+    std::vector<FriBidiCharType> bidiTypes(units.size());
+    std::vector<FriBidiLevel> levels(units.size());
+    std::vector<FriBidiStrIndex> positionsLToV(units.size());
+
+    fribidi_get_bidi_types(visualChars.data(), static_cast<FriBidiStrIndex>(visualChars.size()), bidiTypes.data());
+
+    // Auto-detect the base direction from the visual content, mirroring the
+    // search engine's invertToVisual (FRIBIDI_PAR_ON).
+    FriBidiParType baseDir = FRIBIDI_PAR_ON;
+    const FriBidiLevel maxLevel = fribidi_get_par_embedding_levels_ex(bidiTypes.data(),
+                                                                      nullptr,
+                                                                      static_cast<FriBidiStrIndex>(visualChars.size()),
+                                                                      &baseDir,
+                                                                      levels.data());
+    if (maxLevel == 0)
+    {
+        // No reordering (pure LTR or error) — return the input unchanged.
+        return visual;
+    }
+
+    for (size_t i = 0; i < positionsLToV.size(); ++i)
+    {
+        positionsLToV[i] = static_cast<FriBidiStrIndex>(i);
+    }
+    fribidi_reorder_line(FRIBIDI_FLAGS_DEFAULT,
+                         bidiTypes.data(),
+                         static_cast<FriBidiStrIndex>(visualChars.size()),
+                         0,
+                         baseDir,
+                         levels.data(),
+                         nullptr,
+                         positionsLToV.data());
+
+    QString result;
+    result.reserve(static_cast<int>(visualChars.size()));
+    for (size_t i = 0; i < visualChars.size(); ++i)
+    {
+        result.append(QChar(static_cast<ushort>(visualChars[positionsLToV[i]])));
     }
     return result;
 }

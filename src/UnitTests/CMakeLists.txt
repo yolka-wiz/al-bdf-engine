@@ -34,6 +34,23 @@ set_target_properties(UnitTests PROPERTIES
 )
 add_test(UnitTests  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTests")
 
+# RTL normalizer unit test: PDFRTLTextNormalizer::invertToLogical
+# (visual->logical re-inversion for the GUI clipboard copy path).
+add_executable(UnitTestsRtlNormalizer
+	tst_rtlnormalizertest.cpp
+)
+
+target_link_libraries(UnitTestsRtlNormalizer PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsRtlNormalizer PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsRtlNormalizer COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRtlNormalizer")
+set_tests_properties(UnitTestsRtlNormalizer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(UnitTestsImageOptimizer
 	tst_imageoptimizertest.cpp
 )
