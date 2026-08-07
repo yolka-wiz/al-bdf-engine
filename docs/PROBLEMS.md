@@ -163,6 +163,13 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 - No `QDateTime::currentDateTime()` / timestamps in document output — byte-stable output is a hard requirement and tests depend on it.
 - Golden PNGs are byte-verified by hash; regenerate only with an explicit reviewed commit.
 
+### Redaction / render quirks (M10, DB #29)
+
+- `albdf redact <in> <out>` derives regions **only** from `/Subtype /Redact` annotations in the source PDF — there is no `--page`/rect flag. A fixture without Redact annotations redacts nothing (verified: `multipage.pdf` unchanged).
+- `PDFRedact` rebuilds pages through `QPdfWriter` (glyphs → vector curves): the redacted output has **no text layer** — `fetch-text` returns empty. Assert redaction with **render + pixel sampling** (regions render as solid black bars; public content outside regions keeps its black-pixel fraction), never fetch-text-after.
+- `albdf render --image-output-dir <dir>` fails with exit 7 if `<dir>` does not already exist (`Target directory '<dir>' doesn't exist.`). Tests must pre-create the directory (QTemporaryDir) — `tst_pageopstest.cpp` and `tst_redacttest.cpp` both rely on this.
+- Redact exit codes (verified): missing output positional → `ErrorInvalidArguments` (7); nonexistent input → `ErrorDocumentReading` (4). Redaction bars cover the full `/Rect` (55/56 fully-black rows at 72 dpi; scanline fraction ≥ 0.95).
+
 ### Fork-hygiene traps
 
 - **Never reformat vendored upstream files** — it destroys cherry-pickability. clang-format gate applies to authored files only (git diff from fork base `a52c18c`).

@@ -237,6 +237,30 @@ set_tests_properties(UnitTestsPageOps PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=of
 
 add_dependencies(UnitTestsPageOps albdf)
 
+# Redaction integration test: runs albdf redact against the annotated
+# redact-annotated.pdf fixture (two /Subtype /Redact annotations) and asserts
+# pixel-level redaction (solid black bars over the annotated regions, public
+# content preserved), page-size preservation, info round-trip, byte-determinism
+# and the invalid-arguments exit-code contract.
+add_executable(UnitTestsRedact
+	tst_redacttest.cpp
+)
+
+target_link_libraries(UnitTestsRedact PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsRedact PRIVATE TEST_REDACT_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/redact-annotated.pdf")
+
+set_target_properties(UnitTestsRedact PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsRedact COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRedact")
+set_tests_properties(UnitTestsRedact PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsRedact albdf)
+
 # CLI smoke test: exercises fetch-text/render/info/unite on the fixtures
 # (and recognize-text/delete-object when present) and asserts invariants.
 find_program(BASH_PROGRAM bash)
