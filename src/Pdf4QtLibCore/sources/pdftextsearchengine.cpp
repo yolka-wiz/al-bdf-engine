@@ -236,10 +236,16 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
             }
         }
 
-        // 3. Normalize the joined string, keeping a global char map.
+        // 3. Normalize the joined string, keeping a global char map. The
+        //    joined text is VISUAL order (extracted PDF text), so enable the
+        //    visual-order lam-alef collapse (the query was normalized in
+        //    logical order at step 1 and inverted to visual; both sides must
+        //    collapse the ligature the same way).
         std::vector<int> globalCharMap;
+        PDFRTLTextNormalizer::Options flowOptions = options.normalizer;
+        flowOptions.visualOrder = true;
         const QString normalizedJoined =
-            PDFRTLTextNormalizer::normalize(joinedText, options.normalizer, &globalCharMap);
+            PDFRTLTextNormalizer::normalize(joinedText, flowOptions, &globalCharMap);
 
         // 4. Substring match (repeated, to find all occurrences). Matches can
         //    cross soft ' ' boundaries (word/line separators) but never a hard

@@ -25,6 +25,8 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include "pdfdocument.h"
+#include "pdfdocumentreader.h"
 #include "pdfdocumenttextflow.h"
 #include "pdftextsearchengine.h"
 
@@ -44,6 +46,7 @@ private slots:
     void test_crossItemNoFalsePositive();
     void test_crossLinePhrase();
     void test_presentationFormSearch();
+    void test_engineSearchSalam();
 
 private:
     struct ToolResult
@@ -456,6 +459,63 @@ void SearchTextTest::test_presentationFormSearch()
     const auto matches =
         engine.searchFlow(flow, QString::fromUtf8("\u0644\u0627\u0645"), 0, 0, pdf::PDFTextSearchEngine::Options());
     QVERIFY2(matches.size() >= 1, "presentation-form lam-alef must be found by a base-letter query (NFKC pass, R#3)");
+}
+
+void SearchTextTest::test_engineSearchSalam()
+{
+    // GUI search now routes plain-text queries through PDFTextSearchEngine
+    // (pdfwidgetrtlsearch.h adapter). Pin the exact engine path the GUI uses:
+    // a document containing the RTL fixture text 'سلام' (add-text --rtl,
+    // Noto Naskh Arabic — same recipe as src/tests/fixtures/gui-rtl.pdf)
+    // must be found by the logical-order query via the document-level
+    // PDFTextSearchEngine::search API.
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString inputPath = tmpDir.path() + QStringLiteral("/salam.pdf");
+    ToolResult addResult = runTool(toolPath,
+                                   {QStringLiteral("add-text"),
+                                    m_blankPdf,
+                                    inputPath,
+                                    QStringLiteral("--page"),
+                                    QStringLiteral("1"),
+                                    QStringLiteral("--x"),
+                                    QStringLiteral("72"),
+                                    QStringLiteral("--y"),
+                                    QStringLiteral("700"),
+                                    QStringLiteral("--text"),
+                                    QString::fromUtf8("سلام"),
+                                    QStringLiteral("--size"),
+                                    QStringLiteral("24"),
+                                    QStringLiteral("--rtl"),
+                                    QStringLiteral("--font"),
+                                    m_arabicFont,
+                                    QStringLiteral("--lang"),
+                                    QStringLiteral("ar")},
+                                   tmpDir.path());
+    QCOMPARE(addResult.exitCode, 0);
+
+    pdf::PDFDocument document;
+    pdf::PDFDocumentReader reader(
+        nullptr,
+        [](bool* ok) {
+            *ok = true;
+            return QString();
+        },
+        true,
+        false);
+    document = reader.readFromFile(inputPath);
+    QVERIFY2(document.getCatalog() != nullptr, "Failed to load the add-text output");
+
+    pdf::PDFTextSearchEngine engine;
+    const auto matches = engine.search(&document, QString::fromUtf8("سلام"), 0, 0);
+    QCOMPARE(matches.size(), size_t(1));
+    QVERIFY2(!matches.front().matchedText.isEmpty(), "match must carry the matched text");
+
+    // Negative control: a near-miss query (wrong first letter) must not match.
+    const auto misses = engine.search(&document, QString::fromUtf8("شلام"), 0, 0);
+    QCOMPARE(misses.size(), size_t(0));
 }
 
 QTEST_GUILESS_MAIN(SearchTextTest)
