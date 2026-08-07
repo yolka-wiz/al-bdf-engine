@@ -3,7 +3,7 @@
 # optional GUI layer (vendored PDF4QT apps) behind ALBDF_BUILD_GUI=ON (M12).
 cmake_minimum_required(VERSION 3.16)
 
-set(ALBDF_VERSION 0.2.0)
+set(ALBDF_VERSION 0.3.0)
 set(PDF4QT_VERSION 1.6.0.0)   # kept for upstream compatibility in vendored CMake
 project(albdf VERSION ${ALBDF_VERSION} LANGUAGES CXX)
 

@@ -1,5 +1,52 @@
 # albdf — release notes
 
+## albdf 0.3.0 — GUI + RTL text wiring (M12–M13)
+
+Date: 2026-08-07
+Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
+
+The first release with a **working GUI**: the PDF4QT apps (Viewer, Editor,
+PageMaster) now build against our modified core, and the GUI's text layer is
+wired to the RTL engine. Three real bugs fixed along the way.
+
+### M12 — GUI restore
+
+- Vendored the PDF4QT v1.6.0.0 GUI layers (`Pdf4QtLibGui`, `Pdf4QtLibWidgets`,
+  `Pdf4QtEditor`, `Pdf4QtViewer`, `Pdf4QtPageMaster`) into `src/`, gated
+  behind `ALBDF_BUILD_GUI=ON` (headless default preserved).
+- TextToSpeech compiled out (no-op stub + guards — module not provisioned);
+  fork divergence documented.
+- Headless GUI smoke (`src/tests/gui-smoke.sh`) + RTL fixture; non-gating GUI
+  CI job added.
+- API-compat audit proved the vendored GUI compiles against our modified core
+  with zero fixes — first real build: 270/270 targets.
+
+### M13 — GUI RTL text wiring
+
+- **GUI search → `PDFTextSearchEngine`.** Both find widgets
+  (`PDFFindTextTool`, `PDFAdvancedFindWidget`) route plain-text queries through
+  the RTL-aware engine (normalization + visual inversion + cross-line joining);
+  regex/whole-word stay on the legacy path. New adapter
+  `pdfwidgetrtlsearch.{h,cpp}` maps `Match → PDFFindResult` for the existing
+  highlight pipeline.
+- **RTL clipboard re-inversion.** Copying Arabic/Persian/Hebrew now puts
+  logical-order text on the clipboard (was visual/reversed). New
+  `PDFRTLTextNormalizer::invertToLogical` (FriBidi vis2log emulation, removed
+  in FriBidi 1.0).
+- **R#4 fixed** — the content editor now preserves `/ActualText` marked
+  content on re-edit; mixed RTL+LTR add-text keeps the full lam-alef.
+- **S#3 fixed** — document-level RTL search found no lam-alef words
+  (`سلام`); visual-order collapse added. The GUI adapter exposed this
+  pre-existing engine bug.
+
+### Verified
+
+- Core suite **16/16 ctest green** (Release + ASAN/UBSAN) + clang-format gate.
+- GUI builds (115 targets), headless smoke passes, RTL fixture search now
+  matches (was 0).
+
+---
+
 ## albdf 0.2.0 — first public release (M8–M10 + CI on GitHub)
 
 Date: 2026-08-07
