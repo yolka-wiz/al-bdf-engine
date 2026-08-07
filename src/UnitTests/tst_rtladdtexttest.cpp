@@ -386,14 +386,12 @@ void RtlAddTextTest::test_rtlKeepsLtrIntact()
     ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), mixedPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains("LTR still OK"), "LTR text must survive RTL add");
-    // RTL extracts in visual order: "سلام" -> "ملس" here (degraded lam-alef).
-    // The /ActualText overlay (DB #21) restores the full ligature for RTL-only
-    // documents, but this test does RTL THEN LTR on the same page: the second
-    // add-text rewrites page content through the content editor, which does
-    // not preserve /ActualText marked-content (upstream editor limitation,
-    // documented in PROBLEMS.md R#4). So this mixed case still degrades.
-    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ملس")),
-             "RTL text must survive LTR add");
+    // RTL extracts in visual order: "سلام" -> "ملاس" here (full lam-alef).
+    // The /ActualText overlay (DB #21) plus the R#4 marked-content
+    // preservation fix restore the full ligature even after a second
+    // (LTR) add-text rewrites the page through the content editor.
+    QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("ملاس")),
+             "RTL text must survive LTR add (full ligature preserved by R#4 fix)");
 }
 
 void RtlAddTextTest::test_rtlRenderNoErrors()

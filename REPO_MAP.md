@@ -47,6 +47,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `db/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 | `dist/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 | `docs/` | *(unmapped — add to scripts/gen-repo-map.py)* |
+| `packaging/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 | `plans/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 | `scripts/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 | `skills/` | *(unmapped — add to scripts/gen-repo-map.py)* |
