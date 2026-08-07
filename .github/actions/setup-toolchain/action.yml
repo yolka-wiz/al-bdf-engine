@@ -61,10 +61,13 @@ runs:
         version: '6.8.3'
         arch: 'x64'
         dir: ${{ runner.temp }}/qt
-        # NOTE: no `modules:` here. For Qt 6.8, qtsvg ships inside the qtbase
-        # archive; passing `modules: qtsvg` makes install-qt-action fail with
-        # "The packages ['qt_base', 'qtsvg'] were not found while parsing XML
-        # of package information!" (same trap as `aqt -m qtsvg`).
+        # Install by explicit ARCHIVES, not modules: for Qt 6.8 the base
+        # archive entry (qt_base) is absent from the module XML, so aqt's
+        # module resolution intermittently fails on GH runners with "The
+        # packages ['qt_base'] were not found while parsing XML of package
+        # information!" (miurahr/aqtinstall#769, jurplel/install-qt-action#231).
+        # `--archives qtbase qtsvg` fetches the archives directly and works.
+        archives: qtbase qtsvg
         install-deps: 'true'
 
     - name: Point CMake at the installed Qt
