@@ -144,6 +144,31 @@ add_test(UnitTestsRtlAddText  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/Uni
 
 add_dependencies(UnitTestsRtlAddText albdf)
 
+# /ActualText marked-content regression test (R#4): RTL add-text (lam-alef),
+# a second LTR add-text on the same page (content-editor stream rewrite),
+# then fetch-text must still yield the full ligature.
+add_executable(UnitTestsActualText
+	tst_actualtexttest.cpp
+)
+
+target_link_libraries(UnitTestsActualText PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsActualText PRIVATE
+    TEST_BLANK_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/blank.pdf"
+    TEST_FONT_PERSIAN="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/Vazirmatn-Regular.ttf"
+)
+
+set_target_properties(UnitTestsActualText PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsActualText COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsActualText")
+set_tests_properties(UnitTestsActualText PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsActualText albdf)
+
 # RTL-aware search integration test (M5): drives albdf add-text +
 # search-text on RTL corpus (Hebrew, Persian digits, ZWNJ, tashkeel,
 # mixed LTR+RTL) and asserts match counts.
