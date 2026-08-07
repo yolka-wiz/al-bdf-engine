@@ -154,6 +154,15 @@ public:
         TextSequence textSequence;
 
         PDFPageContentProcessorState state;
+
+        // albdf (R#4): /ActualText marked-content span opener. Empty when
+        // the item is not a marker. When set, the item records a
+        // /Span << /ActualText <...> >> BDC ... EMC region that must be
+        // re-emitted around the following text runs; the value carries the
+        // UTF-16BE + BOM hex payload (same byte format the RTL engine emits).
+        // The span end is implicit: the next marker item (or the end of the
+        // text element) closes the previous span.
+        QByteArray actualText;
     };
 
     PDFEditedPageContentElementText(PDFPageContentProcessorState state, QTransform transform);
@@ -258,6 +267,8 @@ protected:
     virtual void performRestoreGraphicState(ProcessOrder order) override;
     virtual void performUpdateGraphicsState(const PDFPageContentProcessorState& state) override;
     virtual void performProcessTextSequence(const TextSequence& textSequence, ProcessOrder order) override;
+    virtual void performMarkedContentBegin(const QByteArray& tag, const PDFObject& properties) override;
+    virtual void performMarkedContentEnd() override;
 
 private:
     /// Returns the current clip path mapped into the coordinate space
@@ -277,6 +288,12 @@ private:
 
     std::unique_ptr<PDFEditedPageContentElementText> m_contentElementText;
     QPainterPath m_textPath;
+
+    /// Stack of opened marked-content entries (an empty entry = a BDC
+    /// without /ActualText). Pairs every EMC with its BDC so the outermost
+    /// /ActualText span can be detected even when other marked content
+    /// (MCID, optional content, ...) nests inside it (albdf R#4).
+    std::vector<QByteArray> m_actualTextStack;
 };
 
 }   // namespace pdf

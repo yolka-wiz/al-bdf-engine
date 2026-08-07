@@ -22,6 +22,11 @@
 
 #include "pdfpagecontenteditorprocessor.h"
 
+#include "pdfdocument.h"
+#include "pdfencoding.h"
+
+#include <algorithm>
+
 namespace pdf
 {
 
@@ -145,6 +150,75 @@ void PDFPageContentEditorProcessor::performProcessTextSequence(const TextSequenc
         item.textSequence = textSequence;
 
         m_contentElementText->addItem(item);
+    }
+}
+
+void PDFPageContentEditorProcessor::performMarkedContentBegin(const QByteArray& tag, const PDFObject& properties)
+{
+    BaseClass::performMarkedContentBegin(tag, properties);
+
+    // /ActualText marked content (R#4): the RTL engine wraps every RTL run in
+    // /Span << /ActualText <UTF-16BE+BOM> >> BDC ... EMC, and extraction
+    // (PDFTextLayoutGenerator) reads it back to repair ligatures the ToUnicode
+    // CMap degrades to one UTF-16 unit (lam-alef: 'لا' -> 'ل'). Record a
+    // marker on the current text element so the content stream builder can
+    // re-emit the marked content when the page stream is rebuilt. The guard is
+    // the same as PDFTextLayoutGenerator::performMarkedContentBegin: the tag
+    // must be "Span" and /ActualText must resolve to a string.
+    QByteArray actualText;
+    if (tag == QByteArrayLiteral("Span") && m_contentElementText)
+    {
+        if (const PDFDictionary* dictionary = getDocument()->getDictionaryFromObject(properties))
+        {
+            if (dictionary->hasKey("ActualText"))
+            {
+                const PDFObject& actualTextObject = getDocument()->getObject(dictionary->get("ActualText"));
+                if (actualTextObject.isString())
+                {
+                    const QString text = PDFEncoding::convertTextString(actualTextObject.getString());
+                    if (!text.isEmpty())
+                    {
+                        // Re-encode as UTF-16BE + BOM, the byte format the
+                        // RTL engine emits (and the layout generator expects).
+                        actualText.append(char(0xFE));
+                        actualText.append(char(0xFF));
+                        for (const QChar& character : text)
+                        {
+                            actualText.append(char(0xFF & (character.unicode() >> 8)));
+                            actualText.append(char(0xFF & character.unicode()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Only the outermost /ActualText span of a (pathological) nesting is
+    // recorded: the re-emitted span then covers the same glyph range that
+    // extraction replaces with the outer span's text.
+    const bool isOutermostActualText = !actualText.isEmpty() &&
+        std::none_of(m_actualTextStack.cbegin(), m_actualTextStack.cend(),
+                     [](const QByteArray& entry) { return !entry.isEmpty(); });
+
+    if (isOutermostActualText)
+    {
+        PDFEditedPageContentElementText::Item item;
+        item.actualText = actualText;
+        m_contentElementText->addItem(item);
+    }
+
+    m_actualTextStack.push_back(actualText);
+}
+
+void PDFPageContentEditorProcessor::performMarkedContentEnd()
+{
+    BaseClass::performMarkedContentEnd();
+
+    // The span end is implicit: the next mark-begin item (or the end of the
+    // text element) closes the previous span in the emitted stream.
+    if (!m_actualTextStack.empty())
+    {
+        m_actualTextStack.pop_back();
     }
 }
 
@@ -898,6 +972,15 @@ QString PDFEditedPageContentElementText::createItemsAsText(const PDFPageContentP
 
             state = newState;
             state.setStateFlags(PDFPageContentProcessorState::StateFlags());
+        }
+        else if (!item.actualText.isEmpty())
+        {
+            // /ActualText marked-content marker (R#4): serialized into the
+            // itemsAsText XML so the content stream builder re-emits
+            // /Span << /ActualText <...> >> BDC ... EMC around the run that
+            // follows this marker in the item stream. The value is the
+            // UTF-16BE + BOM hex string recorded by performMarkedContentBegin.
+            text += QString("<actualText v=\"%1\"/>").arg(QString::fromLatin1(item.actualText.toHex().toUpper()));
         }
     }
 

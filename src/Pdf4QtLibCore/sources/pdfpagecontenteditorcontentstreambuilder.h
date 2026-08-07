@@ -145,6 +145,11 @@ private:
     PDFEditorFallbackFontManager m_fallbackFontManager;
     QByteArray m_currentTextFontKey;    ///< Resource key of the last written Tf operator
     PDFReal m_currentTextFontSize = 0.0;
+
+    /// True while a /Span << /ActualText <...> >> BDC is open in the
+    /// currently written text element (albdf R#4). Reset at the start of
+    /// every writeText; the final EMC is emitted before the ET operator.
+    bool m_isActualTextSpanOpen = false;
 };
 
 }   // namespace pdf

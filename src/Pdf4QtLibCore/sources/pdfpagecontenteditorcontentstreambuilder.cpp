@@ -761,6 +761,8 @@ void PDFPageContentEditorContentStreamBuilder::writePainterPath(QTextStream& str
 
 void PDFPageContentEditorContentStreamBuilder::writeText(QTextStream& stream, const QString& text)
 {
+    m_isActualTextSpanOpen = false;
+
     stream << "q BT" << Qt::endl;
 
     QString xml = QString("<?xml version=\"1.0\" encoding=\"UTF-8\"?><doc>%1</doc>").arg(text);
@@ -856,6 +858,13 @@ void PDFPageContentEditorContentStreamBuilder::writeText(QTextStream& stream, co
             Q_ASSERT(false);
             break;
         }
+    }
+
+    if (m_isActualTextSpanOpen)
+    {
+        // Close the last /ActualText span before the text object ends.
+        stream << "EMC" << Qt::endl;
+        m_isActualTextSpanOpen = false;
     }
 
     stream << "ET Q" << Qt::endl;
@@ -1138,6 +1147,49 @@ void PDFPageContentEditorContentStreamBuilder::writeTextCommand(QTextStream& str
         else
         {
             addError(PDFTranslationContext::tr("Set text matrix command requires six elements - m11, m12, m21, m22, x, y."));
+        }
+    }
+    else if (tag == "actualText")
+    {
+        // /ActualText marked-content marker (R#4): close the previous span
+        // (if any) and open a new one around the text run that follows. The
+        // value is the UTF-16BE + BOM hex string recorded by the editor
+        // processor — the same byte format the RTL engine emits, so the
+        // layout generator repairs ligatures exactly as before the rewrite.
+        if (attributes.size() == 1 && attributes.hasAttribute("v"))
+        {
+            const QString hex = attributes.value("v").toString();
+            bool isValidHex = !hex.isEmpty();
+            for (const QChar& character : hex)
+            {
+                if (!character.isDigit() &&
+                    !(character >= QLatin1Char('a') && character <= QLatin1Char('f')) &&
+                    !(character >= QLatin1Char('A') && character <= QLatin1Char('F')))
+                {
+                    isValidHex = false;
+                    break;
+                }
+            }
+
+            if (!isValidHex)
+            {
+                addError(PDFTranslationContext::tr("Invalid ActualText value '%1'.").arg(hex));
+            }
+            else
+            {
+                if (m_isActualTextSpanOpen)
+                {
+                    stream << "EMC" << Qt::endl;
+                    m_isActualTextSpanOpen = false;
+                }
+
+                stream << "/Span << /ActualText <" << hex << "> >> BDC" << Qt::endl;
+                m_isActualTextSpanOpen = true;
+            }
+        }
+        else
+        {
+            addError(PDFTranslationContext::tr("ActualText command requires one attribute - v."));
         }
     }
     else
