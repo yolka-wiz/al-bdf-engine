@@ -1,6 +1,6 @@
 # M14 Completion + Upstream Sync + Real-PDF Testing — Execution Plan
 
-> **Status:** ACTIVE — 2026-08-08. Orchestrator: yolka.
+> **Status:** COMPLETE — 2026-08-08. All phases executed, all gates green, pushed to origin/main at `a1c15b5f`.
 > **For Hermes:** execute phase-by-phase; verify every child claim; gate before merge.
 
 **Goal:** (1) complete and merge the two M14 RTL appearance-stream branches, (2)
@@ -117,6 +117,45 @@ returns sane matches; any failure → triage + fix before Phase 5.
 - Push main; verify `git rev-parse origin/main` == local HEAD.
 - DB: verify #41/#42 closed; record sync in PROBLEMS.md/RELEASES notes.
 - Self-critique below already reviewed pre-execution.
+
+## Execution log (2026-08-08)
+
+- **Phase 1 (M14):** freetext WS built the WIP GREEN + verified 17/17
+  (`507ff443`, `56536fe7`); forms WS RED→GREEN (`e2efc315`, `21c42879`,
+  `285deab9`). Merged to main (`b1498640`): 3 additive conflicts resolved
+  (both RTL branches in `updateAnnotationAppearanceStreams`, both font-data
+  members, PROBLEMS.md R#5 → R#5+R#6). Full CI gate ALL GREEN; DB #41/#42 closed.
+- **Phase 3 (sync):** re-vendored 4 upstream core commits (12763887, ae9958bd,
+  ca6f467a, 7300ed2d; TTS 3b99b677 skipped) via `git merge-file` 3-way
+  (LF-normalized → CRLF-restored) + clean takes; CI gate initially failed on
+  format for the 3 clean-take files → added exclusions (`a1c15b5f`), incl. the
+  patch-tool backslash double-escape trap (fixed with Python byte replace).
+  Final: `a4d934b3` + `a1c15b5f`, full gate ALL GREEN (17/17 Release + ASAN,
+  GUI 272/272 + smoke, format 44 files).
+- **Phase 4 (real-PDF tests):** battery script `bash /tmp/p4-battery.sh` run by
+  3 parallel subagents on the 3 uploaded PDFs — all 6 checks PASS per doc
+  (info/render-determinism/fetch-text/search/add-text-RTL/exit-codes). Probes:
+  lam-alef fix confirmed via add-text `سلام` roundtrip (search finds 1 match);
+  digit unification (Persian `۵۰` → ASCII 50, 3 matches); invoice renders with
+  no errors but 0 extractable chars (no-ToUnicode — upstream limitation, not a
+  regression; mojibake title expected).
+- **Phase 5:** pushed main → origin (`69e79af4..a1c15b5f`), verified
+  `origin/main == a1c15b5f`.
+
+## Post-work findings for future sessions
+
+- **Test corpus** (never in repo): `/home/agent/workspace/test-pdfs/` —
+  `b_fonts_showcase.pdf` (7p Chrome/Skia RTL), `asnad-9_39.pdf` (Word), and the
+  Persian invoice (Acrobat Distiller, **no ToUnicode** → 0 extractable chars,
+  mojibake metadata title; renders fine; search returns 0 by design). The
+  invoice is a great *visual* render regression fixture but useless for text
+  extraction/search tests.
+- **Re-vendor method that worked:** `git show <upstream>:<path>` + `git
+  merge-file -p ours base theirs` with **LF-normalized** sides (CRLF mismatch
+  makes merge-file treat the whole file as one conflict), then restore CRLF to
+  match the vendored tree; verify with `git diff -w --ignore-cr-at-eol` vs
+  upstream — result must be only your intended additions. Clean-take files need
+  format-gate exclusions (upstream formatting ≠ our .clang-format).
 
 ---
 
