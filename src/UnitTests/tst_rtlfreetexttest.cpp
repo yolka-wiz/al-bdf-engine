@@ -29,8 +29,8 @@
 // with Arabic contents, build, write, reopen, and walk /AP /N -> /Resources
 // /Font looking for a Type0 entry whose FontDescriptor has a FontFile2.
 
-#include <QtTest>
 #include <QDebug>
+#include <QtTest>
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -67,7 +67,14 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     inputFile.write(fixture.readAll());
     inputFile.close();
 
-    PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = false; return QString(); }, false, false);
+    PDFDocumentReader reader(
+        nullptr,
+        [](bool* ok) {
+            *ok = false;
+            return QString();
+        },
+        false,
+        false);
     PDFDocument document = reader.readFromFile(inputPath);
     qDebug() << "M1 loaded";
     QVERIFY2(document.getCatalog() != nullptr, "Failed to load blank.pdf");
@@ -89,10 +96,13 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     PDFObjectReference annotationRef;
     try
     {
-        annotationRef = builder->createAnnotationFreeText(
-            pageReference, rect, QStringLiteral("title"), QStringLiteral("subj"),
-            QString::fromUtf8("\xD8\xB3\xD9\x84\xD8\xA7\xD9\x85"), // "سلام"
-            TextAlignment(Qt::AlignLeft | Qt::AlignTop));
+        annotationRef =
+            builder->createAnnotationFreeText(pageReference,
+                                              rect,
+                                              QStringLiteral("title"),
+                                              QStringLiteral("subj"),
+                                              QString::fromUtf8("\xD8\xB3\xD9\x84\xD8\xA7\xD9\x85"), // "سلام"
+                                              TextAlignment(Qt::AlignLeft | Qt::AlignTop));
     }
     catch (const std::exception& e)
     {
@@ -154,83 +164,105 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     bool foundType0WithFontFile2 = false;
     try
     {
-    qDebug() << "WALK: annotations on page";
-    const std::vector<PDFObjectReference> annotations = reopenedPage->getAnnotations();
-    qDebug() << "WALK: count" << annotations.size();
-    QVERIFY2(!annotations.empty(), "No annotations on page");
-    for (const PDFObjectReference& annotationRef2 : annotations)
-    {
-        PDFAnnotationPtr annotation = PDFAnnotation::parse(&reopened.getStorage(), annotationRef2);
-        QVERIFY(annotation != nullptr);
+        qDebug() << "WALK: annotations on page";
+        const std::vector<PDFObjectReference> annotations = reopenedPage->getAnnotations();
+        qDebug() << "WALK: count" << annotations.size();
+        QVERIFY2(!annotations.empty(), "No annotations on page");
+        for (const PDFObjectReference& annotationRef2 : annotations)
+        {
+            PDFAnnotationPtr annotation = PDFAnnotation::parse(&reopened.getStorage(), annotationRef2);
+            QVERIFY(annotation != nullptr);
 
-        // Walk /AP /N -> form stream -> /Resources /Font.
-        qDebug() << "WALK: parse ok";
-        const PDFObject normalObject = annotation->getAppearanceStreams().getAppearance(PDFAppeareanceStreams::Appearance::Normal);
-        qDebug() << "WALK: normal isNull" << normalObject.isNull() << "isRef" << normalObject.isReference() << "isStream" << normalObject.isStream() << "isDict" << normalObject.isDictionary();
-        const PDFObject& formObject = reopened.getObject(normalObject);
-        // The AP /N is a Form XObject — a STREAM whose dictionary holds
-        // /Resources. Accept stream or plain dictionary.
-        const PDFDictionary* formDict = nullptr;
-        if (formObject.isStream())
-        {
-            formDict = formObject.getStream()->getDictionary();
-        }
-        else if (formObject.isDictionary())
-        {
-            formDict = formObject.getDictionary();
-        }
-        qDebug() << "WALK: formDict" << (formDict != nullptr);
-        if (!formDict)
-        {
-            continue;
-        }
-        const PDFObject& resourcesObject = reopened.getObject(formDict->get("Resources"));
-        if (!resourcesObject.isDictionary())
-        {
-            continue;
-        }
-        const PDFDictionary* resourcesDict = resourcesObject.getDictionary();
-        const PDFObject& fontsObject = reopened.getObject(resourcesDict->get("Font"));
-        qDebug() << "WALK: fonts isDict" << fontsObject.isDictionary();
-        if (!fontsObject.isDictionary())
-        {
-            continue;
-        }
-        const PDFDictionary* fontsDict = fontsObject.getDictionary();
-        qDebug() << "WALK: font count" << fontsDict->getCount();
-        for (size_t i = 0; i < fontsDict->getCount(); ++i)
-        {
-            const PDFObject& fontEntry = reopened.getObject(fontsDict->getValue(i));
-            qDebug() << "WALK: fontEntry isDict" << fontEntry.isDictionary() << "isRef" << fontEntry.isReference() << "isStream" << fontEntry.isStream();
-            if (!fontEntry.isDictionary())
+            // Walk /AP /N -> form stream -> /Resources /Font.
+            qDebug() << "WALK: parse ok";
+            const PDFObject normalObject =
+                annotation->getAppearanceStreams().getAppearance(PDFAppeareanceStreams::Appearance::Normal);
+            qDebug() << "WALK: normal isNull" << normalObject.isNull() << "isRef" << normalObject.isReference()
+                     << "isStream" << normalObject.isStream() << "isDict" << normalObject.isDictionary();
+            const PDFObject& formObject = reopened.getObject(normalObject);
+            // The AP /N is a Form XObject — a STREAM whose dictionary holds
+            // /Resources. Accept stream or plain dictionary.
+            const PDFDictionary* formDict = nullptr;
+            if (formObject.isStream())
+            {
+                formDict = formObject.getStream()->getDictionary();
+            }
+            else if (formObject.isDictionary())
+            {
+                formDict = formObject.getDictionary();
+            }
+            qDebug() << "WALK: formDict" << (formDict != nullptr);
+            if (!formDict)
             {
                 continue;
             }
-            const PDFDictionary* fontDict = fontEntry.getDictionary();
-            const PDFObject& subtypeObject = reopened.getObject(fontDict->get("Subtype"));
-            qDebug() << "WALK: subtype" << subtypeObject.getString();
-            if (subtypeObject.getString() != "Type0")
+            const PDFObject& resourcesObject = reopened.getObject(formDict->get("Resources"));
+            if (!resourcesObject.isDictionary())
             {
                 continue;
             }
-            qDebug() << "WALK: PASSED Type0";
-            const PDFObject& descriptorObject = reopened.getObject(fontDict->get("FontDescriptor"));
-            if (!descriptorObject.isDictionary())
+            const PDFDictionary* resourcesDict = resourcesObject.getDictionary();
+            const PDFObject& fontsObject = reopened.getObject(resourcesDict->get("Font"));
+            qDebug() << "WALK: fonts isDict" << fontsObject.isDictionary();
+            if (!fontsObject.isDictionary())
             {
                 continue;
             }
-            const PDFDictionary* descriptorDict = descriptorObject.getDictionary();
-            if (!descriptorDict->get("FontFile2").isNull())
+            const PDFDictionary* fontsDict = fontsObject.getDictionary();
+            qDebug() << "WALK: font count" << fontsDict->getCount();
+            for (size_t i = 0; i < fontsDict->getCount(); ++i)
             {
-                foundType0WithFontFile2 = true;
+                const PDFObject& fontEntry = reopened.getObject(fontsDict->getValue(i));
+                qDebug() << "WALK: fontEntry isDict" << fontEntry.isDictionary() << "isRef" << fontEntry.isReference()
+                         << "isStream" << fontEntry.isStream();
+                if (!fontEntry.isDictionary())
+                {
+                    continue;
+                }
+                const PDFDictionary* fontDict = fontEntry.getDictionary();
+                const PDFObject& subtypeObject = reopened.getObject(fontDict->get("Subtype"));
+                qDebug() << "WALK: subtype" << subtypeObject.getString();
+                if (subtypeObject.getString() != "Type0")
+                {
+                    continue;
+                }
+                qDebug() << "WALK: PASSED Type0";
+                // Standard Type0 layout: the FontDescriptor (with FontFile2)
+                // lives in the descendant CIDFontType2 dict (DescendantFonts[0]),
+                // not directly on the Type0 dict.
+                const PDFObject& descendantFontsObject = reopened.getObject(fontDict->get("DescendantFonts"));
+                if (!descendantFontsObject.isArray())
+                {
+                    continue;
+                }
+                const PDFArray* descendantFontsArray = descendantFontsObject.getArray();
+                if (!descendantFontsArray || descendantFontsArray->getCount() == 0)
+                {
+                    continue;
+                }
+                const PDFObject& descendantObject = reopened.getObject(descendantFontsArray->getItem(0));
+                if (!descendantObject.isDictionary())
+                {
+                    continue;
+                }
+                const PDFDictionary* descendantDict = descendantObject.getDictionary();
+                const PDFObject& descriptorObject = reopened.getObject(descendantDict->get("FontDescriptor"));
+                if (!descriptorObject.isDictionary())
+                {
+                    continue;
+                }
+                const PDFDictionary* descriptorDict = descriptorObject.getDictionary();
+                if (!descriptorDict->get("FontFile2").isNull())
+                {
+                    foundType0WithFontFile2 = true;
+                    break;
+                }
+            }
+            if (foundType0WithFontFile2)
+            {
                 break;
             }
         }
-        if (foundType0WithFontFile2)
-        {
-            break;
-        }
-    }
     }
     catch (const std::exception& e)
     {
@@ -238,8 +270,7 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     }
 
     qDebug() << "M8 walked, found=" << foundType0WithFontFile2;
-    QVERIFY2(foundType0WithFontFile2,
-             "FreeText RTL AP does not embed a Type0 font with FontFile2 (tofu)");
+    QVERIFY2(foundType0WithFontFile2, "FreeText RTL AP does not embed a Type0 font with FontFile2 (tofu)");
 }
 
 // The FreeText creation path consults QFontDatabase, so a GUI app instance
