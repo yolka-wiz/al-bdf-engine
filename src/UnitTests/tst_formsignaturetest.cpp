@@ -41,6 +41,7 @@ private slots:
     void initTestCase();
     void test_formList();
     void test_formFill();
+    void test_formFillRtlAppearance();
     void test_signAndVerify();
     void test_signTamperDetected();
 
