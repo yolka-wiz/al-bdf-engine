@@ -767,6 +767,10 @@ public:
                                                 QString contents,
                                                 TextAlignment textAlignment);
 
+    /// Sets the TTF font bytes used to shape RTL FreeText appearance streams
+    /// (M14). When unset, RTL FreeText contents keep the QPainter path.
+    void setRtlFreeTextFontData(const QByteArray& fontData) { m_rtlFreeTextFontData = fontData; }
+
     /// Free text annotation displays text directly on a page. This overload
     /// also sets text style and can auto-resize rectangle to fit the contents.
     /// \param page Page to which is annotation added
@@ -1644,6 +1648,8 @@ private:
     PDFFreeTextStyle createDefaultFreeTextStyle(TextAlignment alignment) const;
     bool updateHighlightAnnotationAppearanceStream(PDFObjectReference annotationReference,
                                                    const PDFHighlightAnnotation* annotation);
+    bool updateRtlFreeTextAppearanceStream(PDFObjectReference annotationReference,
+                                           const PDFFreeTextAnnotation* annotation);
     QRectF resizeFreeTextRectangleToContents(QRectF rectangle,
                                              const QString& contents,
                                              const PDFFreeTextStyle& style,
@@ -1659,6 +1665,7 @@ private:
     PDFObjectStorage m_storage;
     PDFVersion m_version;
     const PDFFormManager* m_formManager = nullptr;
+    QByteArray m_rtlFreeTextFontData;
 };
 
 /// This class serves for document modification. While document is modified,

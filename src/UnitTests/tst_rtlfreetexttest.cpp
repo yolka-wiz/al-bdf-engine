@@ -30,6 +30,7 @@
 // /Font looking for a Type0 entry whose FontDescriptor has a FontFile2.
 
 #include <QtTest>
+#include <QDebug>
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -54,8 +55,10 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
 {
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
+    QTemporaryDir keepDir;
+    keepDir.setAutoRemove(false);
     const QString inputPath = tmpDir.filePath(QStringLiteral("in.pdf"));
-    const QString outputPath = tmpDir.filePath(QStringLiteral("out.pdf"));
+    const QString outputPath = keepDir.path() + QStringLiteral("/out.pdf");
 
     QFile fixture(TEST_BLANK_PDF);
     QVERIFY2(fixture.open(QIODevice::ReadOnly), "Cannot open TEST_BLANK_PDF");
@@ -66,6 +69,7 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
 
     PDFDocumentReader reader(nullptr, [](bool* ok) { *ok = false; return QString(); }, false, false);
     PDFDocument document = reader.readFromFile(inputPath);
+    qDebug() << "M1 loaded";
     QVERIFY2(document.getCatalog() != nullptr, "Failed to load blank.pdf");
     const PDFPage* page = document.getCatalog()->getPage(0);
     QVERIFY(page != nullptr);
@@ -73,7 +77,13 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
 
     PDFDocumentModifier modifier(&document);
     PDFDocumentBuilder* builder = modifier.getBuilder();
+    qDebug() << "M2 modifier+builder";
     QVERIFY(builder != nullptr);
+
+    QFile fontFile(TEST_FONT_ARABIC);
+    QVERIFY2(fontFile.open(QIODevice::ReadOnly), "Cannot open TEST_FONT_ARABIC");
+    qDebug() << "M3 fontset";
+    builder->setRtlFreeTextFontData(fontFile.readAll());
 
     const QRectF rect(50.0, 700.0, 200.0, 40.0);
     PDFObjectReference annotationRef;
@@ -88,8 +98,19 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     {
         QFAIL(qPrintable(QStringLiteral("createAnnotationFreeText threw: %1").arg(QLatin1String(e.what()))));
     }
+    qDebug() << "M4 annotation created";
     QVERIFY(annotationRef.isValid());
 
+    qDebug() << "TEST input pages:" << document.getCatalog()->getPageCount();
+    qDebug() << "KEEP DIR:" << keepDir.path();
+    {
+        PDFDocumentWriter w0(nullptr);
+        const QString rtPath = tmpDir.filePath(QStringLiteral("rt.pdf"));
+        w0.write(rtPath, &document, false);
+        PDFDocument rt = reader.readFromFile(rtPath);
+        qDebug() << "ROUNDTRIP pages:" << (rt.getCatalog() ? rt.getCatalog()->getPageCount() : 999);
+    }
+    modifier.markAnnotationsChanged();
     bool finalized = false;
     try
     {
@@ -99,18 +120,43 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
     {
         QFAIL(qPrintable(QStringLiteral("finalize threw: %1").arg(QLatin1String(e.what()))));
     }
+    qDebug() << "M5 finalized";
     QVERIFY2(finalized, "finalize failed");
     PDFDocumentWriter writer(nullptr);
-    QVERIFY2(static_cast<bool>(writer.write(outputPath, modifier.getDocument().data(), false)), "write failed");
+    bool written = false;
+    try
+    {
+        written = static_cast<bool>(writer.write(outputPath, modifier.getDocument().data(), true));
+    }
+    catch (const std::exception& e)
+    {
+        QFAIL(qPrintable(QStringLiteral("writer.write threw: %1").arg(QLatin1String(e.what()))));
+    }
+    qDebug() << "M6 written";
+    QVERIFY2(written, "write failed");
 
     // Reopen and walk the annotation AP.
-    PDFDocument reopened = reader.readFromFile(outputPath);
+    PDFDocument reopened;
+    try
+    {
+        reopened = reader.readFromFile(outputPath);
+    }
+    catch (const std::exception& e)
+    {
+        qWarning() << "REOPEN THREW:" << e.what();
+    }
+    qDebug() << "M7 reopened";
     QVERIFY2(reopened.getCatalog() != nullptr, "Failed to reopen output");
+    qDebug() << "M7b pages=" << reopened.getCatalog()->getPageCount();
     const PDFPage* reopenedPage = reopened.getCatalog()->getPage(0);
     QVERIFY(reopenedPage != nullptr);
 
     bool foundType0WithFontFile2 = false;
+    try
+    {
+    qDebug() << "WALK: annotations on page";
     const std::vector<PDFObjectReference> annotations = reopenedPage->getAnnotations();
+    qDebug() << "WALK: count" << annotations.size();
     QVERIFY2(!annotations.empty(), "No annotations on page");
     for (const PDFObjectReference& annotationRef2 : annotations)
     {
@@ -118,13 +164,26 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
         QVERIFY(annotation != nullptr);
 
         // Walk /AP /N -> form stream -> /Resources /Font.
+        qDebug() << "WALK: parse ok";
         const PDFObject normalObject = annotation->getAppearanceStreams().getAppearance(PDFAppeareanceStreams::Appearance::Normal);
+        qDebug() << "WALK: normal isNull" << normalObject.isNull() << "isRef" << normalObject.isReference() << "isStream" << normalObject.isStream() << "isDict" << normalObject.isDictionary();
         const PDFObject& formObject = reopened.getObject(normalObject);
-        if (!formObject.isDictionary())
+        // The AP /N is a Form XObject — a STREAM whose dictionary holds
+        // /Resources. Accept stream or plain dictionary.
+        const PDFDictionary* formDict = nullptr;
+        if (formObject.isStream())
+        {
+            formDict = formObject.getStream()->getDictionary();
+        }
+        else if (formObject.isDictionary())
+        {
+            formDict = formObject.getDictionary();
+        }
+        qDebug() << "WALK: formDict" << (formDict != nullptr);
+        if (!formDict)
         {
             continue;
         }
-        const PDFDictionary* formDict = formObject.getDictionary();
         const PDFObject& resourcesObject = reopened.getObject(formDict->get("Resources"));
         if (!resourcesObject.isDictionary())
         {
@@ -132,24 +191,29 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
         }
         const PDFDictionary* resourcesDict = resourcesObject.getDictionary();
         const PDFObject& fontsObject = reopened.getObject(resourcesDict->get("Font"));
+        qDebug() << "WALK: fonts isDict" << fontsObject.isDictionary();
         if (!fontsObject.isDictionary())
         {
             continue;
         }
         const PDFDictionary* fontsDict = fontsObject.getDictionary();
+        qDebug() << "WALK: font count" << fontsDict->getCount();
         for (size_t i = 0; i < fontsDict->getCount(); ++i)
         {
             const PDFObject& fontEntry = reopened.getObject(fontsDict->getValue(i));
+            qDebug() << "WALK: fontEntry isDict" << fontEntry.isDictionary() << "isRef" << fontEntry.isReference() << "isStream" << fontEntry.isStream();
             if (!fontEntry.isDictionary())
             {
                 continue;
             }
             const PDFDictionary* fontDict = fontEntry.getDictionary();
             const PDFObject& subtypeObject = reopened.getObject(fontDict->get("Subtype"));
+            qDebug() << "WALK: subtype" << subtypeObject.getString();
             if (subtypeObject.getString() != "Type0")
             {
                 continue;
             }
+            qDebug() << "WALK: PASSED Type0";
             const PDFObject& descriptorObject = reopened.getObject(fontDict->get("FontDescriptor"));
             if (!descriptorObject.isDictionary())
             {
@@ -167,7 +231,13 @@ void UnitTestsRtlFreeText::test_freetextRtlAppearanceEmbedsFont()
             break;
         }
     }
+    }
+    catch (const std::exception& e)
+    {
+        qWarning() << "AP WALK THREW:" << e.what();
+    }
 
+    qDebug() << "M8 walked, found=" << foundType0WithFontFile2;
     QVERIFY2(foundType0WithFontFile2,
              "FreeText RTL AP does not embed a Type0 font with FontFile2 (tofu)");
 }

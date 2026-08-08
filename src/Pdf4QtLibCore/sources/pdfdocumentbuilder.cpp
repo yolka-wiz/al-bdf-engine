@@ -28,8 +28,10 @@
 #include "pdfnametreeloader.h"
 #include "pdfparser.h"
 #include "pdfstreamfilters.h"
+#include "pdfrtltextengine.h"
 
 #include <QBuffer>
+#include <QFile>
 #include <QFontMetricsF>
 #include <QPainter>
 #include <QPdfWriter>
@@ -1504,6 +1506,18 @@ void PDFDocumentBuilder::updateAnnotationAppearanceStreams(PDFObjectReference an
         }
     }
 
+    if (const PDFFreeTextAnnotation* freeTextAnnotation = dynamic_cast<const PDFFreeTextAnnotation*>(annotation.data()))
+    {
+        // RTL FreeText: the QPainter path (PDFContentStreamBuilder/QPdfWriter)
+        // cannot embed a Type0/FontFile2 font into the AP /Resources, so
+        // generate the appearance manually with the RTL engine when the
+        // contents are RTL. LTR contents keep the QPainter path (unchanged).
+        if (updateRtlFreeTextAppearanceStream(annotationReference, freeTextAnnotation))
+        {
+            return;
+        }
+    }
+
     const PDFDictionary* pageDictionary = m_storage.getDictionaryFromObject(m_storage.getObject(annotation->getPageReference()));
     if (!pageDictionary)
     {
@@ -1777,6 +1791,108 @@ bool PDFDocumentBuilder::updateHighlightAnnotationAppearanceStream(PDFObjectRefe
     annotationFactory.beginDictionaryItem("ca");
     annotationFactory << fillOpacity;
     annotationFactory.endDictionaryItem();
+    annotationFactory.beginDictionaryItem("Rect");
+    annotationFactory << boundingRectangle;
+    annotationFactory.endDictionaryItem();
+    annotationFactory.beginDictionaryItem("AP");
+    annotationFactory.beginDictionary();
+    annotationFactory.beginDictionaryItem("N");
+    annotationFactory << formReference;
+    annotationFactory.endDictionaryItem();
+    annotationFactory.endDictionary();
+    annotationFactory.endDictionaryItem();
+    annotationFactory.endDictionary();
+
+    mergeTo(annotationReference, annotationFactory.takeObject());
+    return true;
+}
+
+bool PDFDocumentBuilder::updateRtlFreeTextAppearanceStream(PDFObjectReference annotationReference,
+                                                           const PDFFreeTextAnnotation* annotation)
+{
+    // Only the RTL path needs the embedded font; LTR keeps the QPainter path.
+    const QString contents = annotation->getContents();
+    if (m_rtlFreeTextFontData.isEmpty() || contents.isEmpty() || !contents.isRightToLeft())
+    {
+        return false;
+    }
+
+    // DA gives the intended font size (and family); fall back to sane defaults.
+    PDFAnnotationDefaultAppearance da = PDFAnnotationDefaultAppearance::parse(annotation->getDefaultAppearance());
+    PDFReal fontSize = da.getFontSize();
+    if (qFuzzyIsNull(fontSize))
+    {
+        fontSize = 12.0;
+    }
+    QByteArray fontFamily = da.getFontName();
+    if (fontFamily.isEmpty())
+    {
+        fontFamily = "Helvetica";
+    }
+
+    pdf::PDFRTLTextEngine::Settings settings;
+    settings.text = contents;                 // LOGICAL — /Contents stays logical
+    settings.language = "ar";
+    settings.fontSize = fontSize;
+    settings.x = 0.0;
+    settings.y = 0.0;
+    settings.fontData = m_rtlFreeTextFontData;
+    settings.fontFamily = QString::fromLatin1(fontFamily);
+
+    QByteArray fontKey = "F2";
+    pdf::PDFRTLTextEngine::Result rtlResult = pdf::PDFRTLTextEngine::create(settings, fontKey);
+    if (!rtlResult.errors.isEmpty())
+    {
+        return false;
+    }
+
+    // Embed the font into the storage (FontFile2/CIDToGIDMap become refs).
+    pdf::PDFDictionary fontDictionary = rtlResult.fontDictionary;
+    replaceObjectsByReferences(fontDictionary);
+
+    // Build the AP form stream, mirroring updateHighlightAnnotationAppearanceStream.
+    PDFObjectFactory resourcesFactory;
+    resourcesFactory.beginDictionary();
+    resourcesFactory.beginDictionaryItem("Font");
+    resourcesFactory << fontDictionary;
+    resourcesFactory.endDictionaryItem();
+    resourcesFactory.endDictionary();
+    PDFObject resourcesObject = resourcesFactory.takeObject();
+
+    const QRectF boundingRectangle = annotation->getRectangle();
+
+    PDFObjectFactory formDictionaryFactory;
+    formDictionaryFactory.beginDictionary();
+    formDictionaryFactory.beginDictionaryItem("Type");
+    formDictionaryFactory << WrapName("XObject");
+    formDictionaryFactory.endDictionaryItem();
+    formDictionaryFactory.beginDictionaryItem("Subtype");
+    formDictionaryFactory << WrapName("Form");
+    formDictionaryFactory.endDictionaryItem();
+    formDictionaryFactory.beginDictionaryItem("BBox");
+    formDictionaryFactory << boundingRectangle;
+    formDictionaryFactory.endDictionaryItem();
+    formDictionaryFactory.beginDictionaryItem("Resources");
+    formDictionaryFactory << resourcesObject;
+    formDictionaryFactory.endDictionaryItem();
+    formDictionaryFactory.endDictionary();
+
+    PDFObject formDictionaryObject = formDictionaryFactory.takeObject();
+    const PDFDictionary* formDictionary = formDictionaryObject.getDictionary();
+    if (!formDictionary)
+    {
+        return false;
+    }
+
+    QByteArray compressedData = PDFFlateDecodeFilter::compress(rtlResult.contentFragment);
+    PDFDictionary streamDictionary(*formDictionary);
+    streamDictionary.setEntry(PDFInplaceOrMemoryString("Length"), PDFObject::createInteger(compressedData.size()));
+    streamDictionary.setEntry(PDFInplaceOrMemoryString("Filter"), PDFObject::createName("FlateDecode"));
+    PDFObject formObject = PDFObject::createStream(std::make_shared<PDFStream>(qMove(streamDictionary), qMove(compressedData)));
+    const PDFObjectReference formReference = addObject(qMove(formObject));
+
+    PDFObjectFactory annotationFactory;
+    annotationFactory.beginDictionary();
     annotationFactory.beginDictionaryItem("Rect");
     annotationFactory << boundingRectangle;
     annotationFactory.endDictionaryItem();
