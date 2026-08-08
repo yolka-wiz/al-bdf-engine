@@ -505,6 +505,12 @@ bool PDFPageContentProcessor::isContentKindSuppressed(ContentKind kind) const
     return false;
 }
 
+bool PDFPageContentProcessor::isTilingPatternProcessingAllowed(PDFInteger tileCount) const
+{
+    Q_UNUSED(tileCount);
+    return true;
+}
+
 void PDFPageContentProcessor::setGraphicsState(const PDFPageContentProcessorState& state)
 {
     m_graphicState = state;
@@ -667,16 +673,38 @@ void PDFPageContentProcessor::processContent(const QByteArray& content)
                         else
                         {
                             // We will calculate stream size from the with/height and bit per component
+                            const bool isImageMask = loader.readBooleanFromDictionary(dictionary, "ImageMask", false);
                             const PDFInteger width = loader.readIntegerFromDictionary(dictionary, "Width", 0);
                             const PDFInteger height = loader.readIntegerFromDictionary(dictionary, "Height", 0);
-                            const PDFInteger bpc = loader.readIntegerFromDictionary(dictionary, "BitsPerComponent", 8);
+                            const PDFInteger bpc = isImageMask ? 1 : loader.readIntegerFromDictionary(dictionary, "BitsPerComponent", 8);
 
                             if (width <= 0 || height <= 0 || bpc <= 0)
                             {
                                 throw PDFException(PDFTranslationContext::tr("Expected name in the inline image dictionary stream."));
                             }
 
-                            const PDFInteger stride = (width * bpc + 7) / 8;
+                            // Each sample consists of one value per color component, so the size
+                            // of the image data depends on the color space of the image. Stencil
+                            // masks have a single component.
+                            PDFInteger componentCount = 1;
+                            if (!isImageMask && dictionary->hasKey("ColorSpace"))
+                            {
+                                try
+                                {
+                                    PDFColorSpacePointer colorSpace = PDFAbstractColorSpace::createColorSpace(m_colorSpaceDictionary, m_document, m_document->getObject(dictionary->get("ColorSpace")));
+                                    if (colorSpace)
+                                    {
+                                        componentCount = qMax<PDFInteger>(1, PDFInteger(colorSpace->getColorComponentCount()));
+                                    }
+                                }
+                                catch (const std::exception&)
+                                {
+                                    // Color space is invalid, we will use a single component
+                                    // and the image itself will report the error later.
+                                }
+                            }
+
+                            const PDFInteger stride = (width * componentCount * bpc + 7) / 8;
                             dataLength = stride * height;
                         }
 
@@ -920,7 +948,8 @@ void PDFPageContentProcessor::processPathPainting(const QPainterPath& path, bool
 
     if (stroke)
     {
-        if (const PDFPatternColorSpace* patternColorSpace = getGraphicState()->getFillColorSpace()->asPatternColorSpace())
+        // Jakub Melka: stroking uses the stroking color space, not the filling one
+        if (const PDFPatternColorSpace* patternColorSpace = getGraphicState()->getStrokeColorSpace()->asPatternColorSpace())
         {
             const PDFPattern* pattern = patternColorSpace->getPattern();
             switch (pattern->getType())
@@ -1110,6 +1139,12 @@ void PDFPageContentProcessor::processTillingPatternPainting(const PDFTilingPatte
     // Draw the tiling
     const PDFInteger columns = qMax<PDFInteger>(qCeil(tilingArea.width() / xStep), 1);
     const PDFInteger rows = qMax<PDFInteger>(qCeil(tilingArea.height() / yStep), 1);
+
+    if (!isTilingPatternProcessingAllowed(columns * rows))
+    {
+        reportRenderError(RenderErrorType::Warning, PDFTranslationContext::tr("Tiling pattern is too complex (%1 tiles) and it was not painted.").arg(columns * rows));
+        return;
+    }
 
     QTransform baseTransformationMatrix = m_graphicState.getCurrentTransformationMatrix();
     for (PDFInteger column = 0; column < columns; ++column)
