@@ -29,6 +29,8 @@
 #include "pdfform.h"
 #include "pdfoutputformatter.h"
 
+#include <QFile>
+
 namespace pdftool
 {
 
@@ -146,6 +148,24 @@ int PDFToolFormFill::execute(const PDFToolOptions& options)
     pdf::PDFDocumentModifier modifier(&document);
     pdf::PDFFormManager formManager(nullptr);
     formManager.setDocument(pdf::PDFModifiedDocument(&document, nullptr));
+
+    // Optional TTF font for RTL appearance streams. When set, text fields
+    // whose value is right-to-left get a shaped appearance stream with an
+    // embedded Type0 TrueType subset (see
+    // PDFDocumentBuilder::updateAnnotationAppearanceStreams). LTR fills are
+    // unaffected.
+    if (!options.formFillFont.isEmpty())
+    {
+        QFile fontFile(options.formFillFont);
+        if (!fontFile.open(QIODevice::ReadOnly))
+        {
+            PDFConsole::writeError(
+                PDFToolTranslationContext::tr("Cannot open font file '%1'.").arg(options.formFillFont),
+                options.outputCodec);
+            return ErrorInvalidArguments;
+        }
+        modifier.getBuilder()->setRtlFormFieldFontData(fontFile.readAll());
+    }
 
     int setCount = 0;
     for (int i = 0; i < options.formFillFields.size(); ++i)

@@ -71,6 +71,9 @@ public:
         QByteArray contentFragment;
         /// True if any run was RTL (ActualText applied).
         bool hasRTL = false;
+        /// Width of the shaped text in PDF points (sum of the runs' glyph
+        /// advances scaled by the font size). Zero when the text is empty.
+        PDFReal boundingWidth = 0.0;
         /// Human-readable errors (empty on success).
         QStringList errors;
     };

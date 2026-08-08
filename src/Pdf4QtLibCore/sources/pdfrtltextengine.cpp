@@ -406,6 +406,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     for (const ShapedRun& run : shapedRuns)
     {
         const PDFReal runWidth = run.totalAdvance * settings.fontSize / PDFReal(metrics.upem);
+        result.boundingWidth += runWidth;
         PDFReal runX = cursorX;
 
         // Right-anchor RTL runs: the run's visual left edge is the origin.

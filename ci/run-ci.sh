@@ -65,7 +65,7 @@ AUTHORED_FILES="$(
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorprocessor\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdftextlayout\.cpp$' \
-        | grep -vE '^src/Pdf4QtLibCore/sources/pdfdocumentbuilder\.cpp$' \
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdfdocumentbuilder\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfutils\.cpp$' \
         | grep -vE '^src/PdfTool/pdftoolrender\.cpp$' \
         | grep -vE '^src/Pdf4QtLibGui/' \
