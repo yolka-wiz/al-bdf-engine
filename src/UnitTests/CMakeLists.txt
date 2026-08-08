@@ -186,6 +186,30 @@ set_tests_properties(UnitTestsActualText PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM
 
 add_dependencies(UnitTestsActualText albdf)
 
+# M14: FreeText annotation with RTL contents must embed a shaped Type0
+# font (FontFile2) in its appearance stream — not base-14 Helvetica (tofu).
+add_executable(UnitTestsRtlFreeText
+	tst_rtlfreetexttest.cpp
+)
+
+target_link_libraries(UnitTestsRtlFreeText PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+target_compile_definitions(UnitTestsRtlFreeText PRIVATE
+    TEST_BLANK_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/blank.pdf"
+    TEST_FONT_ARABIC="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/NotoNaskhArabic-Regular.ttf"
+)
+
+set_target_properties(UnitTestsRtlFreeText PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(NAME UnitTestsRtlFreeText COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRtlFreeText")
+set_tests_properties(UnitTestsRtlFreeText PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_dependencies(UnitTestsRtlFreeText albdf)
+
 # RTL-aware search integration test (M5): drives albdf add-text +
 # search-text on RTL corpus (Hebrew, Persian digits, ZWNJ, tashkeel,
 # mixed LTR+RTL) and asserts match counts.
