@@ -389,6 +389,12 @@ public:
     const PDFFormManager* getFormManager() const;
     void setFormManager(const PDFFormManager* formManager);
 
+    /// Sets TrueType font data used to generate appearance streams for
+    /// text form fields whose values are right-to-left (see
+    /// updateAnnotationAppearanceStreams). Empty by default - the RTL
+    /// branch is inactive and LTR fields are unaffected.
+    void setRtlFormFieldFontData(const QByteArray& fontData) { m_rtlFormFieldFontData = fontData; }
+
     /// Flattens page tree, inheritable attributes in non-leaf nodes will
     /// be written into the page tree. Templates will be lost.
     void flattenPageTree();
@@ -1662,10 +1668,18 @@ private:
     QRectF getPolygonsBoundingRect(const Polygons& Polygons) const;
     PDFObjectReference createOutlineItem(const PDFOutlineItem* root, bool writeOutlineData);
 
+    /// Generates an appearance stream for a text form field whose /V value
+    /// is right-to-left, using PDFRTLTextEngine (embedded Type0 TrueType
+    /// subset + shaped fragment). Returns true when the AP was generated;
+    /// the caller must then skip the generic draw loop.
+    bool updateRtlFormFieldAppearanceStream(PDFObjectReference annotationReference,
+                                            const PDFWidgetAnnotation* annotation);
+
     PDFObjectStorage m_storage;
     PDFVersion m_version;
     const PDFFormManager* m_formManager = nullptr;
     QByteArray m_rtlFreeTextFontData;
+    QByteArray m_rtlFormFieldFontData; ///< TTF font data for RTL form-field APs
 };
 
 /// This class serves for document modification. While document is modified,

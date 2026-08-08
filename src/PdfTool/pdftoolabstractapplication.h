@@ -197,6 +197,7 @@ struct PDFToolOptions
     QStringList formFillFields;     ///< Field fully qualified names (paired with values)
     QStringList formFillValues;     ///< Values for the fields
     QString formFillOutputDocument; ///< Output document filename
+    QString formFillFont;            ///< TTF font file for RTL appearance streams
 
     // For option 'Sign'
     QString signCertificateFile;        ///< PKCS#12 certificate file (.p12/.pfx)

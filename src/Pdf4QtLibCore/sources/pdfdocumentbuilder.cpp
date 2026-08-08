@@ -1518,6 +1518,22 @@ void PDFDocumentBuilder::updateAnnotationAppearanceStreams(PDFObjectReference an
         }
     }
 
+    // ------------------------------------------------------------------
+    // Form-field RTL appearance (M14): a text form field whose /V value
+    // is right-to-left gets its appearance stream generated DIRECTLY via
+    // PDFRTLTextEngine (embedded Type0 TrueType subset + shaped fragment).
+    // Headless core has no form-field painter (PDFFormManager::drawFormField
+    // is a Q_UNUSED no-op), so without this branch no /AP is emitted at all.
+    // The LTR path is untouched and falls through to the generic loop.
+    // ------------------------------------------------------------------
+    if (const PDFWidgetAnnotation* widgetAnnotation = dynamic_cast<const PDFWidgetAnnotation*>(annotation.data()))
+    {
+        if (updateRtlFormFieldAppearanceStream(annotationReference, widgetAnnotation))
+        {
+            return;
+        }
+    }
+
     const PDFDictionary* pageDictionary = m_storage.getDictionaryFromObject(m_storage.getObject(annotation->getPageReference()));
     if (!pageDictionary)
     {
@@ -1661,6 +1677,212 @@ void PDFDocumentBuilder::updateAnnotationAppearanceStreams(PDFObjectReference an
 
         mergeTo(annotationReference, annotationFactory.takeObject());
     }
+}
+
+bool PDFDocumentBuilder::updateRtlFormFieldAppearanceStream(PDFObjectReference annotationReference,
+                                                            const PDFWidgetAnnotation* annotation)
+{
+    // Resolve the field dictionary: for a merged widget+field the widget
+    // dictionary IS the field; otherwise follow /Parent up the hierarchy.
+    // The fresh /V value is already merged into the field BEFORE this
+    // function runs (PDFFormFieldText::setValue calls setFormFieldValue
+    // first), so it can be read straight from the builder storage.
+    const PDFDictionary* widgetDict = m_storage.getDictionaryFromObject(m_storage.getObject(annotationReference));
+    const PDFDictionary* fieldDict = widgetDict;
+    QString value;
+    bool isTextField = false;
+    while (fieldDict)
+    {
+        const PDFObject& fieldTypeObject = fieldDict->get("FT");
+        if (fieldTypeObject.isName() && fieldTypeObject.getString() == QByteArray("Tx"))
+        {
+            isTextField = true;
+        }
+        if (value.isNull())
+        {
+            const PDFObject& valueObject = fieldDict->get("V");
+            if (valueObject.isString())
+            {
+                value = QString::fromUtf8(valueObject.getString());
+            }
+        }
+        if (isTextField && !value.isNull())
+        {
+            break;
+        }
+        const PDFObject& parentObject = fieldDict->get("Parent");
+        if (!parentObject.isReference())
+        {
+            break;
+        }
+        fieldDict = m_storage.getDictionaryFromObject(m_storage.getObject(parentObject.getReference()));
+    }
+
+    // Only text fields with a right-to-left value get the RTL branch;
+    // all other fields (and LTR values) fall through to the generic loop.
+    if (!isTextField || value.isEmpty() || !value.isRightToLeft())
+    {
+        return false;
+    }
+
+    const QRectF rect = annotation->getRectangle();
+    if (!rect.isValid() || rect.isEmpty())
+    {
+        return false;
+    }
+
+    // Default appearance: font size (0 = auto) and family. The embedded
+    // glyphs come from the TTF; the family name only labels the descriptor.
+    // DA is optional (inheritable) - a missing key parses to the defaults.
+    const PDFObject& daObject = fieldDict->get("DA");
+    PDFAnnotationDefaultAppearance defaultAppearance =
+        PDFAnnotationDefaultAppearance::parse(daObject.isString() ? daObject.getString() : QByteArray());
+    PDFReal fontSize = defaultAppearance.getFontSize();
+    if (qFuzzyIsNull(fontSize) || fontSize <= 0.0)
+    {
+        fontSize = 12.0;
+    }
+    QString fontFamily = QString::fromLatin1(defaultAppearance.getFontName());
+    if (fontFamily.isEmpty())
+    {
+        fontFamily = QStringLiteral("Helvetica");
+    }
+
+    // Script/language: Hebrew block -> "he", anything else Arabic -> "ar".
+    QString language;
+    for (const QChar ch : value)
+    {
+        if (ch.unicode() >= 0x0590 && ch.unicode() <= 0x05FF)
+        {
+            language = QStringLiteral("he");
+            break;
+        }
+        if (ch.unicode() >= 0x0600 && ch.unicode() <= 0x06FF)
+        {
+            language = QStringLiteral("ar");
+            break;
+        }
+    }
+
+    PDFRTLTextEngine::Settings settings;
+    settings.text = value;
+    settings.language = language;
+    settings.fontSize = fontSize;
+    settings.fontData = m_rtlFormFieldFontData;
+    settings.fontFamily = fontFamily;
+
+    // Measure the shaped run first (x = 0) so /Q right-anchor (2) and
+    // centering (1) can place the text; then re-shape with the final
+    // origin. Shaping is deterministic, so both passes produce the same
+    // font subset; only the second result is used.
+    const QByteArray fontKey = "F2";
+    settings.x = 0.0;
+    settings.y = 0.0;
+    PDFRTLTextEngine::Result measureResult = PDFRTLTextEngine::create(settings, fontKey);
+    if (!measureResult.errors.isEmpty())
+    {
+        return false;
+    }
+    const PDFReal runWidth = measureResult.boundingWidth;
+
+    PDFInteger quadding = 0;
+    const PDFObject& quaddingObject = fieldDict->get("Q");
+    if (quaddingObject.isInt())
+    {
+        quadding = quaddingObject.getInteger();
+    }
+
+    PDFReal x = rect.left();
+    if (quadding == 1)
+    {
+        x = rect.left() + (rect.width() - runWidth) / 2.0;
+    }
+    else if (quadding == 2)
+    {
+        x = rect.right() - runWidth;
+    }
+    // Single-line field: place the baseline so the glyphs are roughly
+    // vertically centered inside the widget rectangle (PDF y-up coords).
+    const PDFReal y = rect.center().y() - fontSize * 0.25;
+
+    settings.x = x;
+    settings.y = y;
+    PDFRTLTextEngine::Result rtlResult = PDFRTLTextEngine::create(settings, fontKey);
+    if (!rtlResult.errors.isEmpty())
+    {
+        return false;
+    }
+
+    // Embed the Type0 font: nested streams (FontDescriptor, FontFile2
+    // subset, CIDToGIDMap, ToUnicode) become real objects.
+    PDFDictionary fontDictionary = rtlResult.fontDictionary;
+    replaceObjectsByReferences(fontDictionary);
+
+    // Appearance form XObject: /Type /XObject /Subtype /Form with the
+    // shaped fragment as its content stream (FlateDecode compressed).
+    PDFArray filters;
+    filters.appendItem(PDFObject::createName("FlateDecode"));
+    const QByteArray compressedData = PDFFlateDecodeFilter::compress(rtlResult.contentFragment);
+
+    PDFObjectFactory formFactory;
+    formFactory.beginDictionary();
+
+    formFactory.beginDictionaryItem("Type");
+    formFactory << WrapName("XObject");
+    formFactory.endDictionaryItem();
+
+    formFactory.beginDictionaryItem("Subtype");
+    formFactory << WrapName("Form");
+    formFactory.endDictionaryItem();
+
+    formFactory.beginDictionaryItem("BBox");
+    formFactory << rect;
+    formFactory.endDictionaryItem();
+
+    formFactory.beginDictionaryItem("Resources");
+    formFactory.beginDictionary();
+    formFactory.beginDictionaryItem("Font");
+    formFactory << fontDictionary;
+    formFactory.endDictionaryItem();
+    formFactory.endDictionary();
+    formFactory.endDictionaryItem();
+
+    formFactory.beginDictionaryItem("Length");
+    formFactory << PDFObject::createInteger(compressedData.size());
+    formFactory.endDictionaryItem();
+
+    formFactory.beginDictionaryItem("Filter");
+    formFactory << PDFObject::createArray(std::make_shared<PDFArray>(filters));
+    formFactory.endDictionaryItem();
+
+    formFactory.endDictionary();
+
+    PDFObject formDictObject = formFactory.takeObject();
+    PDFDictionary formDictionary = *formDictObject.getDictionary();
+    PDFObject formObject =
+        PDFObject::createStream(std::make_shared<PDFStream>(std::move(formDictionary), QByteArray(compressedData)));
+    const PDFObjectReference formReference = addObject(std::move(formObject));
+
+    // Attach the appearance to the widget: /AP << /N <form> >> + /Rect.
+    PDFObjectFactory annotationFactory;
+    annotationFactory.beginDictionary();
+
+    annotationFactory.beginDictionaryItem("Rect");
+    annotationFactory << rect;
+    annotationFactory.endDictionaryItem();
+
+    annotationFactory.beginDictionaryItem("AP");
+    annotationFactory.beginDictionary();
+    annotationFactory.beginDictionaryItem("N");
+    annotationFactory << formReference;
+    annotationFactory.endDictionaryItem();
+    annotationFactory.endDictionary();
+    annotationFactory.endDictionaryItem();
+
+    annotationFactory.endDictionary();
+
+    mergeTo(annotationReference, annotationFactory.takeObject());
+    return true;
 }
 
 bool PDFDocumentBuilder::updateHighlightAnnotationAppearanceStream(PDFObjectReference annotationReference,

@@ -218,6 +218,7 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("field", "Field fully qualified name to set (repeatable).", "name"));
         parser->addOption(
             QCommandLineOption("value", "Value for the field (repeatable, paired with --field).", "value"));
+        parser->addOption(QCommandLineOption("font", "TTF font file for RTL appearance streams.", "file"));
     }
 
     if (optionFlags.testFlag(Sign))
@@ -687,6 +688,7 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.formFillFields = parser->values("field");
         options.formFillValues = parser->values("value");
         options.formFillOutputDocument = positionalArguments.size() >= 2 ? positionalArguments[1] : QString();
+        options.formFillFont = parser->value("font");
     }
 
     if (optionFlags.testFlag(Sign))
