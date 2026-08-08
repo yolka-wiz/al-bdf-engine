@@ -251,6 +251,10 @@ set_target_properties(UnitTestsFormSignature PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
+target_compile_definitions(UnitTestsFormSignature PRIVATE
+    TEST_FONT_ARABIC="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/NotoNaskhArabic-Regular.ttf"
+)
+
 add_test(NAME UnitTestsFormSignature COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsFormSignature")
 set_tests_properties(UnitTestsFormSignature PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

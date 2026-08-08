@@ -209,6 +209,43 @@ void FormSignatureTest::test_formFill()
     QVERIFY(!listResult.stdOut.contains(QStringLiteral("John"))); // old value gone
 }
 
+void FormSignatureTest::test_formFillRtlAppearance()
+{
+    const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
+    const QString filledPath = m_tmpDir.filePath(QStringLiteral("filled-rtl.pdf"));
+    const ToolResult fillResult = runTool(toolPath,
+                                          {QStringLiteral("form-fill"),
+                                           m_formPdf,
+                                           filledPath,
+                                           QStringLiteral("--field"),
+                                           QStringLiteral("name"),
+                                           QStringLiteral("--value"),
+                                           QString::fromUtf8("سلام"),
+                                           QStringLiteral("--font"),
+                                           QString::fromUtf8(TEST_FONT_ARABIC)},
+                                          m_tmpDir.path());
+    QCOMPARE(fillResult.exitCode, 0);
+    QVERIFY(QFile::exists(filledPath));
+
+    QFile file(filledPath);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QByteArray data = file.readAll();
+    file.close();
+
+    // An RTL field value must produce a real appearance stream: the output
+    // must contain /AP (annotation appearance dictionary) and /FontFile2
+    // (the embedded TrueType subset). Headless form-fill emits no AP at all
+    // without the RTL branch — PDFFormManager::drawFormField is a Q_UNUSED
+    // no-op in core (see docs/PROBLEMS.md, M14 form-field tofu gap).
+    QVERIFY2(data.contains("/AP"), "output PDF must contain /AP appearance stream");
+    QVERIFY2(data.contains("/FontFile2"), "output PDF must contain /FontFile2 embedded TTF font");
+
+    // Round-trip: the logical value must survive form-fill -> form-list.
+    const ToolResult listResult = runTool(toolPath, {QStringLiteral("form-list"), filledPath}, m_tmpDir.path());
+    QCOMPARE(listResult.exitCode, 0);
+    QVERIFY(listResult.stdOut.contains(QString::fromUtf8("سلام")));
+}
+
 void FormSignatureTest::test_signAndVerify()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
