@@ -1,0 +1,207 @@
+# albdf — release workflow.
+#
+# Builds release binaries for Linux (x86_64 + aarch64) and macOS (arm64 +
+# x86_64) from a version tag, then creates the GitHub Release with the
+# packaged artifacts attached.
+#
+# Trigger:
+#   - push of a tag matching `0.*` (e.g. `0.4.0`) → full build + Release
+#   - workflow_dispatch → build + upload artifacts only (no Release), useful
+#     for testing the matrix before tagging
+#
+# Layout:
+#   build     — matrix over 4 platforms; headless Release build + package.sh
+#               (deterministic tarball + sha256). Blocking.
+#   appimage  — linux-x86_64 only; GUI build (ALBDF_BUILD_GUI=ON) + AppImage
+#               via packaging/build-appimage.sh. Non-gating (continue-on-error)
+#               — a GUI regression must not block the CLI release, mirroring
+#               the ci.yml philosophy. Downloads the linuxdeploy tools.
+#   release   — needs build + appimage; downloads all artifacts and creates
+#               the GitHub Release with `gh` (GITHUB_TOKEN, contents: write).
+#               Runs only on tag pushes.
+#
+# Toolchain setup is shared with the CI gate via .github/actions/setup-toolchain
+# (vcpkg + Qt 6.8 + cmake/ninja, Linux and macOS aware).
+
+name: release
+
+on:
+  push:
+    tags: ['0.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Same pin as ci.yml — keeps the vcpkg binary cache warm across workflows.
+  ALBDF_VCPKG_REF: 2026.07.29
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-bincache,readwrite
+  VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/src/vcpkg/overlays
+  QT_QPA_PLATFORM: offscreen
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-24.04
+            qt-arch: linux_gcc_64
+          - platform: linux-aarch64
+            os: ubuntu-24.04-arm
+            qt-arch: linux_gcc_arm64
+          - platform: macos-arm64
+            os: macos-15
+          - platform: macos-x86_64
+            os: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SOURCE_DATE_EPOCH falls back to last commit time
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          qt-arch: ${{ matrix.qt-arch || 'linux_gcc_64' }}
+
+      - name: Configure + build (Release, headless)
+        shell: bash
+        run: |
+          cmake -S src -B src/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DALBDF_BUILD_TESTS=OFF
+          cmake --build src/build
+
+      - name: Package release tarball
+        shell: bash
+        run: |
+          # Tag push → tag name (0.4.0). workflow_dispatch (no tag) → fall
+          # back to the version in src/CMakeLists.txt.
+          if [[ "$GITHUB_REF_NAME" =~ ^[0-9] ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(sed -n 's/^set(ALBDF_VERSION \(.*\))$/\1/p' src/CMakeLists.txt | head -1)"
+          fi
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" \
+            bash scripts/package.sh --build-dir src/build --out-dir dist \
+            --version "${VERSION}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+
+  appimage:
+    name: AppImage (linux-x86_64, non-gating)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-toolchain
+
+      - name: Configure + build GUI (Release)
+        shell: bash
+        run: |
+          cmake -S src -B src/build-gui -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DALBDF_BUILD_TESTS=OFF -DALBDF_BUILD_GUI=ON
+          cmake --build src/build-gui
+
+      - name: Download linuxdeploy tools
+        shell: bash
+        run: |
+          mkdir -p "$HOME/tools"
+          cd "$HOME/tools"
+          curl -sL -o linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -sL -o linuxdeploy-plugin-qt-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          curl -sL -o appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x ./*.AppImage
+
+      - name: Build AppImage
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^[0-9] ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(sed -n 's/^set(ALBDF_VERSION \(.*\))$/\1/p' src/CMakeLists.txt | head -1)"
+          fi
+          TOOLS_DIR="$HOME/tools" BUILD_DIR="src/build-gui" OUT_DIR="dist" \
+            VERSION="${VERSION}" bash packaging/build-appimage.sh
+
+      - name: Checksums
+        shell: bash
+        run: |
+          cd dist
+          for f in *.AppImage; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-x86_64-appimage
+          path: dist/
+          if-no-files-found: ignore
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    needs: [build, appimage]
+    # Run only on tag pushes, and only if every platform build succeeded.
+    # appimage is continue-on-error (non-gating): its failure must not block
+    # the CLI release — the `needs.build.result` check excludes it.
+    if: startsWith(github.ref, 'refs/tags/') && needs.build.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Extract release notes from docs/RELEASES.md
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 - "$VERSION" <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open('docs/RELEASES.md', encoding='utf-8').read()
+          # Grab the "## albdf <version>" section up to the next "## " heading.
+          m = re.search(
+              rf'^## albdf {re.escape(version)}.*?(?=^## albdf |\Z)',
+              text, re.M | re.S)
+          body = m.group(0).strip() if m else f'albdf {version}'
+          with open('/tmp/release-notes.md', 'w', encoding='utf-8') as f:
+              f.write(body + '\n')
+          PY
+          echo "notes bytes: $(wc -c < /tmp/release-notes.md)"
+
+      - name: Create Release with gh
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "== dist contents =="
+          ls -la dist/
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "albdf ${VERSION}" \
+            --notes-file /tmp/release-notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

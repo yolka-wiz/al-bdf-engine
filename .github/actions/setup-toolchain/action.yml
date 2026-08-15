@@ -1,14 +1,15 @@
 # Composite action: albdf CI toolchain.
 #
 # Sets up the same toolchain the dev container uses, on GitHub-hosted
-# Ubuntu runners:
+# runners (Linux x86_64/arm64 and macOS arm64/x86_64):
 #   - vcpkg, pinned to a release tag, with its *binary cache* restored from
 #     actions/cache (keyed on the manifest + overlay hashes + vcpkg ref) so
 #     the 11 manifest deps are built once, not on every run
-#   - cmake + ninja from apt
-#   - Qt 6.8 (qtbase + qtsvg) from the official Qt archives via
-#     install-qt-action — the apt Qt on ubuntu-24.04 is 6.4, which does not
-#     satisfy the project's find_package(Qt6 6.8 REQUIRED)
+#   - cmake + ninja (apt on Linux, Homebrew on macOS; gnu-tar on macOS for
+#     deterministic release tarballs)
+#   - Qt 6.8 (qtbase + qtsvg) from the official Qt archives via aqtinstall —
+#     the apt Qt on ubuntu-24.04 is 6.4, which does not satisfy the
+#     project's find_package(Qt6 6.8 REQUIRED)
 #
 # The vcpkg overlay (src/vcpkg/overlays — blend2d/asmjit pin fixes gcc15 +
 # aarch64 CMake recursion bugs, see docs/PROBLEMS.md) is wired via the
@@ -23,9 +24,15 @@ description: >-
 
 inputs:
   install-qt:
-    description: Install Qt 6.8 via install-qt-action (false for format-only jobs)
+    description: Install Qt 6.8 via aqtinstall (false for format-only jobs)
     required: false
     default: 'true'
+  qt-arch:
+    description: >-
+      aqt Qt target for Linux (linux_gcc_64 / linux_gcc_arm64). macOS is
+      auto-detected from runner.arch (mac_arm64 / mac_x86_64).
+    required: false
+    default: linux_gcc_64
 
 runs:
   using: composite
@@ -34,7 +41,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/vcpkg-bincache
-        key: vcpkg-${{ runner.os }}-${{ env.ALBDF_VCPKG_REF }}-${{ hashFiles('src/vcpkg.json', 'src/vcpkg/**') }}
+        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ env.ALBDF_VCPKG_REF }}-${{ hashFiles('src/vcpkg.json', 'src/vcpkg/**') }}
         restore-keys: |
           vcpkg-${{ runner.os }}-${{ env.ALBDF_VCPKG_REF }}-
 
@@ -48,7 +55,8 @@ runs:
         "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
         "${VCPKG_ROOT}/vcpkg" version
 
-    - name: Install build tools
+    - name: Install build tools (Linux)
+      if: runner.os == 'Linux'
       shell: bash
       run: |
         sudo apt-get update
@@ -58,8 +66,30 @@ runs:
             libgl1-mesa-dev \
             libfontconfig1-dev libfreetype-dev
 
-    - name: Build ICU 73 (Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
-      if: inputs.install-qt == 'true'
+    - name: Install build tools (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        # gnu-tar: scripts/package.sh uses GNU tar flags for deterministic
+        # release tarballs; the system bsdtar lacks --sort/--numeric-owner.
+        # fontconfig: pdffont.cpp needs it on all Unix (Q_OS_UNIX); Qt for
+        # macOS uses CoreText and does NOT drag fontconfig in transitively,
+        # so pkg_check_modules(FONTCONFIG REQUIRED) must find it here.
+        # pkg-config: required by pkg_check_modules (fribidi, fontconfig).
+        # qt: brew Qt is used on macOS (NOT aqt) so the release binary links
+        # against the standard /opt/homebrew|/usr/local framework paths that
+        # users have after `brew install qt` — an aqt Qt in the CI temp dir
+        # would make the shipped binary un-runnable off the runner.
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake ninja gnu-tar fontconfig pkg-config qt
+        # brew's pkgconfig dir is $(brew --prefix)/lib/pkgconfig — on Apple
+        # Silicon that is /opt/homebrew, which is NOT in pkg-config's default
+        # search path, so export it explicitly for the CMake configure step.
+        echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> "${GITHUB_ENV}"
+        # Point CMake at brew Qt for find_package(Qt6 6.8 REQUIRED).
+        echo "CMAKE_PREFIX_PATH=$(brew --prefix qt)" >> "${GITHUB_ENV}"
+
+    - name: Build ICU 73 (Linux Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
+      if: runner.os == 'Linux' && inputs.install-qt == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -70,6 +100,7 @@ runs:
         # post-install check executes qmake, which needs ICU 73 on
         # LD_LIBRARY_PATH (verified: without it qmake fails with
         # "libicui18n.so.73: cannot open shared object file").
+        # (macOS: not needed — brew Qt links the system ICU.)
         curl -sL "https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz" -o /tmp/icu73.tgz
         tar xzf /tmp/icu73.tgz -C /tmp
         cd /tmp/icu/source
@@ -79,8 +110,8 @@ runs:
         echo "ICU_BUILD=/tmp/icu-build" >> "${GITHUB_ENV}"
         echo "LD_LIBRARY_PATH=/tmp/icu-build/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
 
-    - name: Install Qt 6.8.3 (qtbase + qtsvg, headless) with retry
-      if: inputs.install-qt == 'true'
+    - name: Install Qt 6.8.3 (Linux, qtbase + qtsvg, headless) with retry
+      if: runner.os == 'Linux' && inputs.install-qt == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -95,9 +126,10 @@ runs:
         # edge the runner reaches. Retry across mirrors; aqt rotates mirrors
         # between attempts. Same command verified working locally.
         QT_DIR="${RUNNER_TEMP}/qt"
+        QT_ARCH="${{ inputs.qt-arch }}"
         for attempt in 1 2 3; do
-          echo "== aqt install attempt ${attempt}/3 =="
-          if python3 -m aqt install-qt linux desktop 6.8.3 linux_gcc_64 \
+          echo "== aqt install attempt ${attempt}/3 (linux ${QT_ARCH}) =="
+          if python3 -m aqt install-qt linux desktop 6.8.3 "${QT_ARCH}" \
               --archives qtbase qtsvg \
               --outputdir "${QT_DIR}" \
               --timeout 30; then

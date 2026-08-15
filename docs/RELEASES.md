@@ -1,5 +1,54 @@
 # albdf — release notes
 
+## albdf 0.4.0 — RTL appearance streams (M14) + multi-platform release
+
+Date: 2026-08-15
+Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
+
+First release with **native macOS binaries** and **Linux aarch64 binaries** —
+built automatically by a new GitHub Actions release workflow
+(`.github/workflows/release.yml`) from a version tag. Linux x86_64 keeps the
+AppImage.
+
+### M14 — RTL appearance streams (tasks #41/#42, R#5 resolved)
+
+- **FreeText RTL appearance streams** (`m14/freetext-ap`): `add-text`-style RTL
+  text on FreeText annotations now embeds the shaped Type0 font in the
+  annotation's `/Resources` — no more tofu in viewers that render the AP
+  instead of the annotation contents.
+- **Form-field RTL appearance streams** (`m14/form-field-ap`): headless
+  `form-fill` previously emitted **no appearance stream at all** (worse than
+  tofu — `PDFFormManager::drawFormField` is a no-op in core). Form-field APs
+  are now generated via `PDFRTLTextEngine` when an RTL font is supplied
+  (`--font`), with the shaped font embedded in the AP `/Resources`.
+- **R#5 resolved** — the form-field AP tofu gap is closed for both FreeText
+  and form fields (see `docs/PROBLEMS.md`).
+
+### Upstream sync
+
+- Re-vendored 4 core commits from PDF4QT master (`12763887..master`) — engine
+  fixes from upstream now live in the fork (TTS skipped by design; see
+  `docs/PROBLEMS.md` for the fork-divergence note).
+- CI format gate updated to exclude re-vendored upstream files
+  (`a1c15b5f`).
+
+### Packaging
+
+- `scripts/package.sh` is now cross-platform: `.dylib` + `@loader_path` on
+  macOS, `.so` + `$ORIGIN` on Linux, GNU-tar/bsdtar-aware, `shasum`-aware.
+- New `release.yml` workflow: build matrix `{linux-x86_64, linux-aarch64,
+  macos-arm64, macos-x86_64}` × `{Release}`, packaging + GitHub Release
+  creation on tag push.
+
+### Verified
+
+- Core suite green on the CI gate (Release + ASAN/UBSAN + clang-format).
+- Release artifacts: `albdf-0.4.0-linux-x86_64.tar.gz`,
+  `albdf-0.4.0-linux-aarch64.tar.gz`, `albdf-0.4.0-macos-arm64.tar.gz`,
+  `albdf-0.4.0-macos-x86_64.tar.gz`, `albdf-0.4.0-x86_64.AppImage`.
+
+---
+
 ## albdf 0.3.0 — GUI + RTL text wiring (M12–M13)
 
 Date: 2026-08-07

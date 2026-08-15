@@ -209,6 +209,7 @@ target_include_directories(Pdf4QtLibCore PUBLIC ${CMAKE_BINARY_DIR}/${INSTALL_IN
 
 target_link_libraries(Pdf4QtLibCore PRIVATE blend2d::blend2d)
 target_link_libraries(Pdf4QtLibCore PRIVATE harfbuzz::harfbuzz PkgConfig::FRIBIDI)
+target_link_libraries(Pdf4QtLibCore PRIVATE PkgConfig::FONTCONFIG)
 
 set_target_properties(Pdf4QtLibCore PROPERTIES
                       VERSION ${PDF4QT_VERSION}

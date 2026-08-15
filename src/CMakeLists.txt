@@ -3,7 +3,7 @@
 # optional GUI layer (vendored PDF4QT apps) behind ALBDF_BUILD_GUI=ON (M12).
 cmake_minimum_required(VERSION 3.16)
 
-set(ALBDF_VERSION 0.3.0)
+set(ALBDF_VERSION 0.4.0)
 set(PDF4QT_VERSION 1.6.0.0)   # kept for upstream compatibility in vendored CMake
 project(albdf VERSION ${ALBDF_VERSION} LANGUAGES CXX)
 
@@ -51,6 +51,12 @@ find_package(blend2d CONFIG REQUIRED)
 find_package(harfbuzz CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FRIBIDI REQUIRED IMPORTED_TARGET fribidi)
+
+# fontconfig: pdffont.cpp uses it for system-font substitution on all Unix
+# (incl. macOS — Q_OS_UNIX). On Linux QtGui pulls it in transitively, but the
+# core must link it explicitly so macOS (where Qt uses CoreText, no
+# fontconfig) and non-Qt consumers resolve Fc* symbols. brew provides it.
+pkg_check_modules(FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
 
 if(VCPKG_TOOLCHAIN)
     find_package(lcms2 REQUIRED)
@@ -137,6 +143,11 @@ endif()
 if(UNIX AND NOT APPLE)
     set_target_properties(albdf PROPERTIES
         INSTALL_RPATH "\$ORIGIN/../${PDF4QT_INSTALL_LIB_DIR}")
+elseif(APPLE)
+    # macOS dylibs resolve relative to the binary via @loader_path (the
+    # equivalent of $ORIGIN). The staged tree is bin/albdf + lib/*.dylib.
+    set_target_properties(albdf PROPERTIES
+        INSTALL_RPATH "@loader_path/../${PDF4QT_INSTALL_LIB_DIR}")
 endif()
 
 if(ALBDF_INSTALL_INCLUDE)

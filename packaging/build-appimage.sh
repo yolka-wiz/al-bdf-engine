@@ -8,7 +8,7 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS_DIR="${TOOLS_DIR:-$HOME/tools}"
 BUILD_DIR="${BUILD_DIR:-$REPO_DIR/src/build-gui}"
 OUT_DIR="${OUT_DIR:-$REPO_DIR/dist}"
-VERSION="${VERSION:-0.3.0}"
+VERSION="${VERSION:-$(sed -n 's/^set(ALBDF_VERSION \(.*\))$/\1/p' "$REPO_DIR/src/CMakeLists.txt" | head -1)}"
 
 export VCPKG_ROOT="${VCPKG_ROOT:-/home/agent/vcpkg-cache/vcpkg}"
 # AppImage tools self-mount via FUSE; containers often lack /dev/fuse or

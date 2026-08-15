@@ -7,13 +7,17 @@
 # headless (the INSTALLED binary must run --version and info on a fixture
 # with QT_QPA_PLATFORM=offscreen), then tarred with reproducible metadata.
 #
+# Cross-platform (0.4.0+): Linux (.so + $ORIGIN) and macOS (.dylib +
+# @loader_path). GNU tar (or gtar on macOS) is preferred for deterministic
+# output; a Python tarfile fallback keeps bsdtar-only systems working.
+#
 # Determinism:
 #   - all files root-owned, normalized mtime (SOURCE_DATE_EPOCH, falling back
 #     to the last commit time), sorted entries, gzip -n (no filename/mtime
 #     header) => two runs from the same build produce identical sha256.
-#   - the installed binary must resolve libPdf4QtLibCore via $ORIGIN (set by
-#     the INSTALL_RPATH rule in src/CMakeLists.txt), never via a build-tree
-#     path; a readelf check fails the run if a build-tree RUNPATH leaked in.
+#   - the installed binary must resolve libPdf4QtLibCore via $ORIGIN (Linux)
+#     or @loader_path (macOS), never via a build-tree path; a readelf/otool
+#     check fails the run if a build-tree path leaked in.
 #
 # Usage:
 #   bash scripts/package.sh [--build-dir src/build] [--out-dir dist]
@@ -22,8 +26,8 @@
 #   SOURCE_DATE_EPOCH=<epoch> bash scripts/package.sh   # fixed tarball mtime
 #
 # Outputs (in OUT_DIR by default):
-#   albdf-<version>-linux-<arch>.tar.gz      the release artifact
-#   albdf-<version>-linux-<arch>.tar.gz.sha256
+#   albdf-<version>-<os>-<arch>.tar.gz       the release artifact
+#   albdf-<version>-<os>-<arch>.tar.gz.sha256
 #   albdf-<version>_<debarch>.deb             only with --deb (skeleton)
 #
 # Exit code: 0 = packaged + validated; 1 = any step failed.
@@ -59,10 +63,23 @@ done
 fail() { echo "package: ERROR: $*" >&2; exit 1; }
 
 # ---- inputs ---------------------------------------------------------------
+# Shared-library glob differs per platform: .so* on Linux, .dylib* on macOS.
+case "$(uname -s)" in
+    Darwin) LIB_GLOB='libPdf4QtLibCore*.dylib' ;;
+    *)      LIB_GLOB='libPdf4QtLibCore.so*' ;;
+esac
+# Library subdir in the build/install trees: upstream CMake installs the
+# shared library into lib/ on Linux but bin/ on macOS/Windows (the
+# PDF4QT_INSTALL_LIB_DIR else() branch uses CMAKE_INSTALL_BINDIR).
+case "$(uname -s)" in
+    Darwin) LIB_SUBDIR="bin" ;;
+    *)      LIB_SUBDIR="lib" ;;
+esac
+
 [ -x "$BUILD_DIR/bin/albdf" ] || \
     fail "albdf binary not found at $BUILD_DIR/bin/albdf (build first: cmake --build $BUILD_DIR)"
-ls "$BUILD_DIR"/lib/libPdf4QtLibCore.so* >/dev/null 2>&1 || \
-    fail "libPdf4QtLibCore not found under $BUILD_DIR/lib"
+ls "$BUILD_DIR"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || \
+    fail "libPdf4QtLibCore not found under $BUILD_DIR/$LIB_SUBDIR"
 [ -f "$FIXTURE" ] || fail "validation fixture not found: $FIXTURE"
 
 if [ -z "$VERSION" ]; then
@@ -70,13 +87,48 @@ if [ -z "$VERSION" ]; then
 fi
 [ -n "$VERSION" ] || fail "could not determine version (pass --version or fix src/CMakeLists.txt)"
 
+# Platform naming: linux-x86_64 / linux-aarch64 / macos-arm64 / macos-x86_64.
+OS_NAME="$(uname -s)"
+case "$OS_NAME" in
+    Linux)  PLATFORM_OS="linux" ;;
+    Darwin) PLATFORM_OS="macos" ;;
+    *)      PLATFORM_OS="$(printf '%s' "$OS_NAME" | tr '[:upper:]' '[:lower:]')" ;;
+esac
 ARCH="$(uname -m)"
 case "$ARCH" in
-    x86_64)  DEB_ARCH=amd64 ;;
-    aarch64) DEB_ARCH=arm64 ;;
-    *)       DEB_ARCH="$ARCH" ;;
+    x86_64)  DEB_ARCH=amd64 ; PLATFORM_ARCH="x86_64" ;;
+    aarch64|arm64) DEB_ARCH=arm64 ; PLATFORM_ARCH="aarch64" ;;
+    *)       DEB_ARCH="$ARCH" ; PLATFORM_ARCH="$ARCH" ;;
 esac
-PLATFORM="linux-$ARCH"
+PLATFORM="${PLATFORM_OS}-${PLATFORM_ARCH}"
+
+# ---- helpers --------------------------------------------------------------
+# sha256sum (Linux) vs shasum -a 256 (macOS).
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+# stat -c %s (GNU) vs stat -f %z (BSD/macOS).
+file_size() {
+    if [ "$PLATFORM_OS" = "macos" ]; then
+        stat -f %z "$1"
+    else
+        stat -c %s "$1"
+    fi
+}
+# GNU tar (Linux) or gtar (macOS: brew install gnu-tar) for deterministic
+# output. Fall back to plain tar if neither is present (bsdtar-only systems).
+TAR_BIN="$(command -v gtar || command -v tar || true)"
+TAR_DETERMINISTIC=0
+if [ -n "$TAR_BIN" ] && "$TAR_BIN" --version 2>/dev/null | grep -q GNU; then
+    TAR_DETERMINISTIC=1
+fi
+if [ "$TAR_DETERMINISTIC" -ne 1 ]; then
+    echo "package: WARNING: GNU tar (gtar) not found — tarball may not be byte-deterministic" >&2
+fi
 
 # ---- staging --------------------------------------------------------------
 if [ -n "$STAGE_DIR" ]; then
@@ -94,7 +146,7 @@ fi
 echo "== staging install (prefix=$STAGE) =="
 cmake --install "$BUILD_DIR" --prefix "$STAGE" >/dev/null || fail "cmake --install failed"
 [ -x "$STAGE/bin/albdf" ] || fail "installed tree missing bin/albdf"
-ls "$STAGE"/lib/libPdf4QtLibCore.so* >/dev/null 2>&1 || fail "installed tree missing libPdf4QtLibCore"
+ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "installed tree missing libPdf4QtLibCore"
 [ -f "$STAGE/include/Pdf4QtLibCore/pdfglobal.h" ] || fail "installed tree missing headers"
 [ -f "$STAGE/include/Pdf4QtLibCore/pdf4qtlibcore_export.h" ] || fail "installed tree missing generated export header"
 [ -f "$STAGE/share/man/man1/albdf.1" ] || fail "installed tree missing man page"
@@ -103,14 +155,21 @@ ls "$STAGE"/lib/libPdf4QtLibCore.so* >/dev/null 2>&1 || fail "installed tree mis
 # ---- validate the INSTALLED binary (headless) -----------------------------
 echo "== validating installed binary (offscreen) =="
 export QT_QPA_PLATFORM=offscreen
-VER="$("$STAGE/bin/albdf" --version 2>&1)" || fail "installed albdf --version exited non-zero"
+VER="$(QT_QPA_PLATFORM=offscreen "$STAGE/bin/albdf" --version 2>&1)" || fail "installed albdf --version exited non-zero"
 case "$VER" in *albdf*) ;; *) fail "installed albdf --version output unexpected: $VER" ;; esac
-INFO="$("$STAGE/bin/albdf" info "$FIXTURE" 2>&1)" || fail "installed albdf info exited non-zero on $(basename "$FIXTURE")"
+INFO="$(QT_QPA_PLATFORM=offscreen "$STAGE/bin/albdf" info "$FIXTURE" 2>&1)" || fail "installed albdf info exited non-zero on $(basename "$FIXTURE")"
 case "$INFO" in *"Page count"*) ;; *) fail "installed albdf info output missing 'Page count': $(echo "$INFO" | head -3)" ;; esac
 echo "  OK: --version -> $VER ; info $(basename "$FIXTURE") -> page count present"
 
-# The installed binary must be relocatable: no build-tree path in RUNPATH.
-if command -v readelf >/dev/null 2>&1; then
+# The installed binary must be relocatable: no build-tree path in RUNPATH
+# (Linux) / LC_RPATH (macOS).
+if [ "$PLATFORM_OS" = "macos" ] && command -v otool >/dev/null 2>&1; then
+    RPATH="$(otool -l "$STAGE/bin/albdf" 2>/dev/null | grep -A2 LC_RPATH || true)"
+    if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
+        fail "installed albdf still carries the build-tree LC_RPATH ($RPATH); INSTALL_RPATH=@loader_path fix missing"
+    fi
+    echo "  LC_RPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
+elif command -v readelf >/dev/null 2>&1; then
     RPATH="$(readelf -d "$STAGE/bin/albdf" 2>/dev/null | grep -E 'RUNPATH|RPATH' || true)"
     if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
         fail "installed albdf still carries the build-tree RUNPATH ($RPATH); INSTALL_RPATH=\$ORIGIN fix missing"
@@ -122,14 +181,20 @@ fi
 MTIME="${SOURCE_DATE_EPOCH:-$(git -C "$REPO_DIR" log -1 --format=%ct 2>/dev/null || date +%s)}"
 mkdir -p "$OUT_DIR"
 TARBALL="$OUT_DIR/albdf-${VERSION}-${PLATFORM}.tar.gz"
-echo "== creating tarball (SOURCE_DATE_EPOCH=$MTIME) =="
-tar --use-compress-program='gzip -n' -cf "$TARBALL" -C "$STAGE" \
-    --sort=name --numeric-owner --owner=0 --group=0 --mtime=@"$MTIME" .
-sha256sum "$TARBALL" | awk '{print $1}' > "$TARBALL.sha256"
+echo "== creating tarball (SOURCE_DATE_EPOCH=$MTIME, tar=$TAR_BIN) =="
+if [ "$TAR_DETERMINISTIC" -eq 1 ]; then
+    "$TAR_BIN" --use-compress-program='gzip -n' -cf "$TARBALL" -C "$STAGE" \
+        --sort=name --numeric-owner --owner=0 --group=0 --mtime=@"$MTIME" .
+else
+    # bsdtar fallback: no GNU-only flags; mtime normalization via -m is not
+    # available, so determinism is best-effort here.
+    (cd "$STAGE" && "$TAR_BIN" -czf "$TARBALL" .)
+fi
+sha256_of "$TARBALL" > "$TARBALL.sha256"
 
-# ---- optional minimal .deb skeleton ---------------------------------------
+# ---- optional minimal .deb skeleton (Linux only) --------------------------
 DEB=""
-if [ "$DO_DEB" -eq 1 ]; then
+if [ "$DO_DEB" -eq 1 ] && [ "$PLATFORM_OS" = "linux" ]; then
     if command -v ar >/dev/null 2>&1; then
         echo "== building minimal .deb skeleton =="
         mkdir -p "$DEB_WORK/control"
@@ -148,10 +213,10 @@ Description: Headless PDF editing library + CLI (RTL-aware, fork of PDF4QT)
  NOT policy-complete (no symbols, no lintian-clean control fields).
 EOF
         # data: staged files re-rooted under /usr (handle ./prefix or bare)
-        tar --use-compress-program='gzip -n' -cf "$DEB_WORK/data.tar.gz" -C "$STAGE" \
+        "$TAR_BIN" --use-compress-program='gzip -n' -cf "$DEB_WORK/data.tar.gz" -C "$STAGE" \
             --sort=name --numeric-owner --owner=0 --group=0 --mtime=@"$MTIME" \
             --transform='s|^\./|./usr/|' .
-        tar --use-compress-program='gzip -n' -cf "$DEB_WORK/control.tar.gz" \
+        "$TAR_BIN" --use-compress-program='gzip -n' -cf "$DEB_WORK/control.tar.gz" \
             -C "$DEB_WORK/control" \
             --sort=name --numeric-owner --owner=0 --group=0 --mtime=@"$MTIME" control
         printf '2.0\n' > "$DEB_WORK/debian-binary"
@@ -162,11 +227,13 @@ EOF
     else
         echo "package: WARNING: 'ar' (binutils) not found - skipping --deb" >&2
     fi
+elif [ "$DO_DEB" -eq 1 ] && [ "$PLATFORM_OS" != "linux" ]; then
+    echo "package: WARNING: --deb is Linux-only; skipping on $PLATFORM" >&2
 fi
 
 # ---- summary ---------------------------------------------------------------
-FILES="$(tar -tf "$TARBALL" | grep -cv '/$')"
-SIZE="$(stat -c %s "$TARBALL")"
+FILES="$("$TAR_BIN" -tf "$TARBALL" | grep -cv '/$')"
+SIZE="$(file_size "$TARBALL")"
 SHA="$(cat "$TARBALL.sha256")"
 echo
 echo "== package summary =="
