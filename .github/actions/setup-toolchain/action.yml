@@ -80,7 +80,11 @@ runs:
         # against the standard /opt/homebrew|/usr/local framework paths that
         # users have after `brew install qt` — an aqt Qt in the CI temp dir
         # would make the shipped binary un-runnable off the runner.
-        HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake ninja gnu-tar fontconfig pkg-config qt
+        # HOMEBREW_NO_REQUIRE_TAP_TRUST: GitHub's macOS runner image carries an
+        # untrusted `aws/tap` (brew tap-trust feature, 2026); without this
+        # every `brew install` fails with "The following taps are not trusted".
+        HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
+          brew install cmake ninja gnu-tar fontconfig pkg-config qt
         # brew's pkgconfig dir is $(brew --prefix)/lib/pkgconfig — on Apple
         # Silicon that is /opt/homebrew, which is NOT in pkg-config's default
         # search path, so export it explicitly for the CMake configure step.
