@@ -276,7 +276,8 @@ void PDFActionManager::initActions(QSize iconSize, bool initializeStampActions)
     }
 
     if (hasActions({ CreateHyperlinkToThisPDFFit, CreateHyperlinkToThisPDFFitH, CreateHyperlinkToThisPDFFitV, CreateHyperlinkToThisPDFFitR,
-                     CreateHyperlinkToThisPDFFitB, CreateHyperlinkToThisPDFFitBH, CreateHyperlinkToThisPDFFitBV, CreateHyperlinkToThisPDFXYZ }))
+                     CreateHyperlinkToThisPDFFitB, CreateHyperlinkToThisPDFFitBH, CreateHyperlinkToThisPDFFitBV, CreateHyperlinkToThisPDFXYZ,
+                     CreateHyperlinkToThisPDFXYZInheritZoom }))
     {
         m_actionGroups[CreateInDocumentHyperlinkGroup] = new QActionGroup(this);
         m_actionGroups[CreateInDocumentHyperlinkGroup]->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
@@ -288,6 +289,7 @@ void PDFActionManager::initActions(QSize iconSize, bool initializeStampActions)
         m_actionGroups[CreateInDocumentHyperlinkGroup]->addAction(getAction(CreateHyperlinkToThisPDFFitBH));
         m_actionGroups[CreateInDocumentHyperlinkGroup]->addAction(getAction(CreateHyperlinkToThisPDFFitBV));
         m_actionGroups[CreateInDocumentHyperlinkGroup]->addAction(getAction(CreateHyperlinkToThisPDFXYZ));
+        m_actionGroups[CreateInDocumentHyperlinkGroup]->addAction(getAction(CreateHyperlinkToThisPDFXYZInheritZoom));
 
         getAction(CreateHyperlinkToThisPDFFit)->setData(int(pdf::DestinationType::Fit));
         getAction(CreateHyperlinkToThisPDFFitH)->setData(int(pdf::DestinationType::FitH));
@@ -297,6 +299,8 @@ void PDFActionManager::initActions(QSize iconSize, bool initializeStampActions)
         getAction(CreateHyperlinkToThisPDFFitBH)->setData(int(pdf::DestinationType::FitBH));
         getAction(CreateHyperlinkToThisPDFFitBV)->setData(int(pdf::DestinationType::FitBV));
         getAction(CreateHyperlinkToThisPDFXYZ)->setData(int(pdf::DestinationType::XYZ));
+        getAction(CreateHyperlinkToThisPDFXYZInheritZoom)->setData(int(pdf::DestinationType::XYZ));
+        getAction(CreateHyperlinkToThisPDFXYZInheritZoom)->setProperty("inheritZoom", true);
     }
 
     setUserData(RenderOptionAntialiasing, pdf::PDFRenderer::Antialiasing);
@@ -1122,6 +1126,11 @@ void PDFProgramController::initializeToolManager()
         pdf::PDFCreateInDocumentHyperlinkTool* createInDocumentHyperlinkTool = new pdf::PDFCreateInDocumentHyperlinkTool(m_pdfWidget->getDrawWidgetProxy(), m_toolManager, inDocumentHyperlinkGroup, this);
         m_toolManager->addTool(createInDocumentHyperlinkTool);
     }
+    if (QAction* action = m_actionManager->getAction(PDFActionManager::InsertPageNumbers))
+    {
+        pdf::PDFCreateInsertPageNumbersTool* createInsertPageNumbersTool = new pdf::PDFCreateInsertPageNumbersTool(m_pdfWidget->getDrawWidgetProxy(), m_toolManager, action, this);
+        m_toolManager->addTool(createInsertPageNumbersTool);
+    }
     if (QAction* action = m_actionManager->getAction(PDFActionManager::CreateInlineText))
     {
         pdf::PDFCreateFreeTextTool* createFreeTextTool = new pdf::PDFCreateFreeTextTool(m_pdfWidget->getDrawWidgetProxy(), m_toolManager, action, this);
@@ -1939,6 +1948,7 @@ void PDFProgramController::onViewerSettingsChanged()
     m_annotationManager->setFeatures(m_settings->getFeatures());
     m_annotationManager->setMeshQualitySettings(m_pdfWidget->getDrawWidgetProxy()->getMeshQualitySettings());
     pdf::PDFExecutionPolicy::setStrategy(m_settings->getMultithreadingStrategy());
+    pdf::PDFAuthorSettings::setAuthorName(m_settings->getSettings().m_authorNameMode, m_settings->getSettings().m_customAuthorName);
 
     updateRenderingOptionActions();
 }

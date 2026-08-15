@@ -28,6 +28,8 @@
 #include "pdfwidgetformmanager.h"
 #include "pdfwidgetannotation.h"
 #include "pdfwidgetutils.h"
+#include "pdfcatalog.h"
+#include "insertpagenumbersdialog.h"
 
 #include <QActionGroup>
 #include <QCheckBox>
@@ -45,6 +47,11 @@
 #include <QVector2D>
 #include <QVBoxLayout>
 #include <QApplication>
+#include <QSettings>
+
+#include <limits>
+#include <algorithm>
+#include <cmath>
 
 #include "pdfdbgheap.h"
 
@@ -102,9 +109,9 @@ void PDFCreateStickyNoteTool::onPointPicked(PDFInteger pageIndex, QPointF pagePo
     {
         PDFDocumentModifier modifier(getDocument());
 
-        QString userName = PDFSysUtils::getUserName();
+        QString author = PDFAuthorSettings::getAuthorName();
         PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-        modifier.getBuilder()->createAnnotationText(page, QRectF(pagePoint, QSizeF(0, 0)), m_icon, userName, QString(), text, false);
+        modifier.getBuilder()->createAnnotationText(page, QRectF(pagePoint, QSizeF(0, 0)), m_icon, author, QString(), text, false);
         modifier.markAnnotationsChanged();
 
         if (modifier.finalize())
@@ -152,7 +159,6 @@ void PDFCreateHyperlinkTool::onRectanglePicked(PDFInteger pageIndex, QRectF page
     {
         PDFDocumentModifier modifier(getDocument());
 
-        QString userName = PDFSysUtils::getUserName();
         PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
         modifier.getBuilder()->createAnnotationLink(page, pageRectangle, url, m_highlightMode);
         modifier.markAnnotationsChanged();
@@ -228,12 +234,13 @@ void PDFCreateInDocumentHyperlinkTool::setActiveImpl(bool active)
 
 void PDFCreateInDocumentHyperlinkTool::onActionTriggered(QAction* action)
 {
-    setActive(action && action->isChecked());
-
     if (action)
     {
         m_destinationType = static_cast<DestinationType>(action->data().toInt());
+        m_inheritZoom = action->property("inheritZoom").toBool();
     }
+
+    setActive(action && action->isChecked());
 }
 
 void PDFCreateInDocumentHyperlinkTool::onLinkRectanglePicked(PDFInteger pageIndex, QRectF pageRectangle)
@@ -308,7 +315,7 @@ PDFDestination PDFCreateInDocumentHyperlinkTool::createDestination(PDFInteger pa
     destination.setDestinationType(m_destinationType);
     destination.setPageIndex(pageIndex);
     destination.setPageReference(getDocument()->getCatalog()->getPage(pageIndex)->getPageReference());
-    destination.setZoom(getProxy()->getZoom());
+    destination.setZoom(m_inheritZoom ? std::numeric_limits<PDFReal>::quiet_NaN() : getProxy()->getZoom());
 
     if (!pageRectangle.isEmpty())
     {
@@ -459,9 +466,9 @@ void PDFCreateFreeTextTool::onRectanglePicked(PDFInteger pageIndex, QRectF pageR
 
     PDFDocumentModifier modifier(getDocument());
 
-    QString userName = PDFSysUtils::getUserName();
+    QString author = PDFAuthorSettings::getAuthorName();
     PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-    modifier.getBuilder()->createAnnotationFreeText(page, pageRectangle, userName, QString(), text, m_style, m_autoResizeToContents);
+    modifier.getBuilder()->createAnnotationFreeText(page, pageRectangle, author, QString(), text, m_style, m_autoResizeToContents);
     modifier.markAnnotationsChanged();
 
     if (modifier.finalize())
@@ -546,9 +553,9 @@ void PDFCreateLineTypeTool::finishDefinition()
             {
                 PDFDocumentModifier modifier(getDocument());
 
-                QString userName = PDFSysUtils::getUserName();
+                QString author = PDFAuthorSettings::getAuthorName();
                 PDFObjectReference page = getDocument()->getCatalog()->getPage(m_pickTool->getPageIndex())->getPageReference();
-                modifier.getBuilder()->createAnnotationLine(page, QRectF(), pickedPoints.front(), pickedPoints.back(), m_penWidth, m_fillColor, m_strokeColor, userName, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
+                modifier.getBuilder()->createAnnotationLine(page, QRectF(), pickedPoints.front(), pickedPoints.back(), m_penWidth, m_fillColor, m_strokeColor, author, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
                 modifier.markAnnotationsChanged();
 
                 if (modifier.finalize())
@@ -573,9 +580,9 @@ void PDFCreateLineTypeTool::finishDefinition()
                     polygon << point;
                 }
 
-                QString userName = PDFSysUtils::getUserName();
+                QString author = PDFAuthorSettings::getAuthorName();
                 PDFObjectReference page = getDocument()->getCatalog()->getPage(m_pickTool->getPageIndex())->getPageReference();
-                modifier.getBuilder()->createAnnotationPolyline(page, polygon, m_penWidth, m_fillColor, m_strokeColor, userName, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
+                modifier.getBuilder()->createAnnotationPolyline(page, polygon, m_penWidth, m_fillColor, m_strokeColor, author, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
                 modifier.markAnnotationsChanged();
 
                 if (modifier.finalize())
@@ -604,9 +611,9 @@ void PDFCreateLineTypeTool::finishDefinition()
                     polygon << pickedPoints.front();
                 }
 
-                QString userName = PDFSysUtils::getUserName();
+                QString author = PDFAuthorSettings::getAuthorName();
                 PDFObjectReference page = getDocument()->getCatalog()->getPage(m_pickTool->getPageIndex())->getPageReference();
-                PDFObjectReference annotation = modifier.getBuilder()->createAnnotationPolygon(page, polygon, m_penWidth, m_fillColor, m_strokeColor, userName, QString(), QString());
+                PDFObjectReference annotation = modifier.getBuilder()->createAnnotationPolygon(page, polygon, m_penWidth, m_fillColor, m_strokeColor, author, QString(), QString());
                 modifier.getBuilder()->setAnnotationFillOpacity(annotation, m_fillColor.alphaF());
                 modifier.getBuilder()->updateAnnotationAppearanceStreams(annotation);
                 modifier.markAnnotationsChanged();
@@ -634,9 +641,9 @@ void PDFCreateLineTypeTool::finishDefinition()
                 polygon << m_rectOnPage.bottomLeft();
                 polygon << m_rectOnPage.topLeft();
 
-                QString userName = PDFSysUtils::getUserName();
+                QString author = PDFAuthorSettings::getAuthorName();
                 PDFObjectReference page = getDocument()->getCatalog()->getPage(m_pickTool->getPageIndex())->getPageReference();
-                PDFObjectReference annotation = modifier.getBuilder()->createAnnotationPolygon(page, polygon, m_penWidth, m_fillColor, m_strokeColor, userName, QString(), QString());
+                PDFObjectReference annotation = modifier.getBuilder()->createAnnotationPolygon(page, polygon, m_penWidth, m_fillColor, m_strokeColor, author, QString(), QString());
                 modifier.getBuilder()->setAnnotationFillOpacity(annotation, m_fillColor.alphaF());
                 modifier.getBuilder()->updateAnnotationAppearanceStreams(annotation);
                 modifier.markAnnotationsChanged();
@@ -995,9 +1002,9 @@ void PDFCreateEllipseTool::onRectanglePicked(PDFInteger pageIndex, QRectF pageRe
 
     PDFDocumentModifier modifier(getDocument());
 
-    QString userName = PDFSysUtils::getUserName();
+    QString author = PDFAuthorSettings::getAuthorName();
     PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-    PDFObjectReference annotation = modifier.getBuilder()->createAnnotationCircle(page, pageRectangle, m_penWidth, m_fillColor, m_strokeColor, userName, QString(), QString());
+    PDFObjectReference annotation = modifier.getBuilder()->createAnnotationCircle(page, pageRectangle, m_penWidth, m_fillColor, m_strokeColor, author, QString(), QString());
     modifier.getBuilder()->setAnnotationFillOpacity(annotation, m_fillColor.alphaF());
     modifier.getBuilder()->updateAnnotationAppearanceStreams(annotation);
     modifier.markAnnotationsChanged();
@@ -1099,9 +1106,9 @@ void PDFCreateFreehandCurveTool::mouseReleaseEvent(QWidget* widget, QMouseEvent*
                     polygon << point;
                 }
 
-                QString userName = PDFSysUtils::getUserName();
+                QString author = PDFAuthorSettings::getAuthorName();
                 PDFObjectReference page = getDocument()->getCatalog()->getPage(m_pageIndex)->getPageReference();
-                modifier.getBuilder()->createAnnotationPolyline(page, polygon, m_penWidth, Qt::black, m_strokeColor, userName, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
+                modifier.getBuilder()->createAnnotationPolyline(page, polygon, m_penWidth, Qt::black, m_strokeColor, author, QString(), QString(), AnnotationLineEnding::None, AnnotationLineEnding::None);
                 modifier.markAnnotationsChanged();
 
                 if (modifier.finalize())
@@ -1259,9 +1266,9 @@ void PDFCreateStampTool::onPointPicked(PDFInteger pageIndex, QPointF pagePoint)
 {
     PDFDocumentModifier modifier(getDocument());
 
-    QString userName = PDFSysUtils::getUserName();
+    QString author = PDFAuthorSettings::getAuthorName();
     PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-    modifier.getBuilder()->createAnnotationStamp(page, QRectF(pagePoint, QSizeF(0, 0)), m_stampAnnotation.getStamp(), userName, QString(), QString());
+    modifier.getBuilder()->createAnnotationStamp(page, QRectF(pagePoint, QSizeF(0, 0)), m_stampAnnotation.getStamp(), author, QString(), QString());
     modifier.markAnnotationsChanged();
 
     if (modifier.finalize())
@@ -1542,15 +1549,68 @@ void PDFCreateHighlightTextTool::updateInitialColor()
 PDFCreateRedactRectangleTool::PDFCreateRedactRectangleTool(PDFDrawWidgetProxy* proxy, PDFToolManager* toolManager, QAction* action, QObject* parent) :
     BaseClass(proxy, action, parent),
     m_toolManager(toolManager),
-    m_pickTool(nullptr)
+    m_pickTool(nullptr),
+    m_colorDialog(nullptr),
+    m_color(getRedactColor())
 {
     m_pickTool = new PDFPickTool(proxy, PDFPickTool::Mode::Rectangles, this);
     m_pickTool->setSnapToAnnotations(true);
-    m_pickTool->setSelectionRectangleColor(Qt::black);
+    m_pickTool->setSelectionRectangleColor(m_color);
     addTool(m_pickTool);
     connect(m_pickTool, &PDFPickTool::rectanglePicked, this, &PDFCreateRedactRectangleTool::onRectanglePicked);
 
     updateActions();
+}
+
+QColor PDFCreateRedactRectangleTool::getRedactColor()
+{
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    settings.beginGroup("RedactTool");
+    const QColor color = settings.value("redactColor", QColor(Qt::black)).value<QColor>();
+    settings.endGroup();
+    return color.isValid() ? color : QColor(Qt::black);
+}
+
+void PDFCreateRedactRectangleTool::setRedactColor(const QColor& color)
+{
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    settings.beginGroup("RedactTool");
+    settings.setValue("redactColor", color);
+    settings.endGroup();
+}
+
+void PDFCreateRedactRectangleTool::setActiveImpl(bool active)
+{
+    BaseClass::setActiveImpl(active);
+
+    if (!active)
+    {
+        delete m_colorDialog;
+        m_colorDialog = nullptr;
+    }
+    else
+    {
+        m_color = getRedactColor();
+        m_pickTool->setSelectionRectangleColor(m_color);
+
+        m_colorDialog = new QColorDialog(m_color, getProxy()->getWidget());
+        m_colorDialog->setWindowTitle(tr("Select Color"));
+        m_colorDialog->setOption(QColorDialog::ShowAlphaChannel, false);
+        m_colorDialog->setOption(QColorDialog::NoButtons, true);
+        m_colorDialog->setOption(QColorDialog::DontUseNativeDialog, true);
+        m_colorDialog->setOption(QColorDialog::NoEyeDropperButton, true);
+        m_colorDialog->setWindowFlag(Qt::Tool);
+        m_colorDialog->move(pdf::PDFWidgetUtils::scaleDPI_x(m_colorDialog, 50), pdf::PDFWidgetUtils::scaleDPI_y(m_colorDialog, 50));
+        connect(m_colorDialog, &QColorDialog::currentColorChanged, this, &PDFCreateRedactRectangleTool::onColorChanged);
+        m_colorDialog->show();
+    }
+}
+
+void PDFCreateRedactRectangleTool::onColorChanged(const QColor& color)
+{
+    m_color = color;
+    m_pickTool->setSelectionRectangleColor(m_color);
+    setRedactColor(m_color);
 }
 
 void PDFCreateRedactRectangleTool::onRectanglePicked(PDFInteger pageIndex, QRectF pageRectangle)
@@ -1563,7 +1623,7 @@ void PDFCreateRedactRectangleTool::onRectanglePicked(PDFInteger pageIndex, QRect
     PDFDocumentModifier modifier(getDocument());
 
     PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-    PDFObjectReference annotation = modifier.getBuilder()->createAnnotationRedact(page, pageRectangle, Qt::black);
+    PDFObjectReference annotation = modifier.getBuilder()->createAnnotationRedact(page, pageRectangle, m_color);
     modifier.getBuilder()->updateAnnotationAppearanceStreams(annotation);
     modifier.markAnnotationsChanged();
 
@@ -1573,9 +1633,120 @@ void PDFCreateRedactRectangleTool::onRectanglePicked(PDFInteger pageIndex, QRect
     }
 }
 
+PDFCreateInsertPageNumbersTool::PDFCreateInsertPageNumbersTool(PDFDrawWidgetProxy* proxy, PDFToolManager* toolManager, QAction* action, QObject* parent) :
+    BaseClass(proxy, action, parent),
+    m_toolManager(toolManager),
+    m_pickTool(nullptr)
+{
+    m_pickTool = new PDFPickTool(proxy, PDFPickTool::Mode::Rectangles, this);
+    m_pickTool->setSnapToAnnotations(true);
+    m_pickTool->setSelectionRectangleColor(Qt::black);
+    addTool(m_pickTool);
+    connect(m_pickTool, &PDFPickTool::rectanglePicked, this, &PDFCreateInsertPageNumbersTool::onRectanglePicked);
+
+    updateActions();
+}
+
+void PDFCreateInsertPageNumbersTool::onRectanglePicked(PDFInteger pageIndex, QRectF pageRectangle)
+{
+    if (pageRectangle.isEmpty() || !getDocument())
+    {
+        return;
+    }
+
+    const PDFPage* referencePage = getDocument()->getCatalog()->getPage(pageIndex);
+    const QRectF referenceMediaBox = referencePage->getMediaBox();
+
+    // Anchor the picked rectangle to its nearest media box corner, so the same
+    // relative position (and rectangle size) can be reproduced on pages whose
+    // media box differs in size from the reference page.
+    const bool anchorLeft = std::abs(pageRectangle.center().x() - referenceMediaBox.left()) <= std::abs(referenceMediaBox.right() - pageRectangle.center().x());
+    const bool anchorTop = std::abs(pageRectangle.center().y() - referenceMediaBox.top()) <= std::abs(referenceMediaBox.bottom() - pageRectangle.center().y());
+
+    const PDFReal offsetX = anchorLeft ? (pageRectangle.left() - referenceMediaBox.left()) : (referenceMediaBox.right() - pageRectangle.right());
+    const PDFReal offsetY = anchorTop ? (pageRectangle.top() - referenceMediaBox.top()) : (referenceMediaBox.bottom() - pageRectangle.bottom());
+    const PDFReal width = pageRectangle.width();
+    const PDFReal height = pageRectangle.height();
+
+    std::vector<PDFInteger> visiblePages;
+    if (IDrawWidget* drawWidget = getProxy()->getWidget()->getDrawWidget())
+    {
+        visiblePages = drawWidget->getCurrentPages();
+    }
+
+    InsertPageNumbersDialog dialog(getDocument()->getCatalog()->getPageCount(), visiblePages, getProxy()->getWidget());
+    if (dialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    std::vector<PDFInteger> selectedPages = dialog.getSelectedPages();
+    std::sort(selectedPages.begin(), selectedPages.end());
+
+    const PDFPageLabel::NumberingStyle numberingStyle = dialog.getNumberingStyle();
+    const QString formatPattern = dialog.getFormatPattern();
+    const int startNumber = dialog.getStartNumber();
+    const QFont font = dialog.getFont();
+    const QColor color = dialog.getColor();
+    const Qt::Alignment alignment = dialog.getAlignment();
+    const QString totalPagesText = QString::number(getDocument()->getCatalog()->getPageCount());
+
+    PDFDocumentModifier modifier(getDocument());
+
+    for (size_t i = 0; i < selectedPages.size(); ++i)
+    {
+        const PDFInteger targetPageIndex = selectedPages[i] - 1;
+        const PDFPage* targetPage = getDocument()->getCatalog()->getPage(targetPageIndex);
+        const QRectF targetMediaBox = targetPage->getMediaBox();
+
+        const PDFReal x = anchorLeft ? (targetMediaBox.left() + offsetX) : (targetMediaBox.right() - offsetX - width);
+        const PDFReal y = anchorTop ? (targetMediaBox.top() + offsetY) : (targetMediaBox.bottom() - offsetY - height);
+
+        QRectF targetRect;
+        targetRect.setLeft(x);
+        targetRect.setTop(y);
+        targetRect.setWidth(width);
+        targetRect.setHeight(height);
+
+        const QString numberText = PDFPageLabel::formatPageNumber(numberingStyle, startNumber + PDFInteger(i));
+        const QString labelText = QString(formatPattern).arg(numberText).arg(totalPagesText);
+
+        PDFPageContentStreamBuilder contentStreamBuilder(modifier.getBuilder(), PDFContentStreamBuilder::CoordinateSystem::PDF, PDFPageContentStreamBuilder::Mode::PlaceAfter);
+        QPainter* painter = contentStreamBuilder.begin(targetPage->getPageReference());
+        if (painter)
+        {
+            painter->setFont(font);
+            painter->setPen(QPen(color));
+
+            // CoordinateSystem::PDF flips the painter's y-axis to match PDF space;
+            // counteract it locally around the text, otherwise glyphs draw mirrored.
+            painter->save();
+            painter->translate(targetRect.center());
+            painter->scale(1.0, -1.0);
+            QRectF localRect(-targetRect.width() * 0.5, -targetRect.height() * 0.5, targetRect.width(), targetRect.height());
+            painter->drawText(localRect, int(alignment), labelText);
+            painter->restore();
+
+            contentStreamBuilder.end(painter);
+            modifier.markPageContentsChanged();
+        }
+    }
+
+    if (modifier.finalize())
+    {
+        Q_EMIT m_toolManager->documentModified(PDFModifiedDocument(modifier.getDocument(), nullptr, modifier.getFlags()));
+    }
+
+    // Deactivate the tool after stamping, so an accidental extra rectangle pick
+    // does not stamp the already numbered document a second time.
+    setActive(false);
+}
+
 PDFCreateRedactTextTool::PDFCreateRedactTextTool(PDFDrawWidgetProxy* proxy, PDFToolManager* toolManager, QAction* action, QObject* parent) :
     BaseClass(proxy, action, parent),
     m_toolManager(toolManager),
+    m_colorDialog(nullptr),
+    m_color(PDFCreateRedactRectangleTool::getRedactColor()),
     m_isCursorOverText(false)
 {
     updateActions();
@@ -1637,7 +1808,7 @@ void PDFCreateRedactTextTool::mouseReleaseEvent(QWidget* widget, QMouseEvent* ev
                 // Jakub Melka: handle the selection
                 PDFTextLayoutGetter textLayoutGetter = getProxy()->getTextLayoutCompiler()->getTextLayoutLazy(pageIndex);
                 PDFTextLayout textLayout = textLayoutGetter;
-                setSelection(textLayout.createTextSelection(pageIndex, m_selectionInfo.selectionStartPoint, pagePoint, Qt::black));
+                setSelection(textLayout.createTextSelection(pageIndex, m_selectionInfo.selectionStartPoint, pagePoint, m_color));
 
                 QPolygonF quadrilaterals;
                 PDFTextSelectionPainter textSelectionPainter(&m_textSelection);
@@ -1648,7 +1819,7 @@ void PDFCreateRedactTextTool::mouseReleaseEvent(QWidget* widget, QMouseEvent* ev
                     PDFDocumentModifier modifier(getDocument());
 
                     PDFObjectReference page = getDocument()->getCatalog()->getPage(pageIndex)->getPageReference();
-                    modifier.getBuilder()->createAnnotationRedact(page, quadrilaterals, Qt::black);
+                    modifier.getBuilder()->createAnnotationRedact(page, quadrilaterals, m_color);
                     modifier.markAnnotationsChanged();
 
                     if (modifier.finalize())
@@ -1681,7 +1852,7 @@ void PDFCreateRedactTextTool::mouseMoveEvent(QWidget* widget, QMouseEvent* event
         if (m_selectionInfo.pageIndex == pageIndex)
         {
             // Jakub Melka: handle the selection
-            setSelection(textLayout.createTextSelection(pageIndex, m_selectionInfo.selectionStartPoint, pagePoint, Qt::black));
+            setSelection(textLayout.createTextSelection(pageIndex, m_selectionInfo.selectionStartPoint, pagePoint, m_color));
         }
         else
         {
@@ -1712,7 +1883,31 @@ void PDFCreateRedactTextTool::setActiveImpl(bool active)
     {
         // Just clear the text selection
         setSelection(PDFTextSelection());
+
+        delete m_colorDialog;
+        m_colorDialog = nullptr;
     }
+    else
+    {
+        m_color = PDFCreateRedactRectangleTool::getRedactColor();
+
+        m_colorDialog = new QColorDialog(m_color, getProxy()->getWidget());
+        m_colorDialog->setWindowTitle(tr("Select Color"));
+        m_colorDialog->setOption(QColorDialog::ShowAlphaChannel, false);
+        m_colorDialog->setOption(QColorDialog::NoButtons, true);
+        m_colorDialog->setOption(QColorDialog::DontUseNativeDialog, true);
+        m_colorDialog->setOption(QColorDialog::NoEyeDropperButton, true);
+        m_colorDialog->setWindowFlag(Qt::Tool);
+        m_colorDialog->move(pdf::PDFWidgetUtils::scaleDPI_x(m_colorDialog, 50), pdf::PDFWidgetUtils::scaleDPI_y(m_colorDialog, 50));
+        connect(m_colorDialog, &QColorDialog::currentColorChanged, this, &PDFCreateRedactTextTool::onColorChanged);
+        m_colorDialog->show();
+    }
+}
+
+void PDFCreateRedactTextTool::onColorChanged(const QColor& color)
+{
+    m_color = color;
+    PDFCreateRedactRectangleTool::setRedactColor(m_color);
 }
 
 void PDFCreateRedactTextTool::updateCursor()

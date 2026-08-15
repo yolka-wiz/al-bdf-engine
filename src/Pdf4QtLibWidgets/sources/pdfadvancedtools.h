@@ -129,6 +129,7 @@ private:
     QActionGroup* m_actionGroup;
     PDFPickTool* m_pickTool;
     DestinationType m_destinationType = DestinationType::Fit;
+    bool m_inheritZoom = false;
     LinkHighlightMode m_highlightMode = LinkHighlightMode::Outline;
     PDFInteger m_linkPageIndex = -1;
     QRectF m_linkRectangle;
@@ -392,6 +393,38 @@ private:
 public:
     explicit PDFCreateRedactRectangleTool(PDFDrawWidgetProxy* proxy, PDFToolManager* toolManager, QAction* action, QObject* parent);
 
+    /// Returns the color to be used for newly created redaction annotations.
+    /// The color is persisted in the application settings, so it is shared
+    /// (and remembered across restarts) by all redaction tools.
+    static QColor getRedactColor();
+    static void setRedactColor(const QColor& color);
+
+protected:
+    virtual void setActiveImpl(bool active) override;
+
+private:
+    void onRectanglePicked(pdf::PDFInteger pageIndex, QRectF pageRectangle);
+    void onColorChanged(const QColor& color);
+
+    PDFToolManager* m_toolManager;
+    PDFPickTool* m_pickTool;
+    QColorDialog* m_colorDialog;
+    QColor m_color;
+};
+
+/// Tool that stamps a formatted page number into a user-picked rectangle on every
+/// page of a selected page range. Unlike the other tools in this file, the text is
+/// written directly into the page's content stream (not as an annotation).
+class PDF4QTLIBWIDGETSSHARED_EXPORT PDFCreateInsertPageNumbersTool : public PDFWidgetTool
+{
+    Q_OBJECT
+
+private:
+    using BaseClass = PDFWidgetTool;
+
+public:
+    explicit PDFCreateInsertPageNumbersTool(PDFDrawWidgetProxy* proxy, PDFToolManager* toolManager, QAction* action, QObject* parent);
+
 private:
     void onRectanglePicked(pdf::PDFInteger pageIndex, QRectF pageRectangle);
 
@@ -427,6 +460,7 @@ protected:
     virtual void setActiveImpl(bool active) override;
 
 private:
+    void onColorChanged(const QColor& color);
     void updateCursor();
     void setSelection(pdf::PDFTextSelection&& textSelection);
 
@@ -439,6 +473,8 @@ private:
     PDFToolManager* m_toolManager;
     pdf::PDFTextSelection m_textSelection;
     SelectionInfo m_selectionInfo;
+    QColorDialog* m_colorDialog;
+    QColor m_color;
     bool m_isCursorOverText;
 };
 
