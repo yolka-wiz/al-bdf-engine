@@ -123,6 +123,8 @@ DECISIONS = [
      "Authored code GPL-3.0-or-later; upstream PDF4QT portions keep MIT. Deps stay GPLv3-compatible."),
     ("docs/decisions/0006-forms-signatures-cli.md", "Forms and digital signatures via CLI", "accepted",
      "Expose upstream AcroForm engine + PKCS#7 signing through form-list/form-fill/sign/verify-signatures."),
+    ("docs/decisions/0007-antislop-quality-gate.md", "Anti-slop code-quality gate", "accepted",
+     "Binding rules in coding-standard §11 + mechanical check-slop.sh gate + frozen base files + review; violation protocol."),
 ]
 
 QUESTIONS = [
