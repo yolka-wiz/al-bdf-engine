@@ -207,6 +207,7 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 - `ctest` **must** run with `QT_QPA_PLATFORM=offscreen` exported, or tests abort (not a real failure).
 - No `QDateTime::currentDateTime()` / timestamps in document output — byte-stable output is a hard requirement and tests depend on it.
 - Golden PNGs are byte-verified by hash; regenerate only with an explicit reviewed commit.
+- `encrypt` seeds `QRandomGenerator::securelySeeded()` (correct cryptography), so its output is intentionally **not** byte-stable. Tests must not hash `encrypt` output (`docs/coding-standard.md` §D2).
 
 ### Redaction / render quirks (M10, DB #29)
 

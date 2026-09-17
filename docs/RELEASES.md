@@ -8,10 +8,13 @@
 Date: 2026-08-15
 Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
 
-First release with **native macOS binaries** and **Linux aarch64 binaries** —
-built automatically by a new GitHub Actions release workflow
-(`.github/workflows/release.yml`) from a version tag. Linux x86_64 keeps the
-AppImage.
+New **multi-platform GitHub Actions release workflow**
+(`.github/workflows/release.yml`), triggered from a version tag, targeting
+`{linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64}` builds. The **0.4.0
+multi-platform binaries did not ship**: the macOS and linux-aarch64 builds
+failed, so no binary assets were attached to the 0.4.0 release (only the
+linux-x86_64 matrix leg built). See the GitHub release status for the current
+asset list; fixing the workflow is tracked as R6.1.
 
 ### M14 — RTL appearance streams (tasks #41/#42, R#5 resolved)
 
@@ -46,9 +49,9 @@ AppImage.
 ### Verified
 
 - Core suite green on the CI gate (Release + ASAN/UBSAN + clang-format).
-- Release artifacts: `albdf-0.4.0-linux-x86_64.tar.gz`,
-  `albdf-0.4.0-linux-aarch64.tar.gz`, `albdf-0.4.0-macos-arm64.tar.gz`,
-  `albdf-0.4.0-macos-x86_64.tar.gz`, `albdf-0.4.0-x86_64.AppImage`.
+- Release artifacts: **none attached for 0.4.0** — the multi-platform workflow
+  failed on macOS + linux-aarch64, so only the linux-x86_64 matrix leg built.
+  Re-run tracked as R6.1.
 
 ---
 
