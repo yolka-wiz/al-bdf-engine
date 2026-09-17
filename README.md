@@ -34,13 +34,17 @@ The image installs Qt 6, the vcpkg deps, and all tools, sets
 
 ```bash
 git clone https://github.com/yolka-wiz/al-bdf-engine.git albdf
-cd albdf/src
+cd albdf
 export VCPKG_ROOT=/path/to/vcpkg
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
       -DALBDF_BUILD_TESTS=ON
 cmake --build build
 ```
+
+The root `CMakeLists.txt` is a shim over the upstream-derived project in
+`src/`; configuring from inside `src/` (`cmake -S src -B src/build`) still
+works. Pass `-DALBDF_BUILD_GUI=ON` to additionally build the optional GUI.
 
 ### Verify
 

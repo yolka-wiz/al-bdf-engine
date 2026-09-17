@@ -104,7 +104,11 @@ else()
 endif()
 cmake_path(RELATIVE_PATH PDF4QT_PLUGINS_DIR BASE_DIRECTORY "${PDF4QT_INSTALL_BIN_DIR}" OUTPUT_VARIABLE PDF4QT_PLUGINS_RELATIVE_PATH)
 cmake_path(RELATIVE_PATH PDF4QT_INSTALL_TRANS_DIR BASE_DIRECTORY "${PDF4QT_INSTALL_BIN_DIR}" OUTPUT_VARIABLE PDF4QT_TRANSLATIONS_RELATIVE_PATH)
-configure_file(config.h.cmake config.h)
+# Write config.h to the top-level build dir, which is on Pdf4QtLibCore's include
+# path (see Pdf4QtLibCore/CMakeLists.txt). Using ${CMAKE_BINARY_DIR} (not the
+# current dir) keeps this correct whether the project is configured from `src/`
+# (legacy) or from the repo root via the root CMakeLists.txt shim.
+configure_file(config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
 
 add_subdirectory(Pdf4QtLibCore)
 add_subdirectory(PdfTool)   # dir keeps upstream name; target produces the albdf binary
