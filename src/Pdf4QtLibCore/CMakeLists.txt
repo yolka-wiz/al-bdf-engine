@@ -130,6 +130,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfrenderer.h
     sources/pdfpagecontentprocessor.cpp
     sources/pdfpagecontentprocessor.h
+    sources/pdfpagecontentrewriter.cpp
+    sources/pdfpagecontentrewriter.h
     sources/pdfpainter.cpp
     sources/pdfpainter.h
     sources/pdffunction.cpp

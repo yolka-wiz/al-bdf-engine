@@ -23,15 +23,14 @@
 
 #include "pdfcms.h"
 #include "pdfconstants.h"
-#include "pdfdocumentbuilder.h"
-#include "pdfdocumentwriter.h"
+#include "pdfdocument.h"
 #include "pdffont.h"
 #include "pdfmeshqualitysettings.h"
 #include "pdfobject.h"
 #include "pdfoptionalcontent.h"
 #include "pdfpagecontenteditorcontentstreambuilder.h"
 #include "pdfpagecontenteditorprocessor.h"
-#include "pdfstreamfilters.h"
+#include "pdfpagecontentrewriter.h"
 
 namespace pdftool
 {
@@ -52,7 +51,6 @@ QString PDFToolDeleteObject::getStandardString(StandardString standardString) co
         return PDFToolTranslationContext::tr("Delete a whole content object (text run, image, path) from a page.");
 
     default:
-        Q_ASSERT(false);
         break;
     }
 
@@ -144,7 +142,12 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     pdf::PDFMeshQualitySettings meshQualitySettings;
 
     const pdf::PDFPage* page = document.getCatalog()->getPage(pageIndex);
-    Q_ASSERT(page);
+    if (!page)
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Page %1 does not exist.").arg(pageNumber),
+                               options.outputCodec);
+        return ErrorInvalidArguments;
+    }
 
     // Parse the page content into the edited element list. The element order
     // is the content stream order = the index space of recognize-text.
@@ -225,86 +228,29 @@ int PDFToolDeleteObject::execute(const PDFToolOptions& options)
     // safe (unused resource entries are ignored by renderers) and avoids
     // breaking other pages that may share the same XObject. Resources are
     // compacted by the optimize pass if desired.
-    pdf::PDFDocumentModifier modifier(&document);
-    pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+    pdf::PDFPageContentRewriter::Settings rewriteSettings;
+    rewriteSettings.pageReference = page->getPageReference();
+    rewriteSettings.fontDictionary = contentStreamBuilder.getFontDictionary();
+    rewriteSettings.xobjectDictionary = contentStreamBuilder.getXObjectDictionary();
+    rewriteSettings.graphicStateDictionary = contentStreamBuilder.getGraphicStateDictionary();
+    rewriteSettings.contentBytes = contentStreamBuilder.getOutputContent();
+    rewriteSettings.mode = pdf::PDFPageContentRewriter::ContentsMode::Replace;
+    rewriteSettings.outputPath = outputDocument;
 
-    // Replace resource references with actual objects and write the new
-    // page content stream (FlateDecode compressed) into the page object.
-    pdf::PDFDictionary fontDictionary = contentStreamBuilder.getFontDictionary();
-    pdf::PDFDictionary xobjectDictionary = contentStreamBuilder.getXObjectDictionary();
-    pdf::PDFDictionary graphicStateDictionary = contentStreamBuilder.getGraphicStateDictionary();
-
-    builder->replaceObjectsByReferences(fontDictionary);
-    builder->replaceObjectsByReferences(xobjectDictionary);
-    builder->replaceObjectsByReferences(graphicStateDictionary);
-
-    pdf::PDFArray filters;
-    filters.appendItem(pdf::PDFObject::createName("FlateDecode"));
-    const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(contentStreamBuilder.getOutputContent());
-
-    pdf::PDFDictionary contentDictionary;
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
-                               pdf::PDFObject::createInteger(compressedData.size()));
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
-                               pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-    pdf::PDFObject contentObject = pdf::PDFObject::createStream(
-        std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
-
-    pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
-
-    pdf::PDFObjectFactory factory;
-    factory.beginDictionary();
-    factory.beginDictionaryItem("Resources");
-    factory.beginDictionary();
-
-    if (!fontDictionary.isEmpty())
+    pdf::PDFPageContentRewriter::Result rewriteResult = pdf::PDFPageContentRewriter::rewrite(document, rewriteSettings);
+    if (!rewriteResult.isSuccess())
     {
-        factory.beginDictionaryItem("Font");
-        factory << fontDictionary;
-        factory.endDictionaryItem();
-    }
-    if (!xobjectDictionary.isEmpty())
-    {
-        factory.beginDictionaryItem("XObject");
-        factory << xobjectDictionary;
-        factory.endDictionaryItem();
-    }
-    if (!graphicStateDictionary.isEmpty())
-    {
-        factory.beginDictionaryItem("ExtGState");
-        factory << graphicStateDictionary;
-        factory.endDictionaryItem();
-    }
-
-    factory.endDictionary();
-    factory.endDictionaryItem();
-
-    factory.beginDictionaryItem("Contents");
-    factory << builder->addObject(std::move(contentObject));
-    factory.endDictionaryItem();
-
-    factory.endDictionary();
-
-    pageObject = pdf::PDFObjectManipulator::merge(
-        pageObject, factory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
-    builder->setObject(page->getPageReference(), std::move(pageObject));
-
-    // Apply the modification and save.
-    modifier.markPageContentsChanged();
-    if (!modifier.finalize())
-    {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
-                               options.outputCodec);
-        return ErrorFailedWriteToFile;
-    }
-
-    pdf::PDFDocumentWriter writer(nullptr);
-    pdf::PDFOperationResult writeResult = writer.write(outputDocument, modifier.getDocument().data(), true);
-    if (!writeResult)
-    {
-        PDFConsole::writeError(
-            PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
-            options.outputCodec);
+        if (rewriteResult.failure == pdf::PDFPageContentRewriter::Failure::Finalize)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                                   options.outputCodec);
+        }
+        else
+        {
+            PDFConsole::writeError(
+                PDFToolTranslationContext::tr("Failed to write document: %1").arg(rewriteResult.errorMessage),
+                options.outputCodec);
+        }
         return ErrorFailedWriteToFile;
     }
 
