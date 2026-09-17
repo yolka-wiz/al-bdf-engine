@@ -98,6 +98,16 @@ add_albdf_test(UnitTestsActualText tst_actualtexttest.cpp HEADLESS
         TEST_FONT_PERSIAN="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/Vazirmatn-Regular.ttf")
 add_dependencies(UnitTestsActualText albdf)
 
+# R3.1 shared write-back helper: drives PDFPageContentRewriter directly against
+# the indirect-/Resources + indirect-/Contents fixture (Append stream -> array,
+# array growth, Replace, resource preservation, byte-determinism) and through
+# the RTL CLI path that uses Append in production.
+add_albdf_test(UnitTestsPageContentRewriter tst_pagecontentrewritertest.cpp HEADLESS
+    DEFINITIONS
+        TEST_IMAGE_DOC_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/image-doc.pdf"
+        TEST_FONT_PERSIAN="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fonts/Vazirmatn-Regular.ttf")
+add_dependencies(UnitTestsPageContentRewriter albdf)
+
 # M14: FreeText annotation with RTL contents must embed a shaped Type0
 # font (FontFile2) in its appearance stream — not base-14 Helvetica (tofu).
 add_albdf_test(UnitTestsRtlFreeText tst_rtlfreetexttest.cpp HEADLESS
