@@ -22,9 +22,11 @@
 
 #include "pdftoolabstractapplication.h"
 #include "pdfconstants.h"
+#include "pdfexception.h"
 
 #include <QGuiApplication>
 #include <QCommandLineParser>
+#include <QTextStream>
 
 int main(int argc, char *argv[])
 {
@@ -33,32 +35,115 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName("albdf");
     QCoreApplication::setApplicationVersion(pdf::PDF_LIBRARY_VERSION);
 
+    const QString versionText =
+        QCoreApplication::applicationName() + QLatin1Char(' ') + QCoreApplication::applicationVersion();
+
     QStringList arguments = QCoreApplication::arguments();
 
     QCommandLineParser parser;
     parser.setApplicationDescription("albdf - work with pdf documents via command line");
     parser.addPositionalArgument("command", "Command to execute.");
-    parser.parse(arguments);
+    const QCommandLineOption helpOption = parser.addHelpOption();
+    const QCommandLineOption versionOption = parser.addVersionOption();
 
-    QStringList positionalArguments = parser.positionalArguments();
-    QString command = !positionalArguments.isEmpty() ? positionalArguments.front() : QString();
-    arguments.removeOne(command);
+    const auto writeStdout = [](const QString& text) {
+        QTextStream stream(stdout);
+        stream << text << Qt::endl;
+    };
+    const auto writeStderr = [](const QString& text) {
+        QTextStream stream(stderr);
+        stream << text << Qt::endl;
+    };
 
-    pdftool::PDFToolAbstractApplication* application = pdftool::PDFToolApplicationStorage::getApplicationByCommand(command);
-    if (!application)
+    // The command is the first non-option token. Locate it in the raw argument
+    // list so exactly that token is dropped below: removing by value (the old
+    // QStringList::removeOne) could delete a later positional that happens to
+    // be equal to the command.
+    int commandIndex = -1;
+    for (int i = 1; i < arguments.size(); ++i)
     {
-        application = pdftool::PDFToolApplicationStorage::getDefaultApplication();
+        if (!arguments.at(i).startsWith(QLatin1Char('-')))
+        {
+            commandIndex = i;
+            break;
+        }
     }
-    else
+    const QString command = commandIndex > 0 ? arguments.at(commandIndex) : QString();
+
+    try
     {
+        // First pass: only the global --help/--version options and the command
+        // positional are known, so unrecognized command options are not an
+        // error yet. The command-specific parser is installed afterwards and
+        // the second parse diagnoses malformed options.
+        const bool globalParseOk = parser.parse(arguments);
+
+        if (command.isEmpty())
+        {
+            if (parser.isSet(versionOption))
+            {
+                writeStdout(versionText);
+                return pdftool::PDFToolAbstractApplication::ExitSuccess;
+            }
+
+            if (globalParseOk || parser.isSet(helpOption))
+            {
+                writeStdout(parser.helpText());
+                return pdftool::PDFToolAbstractApplication::ExitSuccess;
+            }
+
+            writeStderr(parser.errorText());
+            writeStderr(parser.helpText());
+            return pdftool::PDFToolAbstractApplication::ErrorInvalidArguments;
+        }
+
+        pdftool::PDFToolAbstractApplication* application =
+            pdftool::PDFToolApplicationStorage::getApplicationByCommand(command);
+        if (!application)
+        {
+            writeStderr(QStringLiteral("Unknown command '%1'").arg(command));
+            writeStderr(parser.helpText());
+            return pdftool::PDFToolAbstractApplication::ErrorInvalidArguments;
+        }
+
+        arguments.removeAt(commandIndex);
         parser.clearPositionalArguments();
+        application->initializeCommandLineParser(&parser);
+
+        if (!parser.parse(arguments))
+        {
+            writeStderr(parser.errorText());
+            writeStderr(parser.helpText());
+            return pdftool::PDFToolAbstractApplication::ErrorInvalidArguments;
+        }
+
+        if (parser.isSet(versionOption))
+        {
+            writeStdout(versionText);
+            return pdftool::PDFToolAbstractApplication::ExitSuccess;
+        }
+
+        if (parser.isSet(helpOption))
+        {
+            writeStdout(parser.helpText());
+            return pdftool::PDFToolAbstractApplication::ExitSuccess;
+        }
+
+        return application->execute(application->getOptions(&parser));
     }
-
-    application->initializeCommandLineParser(&parser);
-
-    parser.addHelpOption();
-    parser.addVersionOption();
-    parser.process(arguments);
-
-    return application->execute(application->getOptions(&parser));
+    catch (const pdf::PDFException& exception)
+    {
+        writeStderr(QStringLiteral("Error: %1").arg(exception.getMessage()));
+        return pdftool::PDFToolAbstractApplication::ErrorUnknown;
+    }
+    catch (const std::exception& exception)
+    {
+        writeStderr(QStringLiteral("Error: %1").arg(QString::fromLocal8Bit(exception.what())));
+        return pdftool::PDFToolAbstractApplication::ErrorUnknown;
+    }
+    catch (...)
+    {
+        writeStderr(QStringLiteral("Error: unknown exception"));
+        return pdftool::PDFToolAbstractApplication::ErrorUnknown;
+    }
 }
