@@ -21,13 +21,10 @@
 
 #include "pdfrtltextengine.h"
 
+#include "pdfbidi.h"
 #include "pdfdocumentbuilder.h"
+#include "pdfshaper.h"
 #include "pdfstreamfilters.h"
-
-#include <fribidi.h>
-
-#include <hb-ot.h>
-#include <hb.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -37,7 +34,9 @@
 #include <QStringList>
 
 #include <cmath>
+#include <cstdint>
 #include <map>
+#include <memory>
 
 namespace pdf
 {
@@ -60,14 +59,6 @@ Utf16Buffer toUtf16Buffer(const QString& text)
         buffer.units.push_back(ch.unicode());
     }
     return buffer;
-}
-
-/// Maps a HarfBuzz script tag to a human name (for the font descriptor).
-QByteArray scriptToTagString(hb_script_t script)
-{
-    char tag[5] = {0, 0, 0, 0, 0};
-    hb_tag_to_string(script, tag);
-    return QByteArray(tag, 4);
 }
 
 /// Reads font metrics via FreeType (bbox, ascent, descent, upem).
@@ -116,7 +107,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     Result result;
 
     // ------------------------------------------------------------------
-    // 0. Font metrics (FreeType) + HarfBuzz face/font.
+    // 0. Font metrics (FreeType) + HarfBuzz shaper.
     // ------------------------------------------------------------------
     const FontMetrics metrics = readFontMetrics(settings.fontData);
     if (!metrics.ok)
@@ -125,12 +116,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         return result;
     }
 
-    hb_blob_t* blob = hb_blob_create(
-        settings.fontData.constData(), unsigned(settings.fontData.size()), HB_MEMORY_MODE_READONLY, nullptr, nullptr);
-    hb_face_t* face = hb_face_create(blob, 0);
-    hb_font_t* hbFont = hb_font_create(face);
-    hb_ot_font_set_funcs(hbFont);
-    hb_font_set_scale(hbFont, metrics.upem, metrics.upem);
+    std::unique_ptr<PDFShaper> shaper = PDFShaper::create(settings.fontData, metrics.upem);
 
     // ------------------------------------------------------------------
     // 1. FriBidi: logical text -> embedding levels.
@@ -138,60 +124,17 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     //    from level parity: odd level = RTL run, even level = LTR run.
     // ------------------------------------------------------------------
     const Utf16Buffer textBuffer = toUtf16Buffer(settings.text);
-    std::vector<FriBidiChar> logical(textBuffer.units.size());
-    std::vector<FriBidiChar> visual(textBuffer.units.size());
-    std::vector<FriBidiStrIndex> positionsLToV(textBuffer.units.size());
-    std::vector<FriBidiStrIndex> positionsVToL(textBuffer.units.size());
-    std::vector<FriBidiLevel> levels(textBuffer.units.size());
-    for (size_t i = 0; i < textBuffer.units.size(); ++i)
-    {
-        logical[i] = textBuffer.units[i];
-    }
-
-    FriBidiParType baseDirection = FRIBIDI_PAR_LTR;
-    if (settings.language == QLatin1String("fa") || settings.language == QLatin1String("ar") ||
-        settings.language == QLatin1String("he") || settings.language == QLatin1String("ur"))
-    {
-        baseDirection = FRIBIDI_PAR_RTL;
-    }
-
-    FriBidiLevel maxLevel = 0;
-    if (!fribidi_log2vis(logical.data(),
-                         FriBidiStrIndex(logical.size()),
-                         &baseDirection,
-                         visual.data(),
-                         positionsLToV.data(),
-                         positionsVToL.data(),
-                         levels.data()))
+    const PDFBidi::Levels bidiLevels = PDFBidi::levels(settings.text, PDFBidi::directionForLanguage(settings.language));
+    if (bidiLevels.maxLevel == 0)
     {
         result.errors << QStringLiteral("FriBidi failed.");
-        hb_font_destroy(hbFont);
-        hb_face_destroy(face);
-        hb_blob_destroy(blob);
         return result;
     }
 
     // ------------------------------------------------------------------
     // 2. Split into maximal directional runs (logical order substrings).
     // ------------------------------------------------------------------
-    struct Run
-    {
-        size_t begin = 0;
-        size_t end = 0;
-        bool isRTL = false;
-    };
-    std::vector<Run> runs;
-    for (size_t i = 0; i < levels.size();)
-    {
-        const bool rtl = (levels[i] & 1) != 0;
-        size_t j = i + 1;
-        while (j < levels.size() && ((levels[j] & 1) != 0) == rtl)
-        {
-            ++j;
-        }
-        runs.push_back(Run{i, j, rtl});
-        i = j;
-    }
+    const std::vector<PDFBidi::Run> runs = PDFBidi::runsFromLevels(bidiLevels.levels);
 
     // ------------------------------------------------------------------
     // 3. Shape each run with HarfBuzz.
@@ -208,24 +151,11 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
     std::map<PDFInteger, PDFReal> glyphToWidth;      // code -> hmtx advance (font units)
 
     // Script selection: Arabic script for fa/ar/ur, Hebrew for he, else guess.
-    hb_script_t script = HB_SCRIPT_INVALID;
-    if (settings.language == QLatin1String("fa") || settings.language == QLatin1String("ar") ||
-        settings.language == QLatin1String("ur"))
-    {
-        script = HB_SCRIPT_ARABIC;
-    }
-    else if (settings.language == QLatin1String("he"))
-    {
-        script = HB_SCRIPT_HEBREW;
-    }
-    else
-    {
-        script = hb_script_from_string("Arab", -1); // default assumption for RTL engine
-    }
+    // The seam takes an ISO-15924 tag, so only the language mapping stays here.
+    const QByteArray scriptTag =
+        (settings.language == QLatin1String("he")) ? QByteArrayLiteral("Hebr") : QByteArrayLiteral("Arab");
 
-    hb_language_t language = hb_language_from_string(settings.language.toUtf8().constData(), -1);
-
-    for (const Run& run : runs)
+    for (const PDFBidi::Run& run : runs)
     {
         if (run.begin == run.end)
         {
@@ -237,36 +167,23 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         shapedRun.begin = run.begin;
         shapedRun.end = run.end;
 
-        hb_buffer_t* buffer = hb_buffer_create();
-        hb_buffer_set_direction(buffer, run.isRTL ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-        hb_buffer_set_script(buffer, script);
-        if (language)
-        {
-            hb_buffer_set_language(buffer, language);
-        }
         // cluster_level = 2 (MONOTONE_CHARACTERS): every INPUT CHARACTER gets its
         // own monotone cluster value, so a combining mark (fatha etc.) carries the
         // cluster of ITS OWN char index, not its base's. This lets the ToUnicode
         // mapping give the mark its own code point (064E/064F...) instead of the
         // base letter, which is required for tashkeel-tolerant search.
-        hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
-
-        hb_buffer_add_utf16(
-            buffer, textBuffer.units.data(), int(textBuffer.units.size()), int(run.begin), int(run.end - run.begin));
-        hb_shape(hbFont, buffer, nullptr, 0);
-
-        unsigned glyphCount = 0;
-        hb_glyph_info_t* glyphInfo = hb_buffer_get_glyph_infos(buffer, &glyphCount);
-        hb_glyph_position_t* glyphPos = hb_buffer_get_glyph_positions(buffer, &glyphCount);
+        const std::vector<PDFShaper::Glyph> shapedGlyphs = shaper->shape(
+            textBuffer.units, PDFShaper::RunInput{run.isRTL, run.begin, run.end}, scriptTag, settings.language);
 
         // Per-glyph full cluster text (UTF-16BE), kept for mark-glyph reuse.
         std::vector<QByteArray> glyphClusterText;
-        glyphClusterText.reserve(glyphCount);
+        glyphClusterText.reserve(shapedGlyphs.size());
 
-        for (unsigned g = 0; g < glyphCount; ++g)
+        for (std::size_t g = 0; g < shapedGlyphs.size(); ++g)
         {
-            const hb_codepoint_t gid = glyphInfo[g].codepoint;
-            const unsigned cluster = glyphInfo[g].cluster;
+            const PDFShaper::Glyph& shaped = shapedGlyphs[g];
+            const std::uint32_t gid = shaped.glyphId;
+            const unsigned cluster = shaped.cluster;
 
             // Unique per-instance code; the GID is stored for the
             // /CIDToGIDMap stream (code -> gid).
@@ -274,8 +191,7 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             codeToGid.push_back(PDFInteger(gid));
 
             // /W advance: hmtx advance (1000/upem) — nominal, not shaped.
-            const PDFReal hmtxAdvance = hb_font_get_glyph_h_advance(hbFont, gid);
-            glyphToWidth[code] = hmtxAdvance;
+            glyphToWidth[code] = shaped.xAdvance;
 
             // Cluster -> logical code points (UTF-16BE) for ToUnicode.
             // HarfBuzz emits glyphs in VISUAL order. For RTL runs the clusters
@@ -289,14 +205,14 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             // yeh = base + dots) map to the SAME unicode as that neighbour.
             //
             // NOTE: clusters are ABSOLUTE indices into the full logical text
-            // because hb_buffer_add_utf16 was called with item_offset=run.begin
-            // (HarfBuzz offsets cluster values by item_offset). Do NOT add
-            // run.begin again — charBegin is cluster itself. (Bug fixed in M5:
-            // mixed LTR+RTL runs had run.begin > 0 and produced <0000> entries.)
+            // because PDFShaper shapes with item_offset=run.begin (HarfBuzz
+            // offsets cluster values by item_offset). Do NOT add run.begin
+            // again — charBegin is cluster itself. (Bug fixed in M5: mixed
+            // LTR+RTL runs had run.begin > 0 and produced <0000> entries.)
             QByteArray unicode;
             const bool sharesClusterWithLeftNeighbour =
-                run.isRTL ? (g > 0 && glyphInfo[g - 1].cluster == cluster)
-                          : (g + 1 < glyphCount && glyphInfo[g + 1].cluster == cluster);
+                run.isRTL ? (g > 0 && shapedGlyphs[g - 1].cluster == cluster)
+                          : (g + 1 < shapedGlyphs.size() && shapedGlyphs[g + 1].cluster == cluster);
             if (sharesClusterWithLeftNeighbour)
             {
                 // Decomposed mark: reuse the base's cluster text.
@@ -305,8 +221,9 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
             }
             else
             {
-                unsigned nextCluster = run.isRTL ? (g > 0 ? glyphInfo[g - 1].cluster : unsigned(run.end))
-                                                 : (g + 1 < glyphCount ? glyphInfo[g + 1].cluster : unsigned(run.end));
+                unsigned nextCluster =
+                    run.isRTL ? (g > 0 ? shapedGlyphs[g - 1].cluster : unsigned(run.end))
+                              : (g + 1 < shapedGlyphs.size() ? shapedGlyphs[g + 1].cluster : unsigned(run.end));
                 const size_t charBegin = size_t(cluster);
                 const size_t charEnd = std::min(size_t(nextCluster), run.end);
                 for (size_t ci = charBegin; ci < charEnd; ++ci)
@@ -352,21 +269,18 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
 
             ShapedGlyph glyph;
             glyph.code = code;
-            glyph.xAdvance = PDFReal(hmtxAdvance);
-            glyph.xOffset = PDFReal(glyphPos[g].x_offset);
-            glyph.yOffset = PDFReal(glyphPos[g].y_offset);
+            glyph.xAdvance = shaped.xAdvance;
+            glyph.xOffset = shaped.xOffset;
+            glyph.yOffset = shaped.yOffset;
             // Decide the Ts rise sign from where the mark's INK sits relative
             // to its origin (not from yOffset's sign — both fatha and kasra
             // have negative y_off but must move in opposite directions).
-            // hb_font_get_glyph_extents gives ink bounds in font units with
-            // the y axis pointing up: positive y_max means ink above origin.
+            // PDFShaper::glyphInkAboveOrigin reports ink bounds in font units
+            // with the y axis pointing up: positive y_max means ink above
+            // origin.
             if (!qFuzzyIsNull(glyph.yOffset))
             {
-                hb_glyph_extents_t extents = {};
-                if (hb_font_get_glyph_extents(hbFont, gid, &extents) != 0)
-                {
-                    glyph.inkAboveOrigin = extents.y_bearing > 0;
-                }
+                glyph.inkAboveOrigin = shaper->glyphInkAboveOrigin(gid);
             }
             glyph.unicode = unicode;
             shapedRun.glyphs.push_back(glyph);
@@ -383,13 +297,8 @@ PDFRTLTextEngine::Result PDFRTLTextEngine::create(const Settings& settings, cons
         // reversing here would mirror the text.)
         // ------------------------------------------------------------------
 
-        hb_buffer_destroy(buffer);
         shapedRuns.push_back(std::move(shapedRun));
     }
-
-    hb_font_destroy(hbFont);
-    hb_face_destroy(face);
-    hb_blob_destroy(blob);
 
     // ------------------------------------------------------------------
     // 5. Build the content stream fragment: BT ... ET, one Tj per run,
