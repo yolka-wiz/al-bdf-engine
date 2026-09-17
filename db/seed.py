@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed the albdf tracking DB with the current known state (2026-08-05).
+"""Seed the albdf tracking DB with the current known state (2026-09-17).
 
 Run after `python3 scripts/db.py init`. Idempotent-ish: components are
 INSERT OR IGNORE, tasks/decisions/questions are inserted fresh (run once).
@@ -74,9 +74,39 @@ TASKS = [
     ("forms-signatures", "UnitTestsFormSignature: form-list/form-fill/sign/verify/tamper round-trip", 1, "1-2d", "test-agent", "done",
      "Suite now 11/11.", "6a2a325"),
     ("rtl-writer", "P3: vertical mark offsets via per-glyph Ts (text rise) emission", 2, "M", "rtl-agent", "done",
-     "Design: plans/P3-vertical-mark-offsets.md. Emit Ts around zero-width GPOS marks so diacritics render above baseline. RED pixel-probe test in tst_rtladdtexttest.cpp. Fixed 109a4af (Ts emission, sign from mark ink position) + 9a4587d (flow phantom-space guard) + 4ed7ab2 (kasra band calibration). Blocked by P6 (74a1166).", "109a4af"),
+     "Design: plans/archive/P3-vertical-mark-offsets.md. Emit Ts around zero-width GPOS marks so diacritics render above baseline. RED pixel-probe test in tst_rtladdtexttest.cpp. Fixed 109a4af (Ts emission, sign from mark ink position) + 9a4587d (flow phantom-space guard) + 4ed7ab2 (kasra band calibration). Blocked by P6 (74a1166).", "109a4af"),
     ("rtl-writer", "P6: emit spec-valid 65536-entry CIDToGIDMap stream (PDF 32000-1 9.7.4.3) — short array renders wrong glyphs in all strict renderers", 1, "M", "rtl-agent", "done",
      "Verified with Ghostscript 2026-08-05: short array [0,681]/[0,1173,728,1266] falls back to Identity; PDF4QT reads streams only (pdffont.cpp isStream). Blocks P3 verification. Fixed 74a1166: Flate stream, code->gid, unused=0.", "74a1166"),
+    # M9–M10 shipped tasks.
+    ("rtl-writer", "P1: ligature degradation in extraction — /ActualText overlay in PDFTextLayoutGenerator + writer emits full cluster text", 1, None, "rtl-agent", "done", "Wave-1 M9", "800f91e"),
+    ("rtl-writer", "P2: decomposed-yeh duplication in extraction — /ActualText overlay dedups یی→ی", 1, None, "rtl-agent", "done", "Wave-1 M9", "800f91e"),
+    ("rtl-search", "R#3: presentation-form NFKC pass pinned by regression test (fails if removed)", 1, None, "rtl-agent", "done", "Wave-1 M9", "271bfe8"),
+    ("cli", "Page ops CLI — rotate, move-page, delete-page + UnitTestsPageOps (12/12)", 1, None, "core-agent", "done", "Wave-1 M9", "411d8f7"),
+    ("tests", "W1 hosted CI — GitHub Actions gate/asan/format + vcpkg binary cache", 1, None, "infra-agent", "done", "Wave-1 M9", "88413dc"),
+    ("cli", "W7 packaging — deterministic scripts/package.sh (sha256-reproducible tarball + optional deb)", 1, None, "infra-agent", "done", "Wave-1 M9", "78f608d"),
+    ("tests", "W8 tracking — tracked 1000-page perf benchmark scripts/benchmark.sh (5s threshold, JSON, non-gating CI)", 1, None, "infra-agent", "done", "Wave-1 M9", "b197861"),
+    ("rtl-search", "S#1 cross-line search — extend joined-visual-string search past the \\n boundary (currently cross-item only)", 1, None, "rtl-agent", "done", "M10 wave-2; depends on P1/P2 extraction fixes (landed). DB #28", "0cf3338"),
+    ("object-deletion", "Object-level redaction — wire upstream redact as an albdf CLI command", 1, None, "core-agent", "done", "M10 wave-2; depends on #24 CLI registry (free). DB #29", "3a7568b"),
+    ("tests", "W5 fuzzing — input fuzz harness for CLI commands", 1, None, "infra-agent", "done", "M10 wave-2; depends on #25 run-ci.sh (hosted CI). DB #30", "8d935a1"),
+    ("cli", "QFlags 32-bit overflow: page-ops flags (Rotate/MovePage/DeletePage) past bit 31 broke build on Qt 6.8/6.10 — replaced with 64-bit Options class", 1, None, "yolka", "done", "Blocked all M10 branches; verified fix + ctest 12/12", "4bb644f"),
+    ("cli", "F#1: render --page-first 0 / --page-last 999999999 → SIGABRT 134 (std::out_of_range, (size_t)-1) from Qt Concurrent worker — fuzz-found", 1, None, "core-agent", "done", "Reproducers /tmp/fuzz-final/fail/cli_render_page0.* (also cli_render_huge_last); found by scripts/fuzz.sh (DB #30). Separate fix dispatch.", "7a70767"),
+    ("cli", "F#2: render --image-res-dpi >=10000 hangs (94 GP image, resource exhaustion) — fuzz-found", 1, None, "core-agent", "done", "Reproducer /tmp/fuzz-final/fail/cli_render_huge_dpi.*; found by scripts/fuzz.sh (DB #30). Separate fix dispatch.", "7a70767"),
+    ("tests", "GH-hosted CI green: toolchain action fixed (vcpkg bootstrap, Qt archives+ICU73, fontconfig) + benchmark comma bug", 1, None, "yolka", "done", "Run 31165712432 all 5 jobs success", "d009c4b"),
+    ("research", "M11 public hardening: branch protection ruleset active + first public release albdf 0.2.0", 1, None, "yolka", "done", "Ruleset 'pr check' (PR+1 approval, no deletions/force-push); release notes in docs/RELEASES.md; tag+GH release pending gate", "5b2e578"),
+    ("research", "Release albdf 0.2.0 published (tag + GH release + deterministic tarball)", 1, None, "yolka", "done", "Published 2026-08-07T14:00:37Z; assets verified sha256 905d5510e3085fb57aaf0ef24bc88f7e35f1453b2b65016e2835dba83d725262", "0.2.0"),
+    # M12–M14 shipped.
+    ("rtl-search", "M13 GUI RTL search wiring: GUI search -> PDFTextSearchEngine (adapter + 2 widgets)", 1, None, "yolka", "done", "pdfwidgetrtlsearch adapter; PDFFindTextTool + PDFAdvancedFindWidget plain-text branch; regex stays legacy", "088c1b09"),
+    ("rtl-writer", "M13 R#4: preserve /ActualText marked content on content re-edit", 1, None, "yolka", "done", "processor overrides + builder re-emit; RED 1d7b8c69, GREEN 80548d8c", "80548d8c"),
+    ("rtl-search", "M13 S#3: visual-order lam-alef collapse in document-level search", 1, None, "yolka", "done", "GUI adapter exposed; 4cabbf7a", "4cabbf7a"),
+    ("rtl-writer", "M13 RTL clipboard re-inversion (logical-order copy)", 2, None, "yolka", "done", "invertToLogical + onActionCopyText; a8b2a7c0 + b48bcd40", "b48bcd40"),
+    ("forms-signatures", "M14 RTL form-field AP: headless form-fill emits NO appearance stream (no-op); fix to embed shaped Type0 font via PDFRTLTextEngine + add --font option", 1, None, "yolka", "done", "M14 shipped: form-field AP via PDFRTLTextEngine + --font; R#5 resolved. Merge b149864 (impl 21c4287).", "b149864"),
+    ("rtl-writer", "M14 RTL FreeText annotation AP: QPainter path cannot embed Type0; additive early-return branch in updateAnnotationAppearanceStreams", 1, None, "yolka", "done", "M14 shipped: FreeText RTL AP embeds shaped Type0 font. Merge 4b9a5dd (impl 507ff44).", "4b9a5dd"),
+    # v3 roadmap (plan §R0–R2), open.
+    ("cli", "R1: top-level exception guard + enforce exit-code contract (unknown cmd/args)", 1, "S", "cli-agent", "open", "plan v3 R1.1/R1.2; closes fuzz F#1 crash class; unknown command currently exits 0", None),
+    ("tests", "R1: CLI exit-code contract regression test (QProcess, real binary)", 1, "S", "test-agent", "open", "plan v3 R1.3; depends on R1.2", None),
+    ("tests", "R2: shared runTool test helper + add_albdf_test() CMake function", 1, "S", "test-agent", "open", "plan v3 R2.1/R2.2; dedupe 8 runTool copies + 16 CMake blocks", None),
+    ("tests", "R2: scripts/check-slop.sh anti-slop gate + wire into CI/pre-commit", 1, "M", "infra-agent", "open", "plan v3 R2.3; enforces coding-standard §11", None),
+    ("fork-base", "R0: plan hygiene (archive plans, fix RELEASES claim, refresh seed.py)", 1, "S", "docs-agent", "open", "plan v3 R0.2/R0.3/R0.4", None),
 ]
 
 DECISIONS = [
