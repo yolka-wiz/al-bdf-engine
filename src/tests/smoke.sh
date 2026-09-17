@@ -70,6 +70,7 @@ expect_exit 7 "unknown command exits 7" "$PDFTOOL" definitely-not-a-command
 expect_exit 7 "unknown option exits 7" \
     "$PDFTOOL" info --definitely-not-an-option "$FIXTURES/test-baseline.pdf"
 expect_exit 0 "add-text --help exits 0" "$PDFTOOL" add-text --help
+expect_exit 0 "add-text --help-all exits 0" "$PDFTOOL" add-text --help-all
 if command_present "add-text"; then
     pass "add-text --help prints command usage"
 else
