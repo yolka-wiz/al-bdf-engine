@@ -201,11 +201,14 @@ contract and are regression-tested. ✅ (CI: Release + ASAN green.)
 Make new tests cheap before doing large refactors; the same `runTool` is
 copy-pasted in 8 files and the CMake test block repeats 16×.
 
-- [ ] **R2.1 ∥** Extract `src/UnitTests/testsupport/tst_toolrunner.h` (shared
-  `runTool`/binary-path helpers) and migrate all 8 call sites. `#TBD`, S.
-- [ ] **R2.2 ∥** Add a CMake helper `add_albdf_test(<name> <source> [deps…])`
+- [x] **R2.1 ∥** Extract `src/UnitTests/testsupport/tst_toolrunner.h` (shared
+  `runTool`/binary-path helpers) and migrate all call sites. `#TBD`, S.
+  **DONE** (`fdba735`) — 9 suites migrated; sentinels unified to -100/-101,
+  60 s timeout.
+- [x] **R2.2 ∥** Add a CMake helper `add_albdf_test(<name> <source> [deps…])`
   encapsulating the repeated `set_target_properties`/`add_test` block; migrate
-  `src/UnitTests/CMakeLists.txt`. `#TBD`, S–M.
+  `src/UnitTests/CMakeLists.txt`. `#TBD`, S–M. **DONE** (`10e5260`) — all 16
+  targets; names/definitions/offscreen preserved.
 - [x] **R2.3 ∥** Implement `scripts/check-slop.sh` (the mechanical rules in
   §3.2) with its own test, and wire it into `ci/run-ci.sh` + `.githooks/pre-commit`.
   `#TBD`, M. **DONE** (script + wiring; enforced in the CI `gate`/`asan` jobs
@@ -257,9 +260,11 @@ without the full engine.
   replace the hardcoded `src/build` in `scripts/package.sh`,
   `scripts/benchmark.sh`, `scripts/fuzz.sh`, and CI; add a CI job that builds
   from the repo root to keep the shim honest. `#TBD`, M.
-- [ ] **R5.2** Fix `scripts/gen-repo-map.py` duplicate "unmapped" rows; decide
+- [x] **R5.2** Fix `scripts/gen-repo-map.py` duplicate "unmapped" rows; decide
   the generated-file policy (keep committing `REPO_MAP.md` or generate on
-  demand). `#TBD`, S.
+  demand). `#TBD`, S. **DONE** (`795259e`) — scanner driven by `git ls-files`;
+  map is deterministic and independent of the local working copy; `REPO_MAP.md`
+  stays committed and byte-identical to generator output.
 - [ ] **R5.3** Add a `--warnings-as-errors` build to CI. `#TBD`, S.
 - [ ] **R5.4** Fix the dev `Dockerfile`: it installs Qt 6.4 but the project needs
   ≥ 6.8 (replicate the CI path — official Qt archives — or pin a base image
