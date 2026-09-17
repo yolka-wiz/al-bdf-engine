@@ -1,260 +1,106 @@
 # albdf
 
-**PDF editing that speaks your language — literally.**
+**Headless PDF editing that speaks Arabic, Persian, and Hebrew.**
 
-albdf is a headless PDF editing **library + CLI** for Linux, built with one goal
-in mind: make **Arabic, Persian and Hebrew** (RTL) text work the way it should —
-in write, in search, and in extraction. It's a fork of
-[PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT), with our additions under
-**GPL-3.0-or-later**, and it's the engine behind a future GUI.
+albdf is a headless PDF editing **library + CLI** for Linux. It is a fork of
+[PDF4QT](https://github.com/JakubMelka/PDF4QT) (MIT) with first-class RTL
+support — writing, searching, and extracting Arabic/Persian/Hebrew text, which
+upstream lacks. Authored code is **GPL-3.0-or-later**; vendored upstream
+portions stay MIT. It is the engine behind a future GUI.
 
-**Status:** v0.2.0 released. RTL write + search, forms & signatures, page ops,
-redaction, deterministic builds, CI green, and a working optional GUI (the
-PDF4QT apps now build against our modified core).
-
-> 👋 **New here?** The fastest way to feel albdf is the 60-second demo in
-> [Getting started](#installation) — no GUI, no display needed.
-
----
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Usage](#usage)
-  - [add-text (incl. RTL)](#add-text)
-  - [recognize-text](#recognize-text)
-  - [delete-object](#delete-object)
-  - [search-text (RTL-aware)](#search-text)
-  - [Forms & signatures](#forms--signatures)
-  - [Other commands](#other-commands)
-- [For humans contributing](#for-humans-contributing)
-- [For AI agents contributing](#for-ai-agents-contributing)
-  - [Start here](#start-here-required-reading)
-  - [Repo layout](#repo-layout)
-  - [AGENT.md guide map](#agentmd-guide-map)
-  - [Build & test](#build--test)
-  - [The tracking database](#the-tracking-database)
-  - [Determinism & coding rules](#determinism--coding-rules)
-  - [Known limitations](#known-limitations)
-- [Testing & CI](#testing--ci)
-- [License](#license)
-
----
-
-## Installation
+## Install
 
 ### Prerequisites
+
 - CMake ≥ 3.25, Ninja, GCC/Clang (C++20)
 - Qt 6.8+ (Core/Gui/Xml/Svg/Test — **no Widgets/QML**; 6.10.2 tested)
-- [vcpkg](https://github.com/microsoft/vcpkg) with deps in `src/vcpkg.json` (HarfBuzz, FriBidi, FreeType, OpenJPEG, OpenSSL, TBB, LCMS2, zlib, libjpeg-turbo, libpng, blend2d)
+- [vcpkg](https://github.com/microsoft/vcpkg) with the deps in `src/vcpkg.json`
+  (HarfBuzz, FriBidi, FreeType, OpenJPEG, OpenSSL, TBB, LCMS2, zlib,
+  libjpeg-turbo, libpng, blend2d)
 
-### Option A — your own machine
+### Option A — dev container (recommended, reproducible)
+
 ```bash
-git clone <repo-url> albdf && cd albdf/src
+git clone https://github.com/yolka-wiz/al-bdf-engine.git albdf
+cd albdf
+docker build -t albdf-dev -f Dockerfile .
+docker run -it --rm -v "$(pwd)":/workspace/albdf -w /workspace/albdf albdf-dev
+```
+
+The image installs Qt 6, the vcpkg deps, and all tools, sets
+`QT_QPA_PLATFORM=offscreen`, and ships the `ci/run-ci.sh` gate.
+
+### Option B — local build
+
+```bash
+git clone https://github.com/yolka-wiz/al-bdf-engine.git albdf
+cd albdf/src
 export VCPKG_ROOT=/path/to/vcpkg
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+      -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
       -DALBDF_BUILD_TESTS=ON
 cmake --build build
 ```
 
-### Option B — dev container (recommended, reproducible)
-```bash
-docker build -t albdf-dev -f Dockerfile .
-docker run -it --rm -v $(pwd):/workspace/albdf -w /workspace/albdf albdf-dev
-# inside: cmake + build + test as above (toolchain already at /workspace/vcpkg)
-```
-The Dockerfile installs Qt 6 + vcpkg deps + all tools, sets `QT_QPA_PLATFORM=offscreen`, and provides the `ci/run-ci.sh` gate.
-apt and PyPI are preconfigured to **Aliyun mirrors** for faster dependency downloads; vcpkg has no Aliyun mirror and stays on GitHub (shallow clone).
-
 ### Verify
+
 ```bash
-build/bin/albdf --version        # → albdf 0.1.0
-QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (11 tests)
+build/bin/albdf --version                          # → albdf 0.4.0
+QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (17 tests)
 ```
 
----
+## Quick start
 
-## Usage
-
-All commands follow `albdf <command> <args>`. Exit codes: **0** success, **7** invalid arguments.
-RTL fonts (OFL) ship in `src/tests/fonts/` (Vazirmatn, Noto Naskh Arabic, Noto Sans Hebrew).
-
-### add-text
+RTL fonts (OFL) ship in `src/tests/fonts/`. Coordinates are PDF points with the
+origin at the bottom-left. Exit codes: `0` success, `7` invalid arguments.
 
 ```bash
-# LTR — standard Helvetica, no font embedding
-albdf add-text in.pdf out.pdf --page 1 --x 72 --y 700 --text "Hello" --size 18
-
-# RTL — FriBidi + HarfBuzz + embedded TrueType font
+# Add a Persian label with the RTL pipeline (FriBidi + HarfBuzz, embedded font)
 albdf add-text in.pdf out.pdf --page 1 --x 72 --y 700 \
         --text "سلام دنیا" --size 24 --rtl \
         --font src/tests/fonts/Vazirmatn-Regular.ttf --lang fa
-```
-Coordinates are PDF points (origin bottom-left). `--lang` ∈ `fa|ar|he|ur`.
 
-### recognize-text
+# RTL-aware search; normalization is on by default (۱۲۳ matches "123")
+albdf search-text out.pdf "سلام"
 
-```bash
-# List page content objects (text/image/path) with bounding boxes.
-# The printed index is the address used by delete-object.
-albdf recognize-text in.pdf
-```
+# Fill interactive form fields and write a new document
+albdf form-fill in.pdf filled.pdf --field name --value "Ali" --field agree --value On
 
-### delete-object
+# Render a page to PNG (the output directory must already exist)
+albdf render in.pdf --page-first 1 --page-last 1 --image-format png \
+        --image-res-dpi 144 --image-output-dir ./out
 
-```bash
-# Delete a whole content object by page + index (see recognize-text).
-albdf delete-object in.pdf out.pdf --page 1 --index 3
-albdf delete-object in.pdf --page 1 --list      # list without modifying
+# Full command list and per-command help
+albdf help
+albdf help add-text
 ```
 
-### search-text
+## Commands
 
-```bash
-# RTL-aware, logical-order query; normalization ON by default.
-albdf search-text in.pdf "سلام"
-albdf search-text in.pdf "123"                   # matches ۱۲۳ (digit unification)
-albdf search-text in.pdf "محمد" --no-normalize   # exact match only
-albdf search-text in.pdf "hello" --case-sensitive
-```
-Normalization strips tashkeel/ZWNJ/ZWJ, folds presentation forms & lam-alef, unifies Persian/Arabic letters and digit sets. Output: page / item / bounding box / matched text.
-
-### Other commands
-
-`render`, `fetch-text`, `info`, `info-fonts`, `info-inks`, `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `xml`, `statistics`, `diff`, `attachments`, `cert-store`, `verify-signatures`, `remove-external-links`, `benchmark`, … — run `albdf help` for the full list.
-
-### Forms & signatures
-
-```bash
-albdf form-list in.pdf                          # list interactive form fields (name, type, value, page, rect)
-albdf form-fill in.pdf out.pdf \
-  --field name --value "Ali" --field agree --value On   # fill fields, write new doc
-albdf sign in.pdf signed.pdf \
-  --cert mykey.p12 --password secret --reason "approved" # apply PKCS#7 digital signature
-albdf sign in.pdf signed.pdf --cert mykey.p12 --password secret \
-  --page 1 --rect-x 100 --rect-y 100 --rect-w 200 --rect-h 50   # visible signature widget
-albdf verify-signatures signed.pdf                # validate signatures (upstream tool)
-```
-
-`form-list` walks the AcroForm tree and reports every field (text / button /
-choice / signature) with its current value and widget location. `form-fill`
-sets values through PDF4QT's `PDFFormField::setValue` (appearance streams are
-regenerated) and writes a new document. `sign` implements the standard
-PAdES-style byte-range flow: it reserves the signature contents with a
-same-size probe, patches `/ByteRange` in place, signs the covered ranges with
-OpenSSL `PKCS7_sign` (adbe.pkcs7.detached), and writes the final signature
-back. `verify-signatures` then validates it — and detects any tampering of the
-signed bytes.
-
----
-
-## For humans contributing
-
-- **`CONTRIBUTING.md`** — the five binding rules: branch per task, docs as you
-  go, no direct push to main, update the problem list, no secrets/junk.
-- **`SECURITY.md`** — how to report a vulnerability (privately).
-- **`docs/branch-protection.md`** — how `main` is guarded (PR + review + CI).
-- `.github/CODEOWNERS` — default reviewers per subsystem.
-
-## For AI agents contributing
-
-### Start here (required reading)
-1. **`AGENTS.md`** (repo root) — the binding contract. Read it fully first; it overrides general habits.
-2. **`docs/coding-standard.md`** — C++20/Qt style, determinism, TDD, git rules.
-3. **This README** — layout, build, commands.
-4. **`plans/PLAN.md`** — milestone roadmap and exit criteria.
-5. **The tracking DB** — every component/task/decision/question is tracked.
-
-### Repo layout
-
-```
-AGENTS.md                  binding contract for every agent (read first)
-README.md                  this file
-.clang-format              enforced style (LLVM base, 4-space, 120-col)
-Dockerfile                 reproducible dev container
-ci/run-ci.sh               CI gate: build + ctest + ASAN/UBSAN + clang-format
-db/                        tracking DB (schema.sql + seed.py committed; albdf.db gitignored)
-scripts/db.py              tracking DB CLI
-scripts/gen-repo-map.py    REPO_MAP.md generator (pre-commit hook runs it)
-scripts/check-markdown-structure.py  doc-structure gate (H1 + sections)
-scripts/install-hooks.sh   install .githooks/pre-commit (core.hooksPath)
-plans/PLAN.md              master roadmap (M0–M8.1)
-docs/                      coding standard, ADRs, research, release notes, man page
-agents/roles/              one markdown contract per agent role
-skills/                    vendored skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review)
-src/                       the fork: Pdf4QtLibCore + PdfTool + UnitTests + tests
-vendor-upstream-pdf4qt/    gitignored upstream clone (reference only)
-```
-
-### AGENT.md guide map
-
-Each major directory has an `AGENT.md` onboarding guide (with its own TOC):
-
-| Guide | What it covers |
+| Area | Commands |
 |---|---|
-| `src/AGENT.md` | source tree layout, build, RTL pipeline location, custom CLI tools, determinism, pitfalls |
-| `src/Pdf4QtLibCore/AGENT.md` | the core PDF library: naming, subsystems, registering new sources, RTL quirks |
-| `src/PdfTool/AGENT.md` | how to add a CLI command, output formatter + exit-code contracts |
-| `src/UnitTests/AGENT.md` | how to add a unit/integration test, the QProcess helper pattern |
-| `src/tests/AGENT.md` | fixtures, fonts, golden images, smoke.sh |
-| `db/AGENT.md` | the tracking database: db.py commands, evidence-gated completion |
-| `docs/AGENT.md` | writing docs, ADRs vs research notes, man page, context7 vendoring |
+| RTL text | `add-text` (LTR/RTL), `search-text` |
+| Content | `recognize-text`, `delete-object`, `rotate`, `move-page`, `delete-page` |
+| Forms & signing | `form-list`, `form-fill`, `sign`, `verify-signatures` |
+| Render & inspect | `render`, `fetch-text`, `info`, `statistics`, `xml` |
+| Documents | `unite`, `separate`, `redact`, `encrypt`, `decrypt`, `optimize`, `attachments` |
 
-### Build & test
+Run `albdf help` for every command — including the inherited PDF4QT commands.
+The albdf-specific reference is `docs/albdf.1`.
 
-```bash
-cd src
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
-      -DALBDF_BUILD_TESTS=ON
-cmake --build build
-QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure   # 11 tests
-# Full gate (build + ctest + ASAN/UBSAN + clang-format):
-bash ci/run-ci.sh            # or --skip-asan --skip-format for a fast loop
-```
+## Documentation
 
-### The tracking database
-
-```bash
-python3 scripts/db.py status              # full status by component
-python3 scripts/db.py search "rtl"        # FTS5 search across tasks/decisions/notes
-python3 scripts/db.py tasks --open        # open tasks
-python3 scripts/db.py task-done 9 --ref <sha>   # close a task WITH evidence (required)
-```
-Every task you touch must exist in the DB. **Closing a task requires `--ref <commit-sha>`** — no evidence, no close. Never commit `db/albdf.db`; only `schema.sql` + `seed.py`.
-
-### Determinism & coding rules
-
-- **Byte-deterministic output** for a given input — no timestamps/random IDs in document output.
-- **Headless** — everything passes with `QT_QPA_PLATFORM=offscreen`; no window-needed tests.
-- **CLI-first** — a capability exists only if reachable from a shell command.
-- **TDD** — failing test first for every fix/feature; golden-image tests for anything visual.
-- **Small commits** — one logical change, Conventional Commits (`feat:|fix:|test:|docs:|refactor:|chore:`), commit messages explain WHY.
-- **No scope creep** — note extras in the DB as proposals, don't implement silently.
-- **Never fake results** — a task isn't done until `git log` + passing test prove it.
-- **clang-format** must be clean on every touched file. Vendored upstream files are exempt (keep cherry-picks clean).
-
-### Known limitations
-
-- ToUnicode CMap entries are one UTF-16 unit: ligatures degrade in `fetch-text` (full text in `/ActualText`; search still works via normalization).
-- Decomposed marks duplicate their base letter in extraction.
-- Vertical mark offsets (diacritic height) dropped in v1 rendering.
-- Search matches within a single text item, or across adjacent items split at a word boundary (S#1 resolved: joined per-page visual string; cross-line spans remain out of scope).
-
----
-
-## Testing & CI
-
-- **11 ctest targets**: unit, font encoding, recognize-text, delete-object, add-text, RTL add-text (incl. mirror-regression), RTL search (Hebrew/digits/ZWNJ/tashkeel/mixed-bidi corpus), forms/signatures round-trip, golden-image render harness, CLI smoke (34 checks).
-- **ASAN/UBSAN**: full suite clean.
-- **clang-format gate**: authored files only (vendored upstream exempt).
-- Run everything: `bash ci/run-ci.sh`.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to contribute: branches, commits, gates.
+- [`CHANGELOG.md`](CHANGELOG.md) — concise release history.
+- [`docs/RELEASES.md`](docs/RELEASES.md) — detailed release notes.
+- [`docs/albdf.1`](docs/albdf.1) — CLI man page.
+- [`docs/coding-standard.md`](docs/coding-standard.md) — C++/Qt style and rules.
+- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability.
+- [`docs/branch-protection.md`](docs/branch-protection.md) — how `main` is guarded.
+- AI agents: read [`AGENTS.md`](AGENTS.md) first.
 
 ## License
 
-**GPL-3.0-or-later** (see `LICENSE` and ADR-0005). Our authored code is GPL-3.0-or-later;
-vendored upstream PDF4QT portions keep their MIT headers (MIT is GPLv3-compatible).
-Deps (all GPLv3-compatible — ADR-0005): Qt (LGPL-3, dynamic), FreeType (FTL), OpenJPEG
-(MIT), OpenSSL (Apache-2.0), ZLIB, HarfBuzz (MIT), FriBidi (LGPL-2.1, dynamic), blend2d
-(Zlib), TBB (Apache-2.0). RTL fonts are OFL.
+**GPL-3.0-or-later** — see [`LICENSE`](LICENSE) and ADR-0005. Authored code is
+GPL-3.0-or-later; vendored upstream PDF4QT portions keep their MIT headers (MIT
+is GPLv3-compatible). RTL fonts are OFL.

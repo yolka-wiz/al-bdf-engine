@@ -5,6 +5,13 @@
 > actual GitHub settings must match this. Apply via the GitHub UI
 > (**Settings → Branches → Add rule**) or the REST API below.
 
+## Current status
+
+**Not yet enabled.** Branch protection is documented policy only: the remote
+currently returns "Branch not protected" for `main`. Until an admin applies
+the rule below, contributors **must not push to `main`** — work on a branch
+and open a pull request (see `CONTRIBUTING.md` §3b).
+
 ## Rule: protect `main`
 
 | Setting | Value |

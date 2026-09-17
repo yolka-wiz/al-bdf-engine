@@ -90,7 +90,7 @@ groff -man -Tutf8 docs/albdf.1 | less     # or pipe to a pager / file
 ```
 
   Fix any formatting warnings or broken macro output before committing. The
-  header line (`.TH ALBDF 1 "date" "albdf 0.1.0" "User Commands"`) carries
+  header line (`.TH ALBDF 1 "date" "albdf 0.4.0" "User Commands"`) carries
   the date and version — keep them current.
 
 ## Release notes (RELEASES.md)
