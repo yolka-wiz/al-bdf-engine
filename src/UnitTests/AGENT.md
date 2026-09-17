@@ -32,25 +32,35 @@ Read [`AGENTS.md`](../../AGENTS.md) and
   `QProcess` and assert on its stdout/exit code.
 
 ## 2. Test structure & ctest wiring
-Every `add_executable` in `CMakeLists.txt` follows the same template:
-- `add_executable(UnitTestsX tst_x.cpp)`
-- `target_link_libraries(UnitTestsX PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)`
-- `set_target_properties(UnitTestsX PROPERTIES WIN32_EXECUTABLE OFF MACOSX_BUNDLE OFF ...)`
-- `add_test(NAME UnitTestsX COMMAND "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsX")`
-- Integration tests that shell out to the CLI add
-  `add_dependencies(UnitTestsX albdf)` so the binary is built first.
-- Tests that need a headless render add
-  `set_tests_properties(UnitTestsX PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")`
-  (see `UnitTestsGolden`).
+Every suite is registered with the `add_albdf_test()` helper defined at the top
+of `CMakeLists.txt`. It expands to the executable/link/target-properties/
+`add_test` boilerplate that used to be copy-pasted per target:
+
+```cmake
+# add_albdf_test(<target> <source> [HEADLESS] [DEFINITIONS <define>...])
+add_albdf_test(UnitTestsMyThing tst_mything.cpp HEADLESS
+    DEFINITIONS TEST_BLANK_PDF="${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/blank.pdf")
+add_dependencies(UnitTestsMyThing albdf)   # only when the suite launches the CLI
+```
+
+- `HEADLESS` adds
+  `set_tests_properties(... ENVIRONMENT "QT_QPA_PLATFORM=offscreen")`
+  (tests that render or otherwise touch QtGui, e.g. `UnitTestsGolden`).
+- `DEFINITIONS <define>...` forwards compile definitions (`TEST_*`,
+  `ALBDF_TESTS_DIR`; see §5).
+- Integration tests that shell out to the CLI still add
+  `add_dependencies(<target> albdf)` themselves so the binary is built first.
 
 ## 3. Add a new test (step by step)
 1. **Create `src/UnitTests/tst_mything.cpp`.** MIT header; a `QObject` subclass
    with a `Q_OBJECT` macro and `private slots:` (each slot = one test function).
    Add a file-top comment explaining what the suite verifies.
-2. **Wire it into `CMakeLists.txt`** with the template in §2. Give the target a
-   unique name (e.g. `UnitTestsMyThing`). If it runs `albdf`, add
-   `add_dependencies(UnitTestsMyThing albdf)` and set the offscreen ENV.
-3. **Add compile definitions** for any fixture/font paths the test needs (§5).
+2. **Register it** with `add_albdf_test(UnitTestsMyThing tst_mything.cpp)` (§2).
+   Give the target a unique name (e.g. `UnitTestsMyThing`). If it runs `albdf`,
+   add `add_dependencies(UnitTestsMyThing albdf)`; add `HEADLESS` for a
+   render/QtGui suite.
+3. **Add compile definitions** for any fixture/font paths the test needs by
+   passing `DEFINITIONS ...` to `add_albdf_test()` (§5).
 4. **End the file with `QTEST_GUILESS_MAIN(MyThingClass)`** followed by
    `#include "tst_mything.moc"`.
 5. **Run:** `cmake -S src -B src/build && cmake --build src/build -j$(nproc)`
@@ -58,27 +68,24 @@ Every `add_executable` in `CMakeLists.txt` follows the same template:
    Full gate: `ci/run-ci.sh`.
 
 ## 4. The `runTool` QProcess helper pattern
-Integration tests use a shared anonymous-namespace helper (copy from
-`tst_deleteobjecttest.cpp`):
+Integration tests use the shared `runAlbdfTool()` helper in
+`testsupport/tst_toolrunner.h` — never copy a local `runTool` (that duplication
+is what roadmap R2.1 removed):
 ```cpp
-struct ToolResult { int exitCode = -1; QByteArray stdoutData; QByteArray stderrData; };
-ToolResult runTool(const QString& toolPath, const QStringList& args, const QString& workingDir)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, args);
-    if (!process.waitForStarted() || !process.waitForFinished(180000)) return result;
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
+#include "testsupport/tst_toolrunner.h"
+
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
+
+ToolResult result = runAlbdfTool(toolPath, {QStringLiteral("info"), inputPath}, tmpDir.path());
+QCOMPARE(result.exitCode, 0);
+QVERIFY2(result.stdoutData.contains("Page count"), "info must report a page count");
 ```
+- `ToolResult` carries `exitCode` (`-100` = could not start, `-101` = timed out),
+  `exitStatus`, `finishedInTime`, and the `QByteArray` `stdoutData`/`stderrData`.
+- The helper always runs the child headless (`QT_QPA_PLATFORM=offscreen`) with
+  separate channels, kills it on timeout, and uses a 60000 ms watchdog by
+  default; pass a fourth argument to override the timeout.
 - Resolve the binary via `QCoreApplication::applicationDirPath() + "/albdf"`.
   This is why `QTEST_GUILESS_MAIN` is used — it instantiates a `QCoreApplication`.
 - Do work in a `QTemporaryDir` (never the source tree). Assert with `QCOMPARE`
