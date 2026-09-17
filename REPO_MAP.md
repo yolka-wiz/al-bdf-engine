@@ -38,25 +38,18 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `ci/` | CI gate: run-ci.sh (build + ctest + ASAN/UBSAN + clang-format) |
 | `db/` | Tracking DB: schema.sql + seed.py committed; albdf.db gitignored (db.py CLI) |
 | `docs/` | PROBLEMS.md, RELEASES.md, ADRs (decisions/), research notes, man page, coding standard |
+| `packaging/` | Linux desktop integration: .desktop file, AppImage build script, app icon |
 | `plans/` | PLAN.md active roadmap (v3) + archive/ of completed execution plans |
 | `scripts/` | Tooling: db.py (tracking DB), gen-repo-map.py (this file), install-hooks.sh |
 | `skills/` | Vendored Qt Company agent skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review) |
 | `src/` | The fork: Pdf4QtLibCore (engine) + PdfTool (CLI) + UnitTests + tests |
-| `agents/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `ci/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `db/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `dist/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `docs/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `packaging/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `plans/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `scripts/` | *(unmapped — add to scripts/gen-repo-map.py)* |
-| `skills/` | *(unmapped — add to scripts/gen-repo-map.py)* |
 
 ## Document index (markdown, except README.md)
 
 | Document | Title | One-liner |
 |---|---|---|
 | `AGENTS.md` | AGENTS.md — Binding contract for every agent working in this repo | > Read this file completely before doing anything. It overrides general coding habits. > If a task conflicts with this file, STOP and ask the orchestrator (Yolka) — do not… |
+| `CHANGELOG.md` | Changelog | All notable changes to `albdf` are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic… |
 | `CONTRIBUTING.md` | CONTRIBUTING.md — albdf contribution rules | > These are the binding rules for every contributor — human or AI agent. > The short version is also summarized in `REPO_MAP.md`; this file is the > full contract. If a task… |
 | `REPO_MAP.md` | REPO_MAP.md — albdf repository orientation index | > **Purpose:** one-page orientation for humans and AI agents: what this > repo is, how to build/test it, and where every document lives. This > file is **auto-generated** by… |
 | `SECURITY.md` | Security Policy | Please **do not open a public issue** for security vulnerabilities. Report privately to the maintainers via GitHub's **Security Advisory** flow: 1. Open the repository on GitHub. |
@@ -70,7 +63,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `db/AGENT.md` | AGENT.md — the tracking database (source of truth for status) | > Everything about the state of `albdf` lives in `db/albdf.db`. If you > changed a component's status, closed a task, added a decision, found a risk, > or imported a dependency,… |
 | `docs/AGENT.md` | AGENT.md — writing documentation in this repo | > How to document `albdf`. The binding code rules live in > `docs/coding-standard.md` (referenced, not restated here). This guide is > about the docs/ *layout*, when to write… |
 | `docs/PROBLEMS.md` | albdf — Known Problems, Future Outlook & Catches | > Living document for agents (and humans) working on this repo. This is the > institutional memory of the sharp edges discovered while building v0.1.0. > If you hit something new,… |
-| `docs/RELEASES.md` | albdf — release notes | Date: 2026-08-07 Branch: `main` (GitHub: yolka-wiz/al-bdf-engine) The first release with a **working GUI**: the PDF4QT apps (Viewer, Editor, |
+| `docs/RELEASES.md` | albdf — release notes | > The concise, user-facing changelog lives in [`/CHANGELOG.md`](../CHANGELOG.md); > this file holds the detailed per-release engineering notes. Date: 2026-08-15 |
 | `docs/branch-protection.md` | Branch protection — `main` | > How the repository is guarded so nothing reaches `main` (or a release) > without passing the gates. This describes the *intended* settings; the > actual GitHub settings must… |
 | `docs/coding-standard.md` | albdf Coding Standard | Applies to ALL code in this repo, human- or agent-written. Binding — see `AGENTS.md` §5. When in doubt, follow the surrounding PDF4QT code style; this standard codifies it. --- |
 | `docs/context7/README.md` | Context7 MCP usage notes (albdf) | Fetched 2026-08-04 via native `mcp__context7__*` tools (wired by user on host). 1. `resolve-library-id` with BOTH args: - `libraryName`: official name ("HarfBuzz", not "harfbuzz") |
@@ -83,6 +76,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `docs/decisions/0004-license-posture.md` | ADR-0004: License posture — MIT fork + permissive deps only | **Status:** accepted (2026-08-04) The fork inherits MIT from PDF4QT. The project must stay clean for permissive distribution. No AGPL/GPL contamination (research report §2.4:… |
 | `docs/decisions/0005-gpl-license.md` | ADR-0005: Relicense to GPL-3.0-or-later | **Status:** accepted (2026-08-04) **Supersedes:** ADR-0004 (MIT fork + permissive deps only) The project's license posture was MIT (inherited from the PDF4QT fork, ADR-0004), |
 | `docs/decisions/0006-forms-signatures-cli.md` | ADR-0006: Forms and digital signatures via CLI | - Status: accepted - Date: 2026-08-04 - Deciders: user, Yolka |
+| `docs/decisions/0007-antislop-quality-gate.md` | ADR-0007: Anti-slop code-quality gate | - Status: accepted - Date: 2026-09-17 - Deciders: user, Yolka |
 | `docs/research/001-pdf4qt-deepdive.md` | 001 — PDF4QT deep dive (CLI extension, text-flow write-back, fonts, determinism) | - **Date:** 2026-08-04 - **Author:** research subagent (Rosetta brief 001, task 0) - **Status:** verified against source ([V]) unless flagged [unverified] |
 | `docs/research/002-rtl-reference-implementations.md` | 002 — RTL reference implementations (for PDF4QT fork) | - **Date:** 2026-08-04 - **Author:** research subagent (Rosetta brief 001, task 1) - **Status:** source-verified against fpdf2 master ([V]); behavioral claims that could not be |
 | `docs/research/003-skills-and-agent-conventions.md` | 003 — Skills Sourcing & AGENTS.md Conventions | - **Date:** 2026-08-04 - **Author:** research-agent (Rosetta brief #003) - **Status:** draft — findings for orchestrator review; no skills were installed by this brief |
@@ -90,7 +84,7 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 | `docs/research/baseline-upstream.md` | Baseline — Pristine PDF4QT on this Container (M0.5) | **Date:** 2026-08-04 **Status:** DONE — recorded BEFORE any fork modifications (M0.5 gate) **Upstream:** JakubMelka/PDF4QT 1.6.0.0 (master, depth-1 clone 2026-08-03) |
 | `docs/research/brief-001-rosetta.md` | Research Brief 001 — for Rosetta (research agent) | **From:** Yolka (orchestrator), albdf project **Date:** 2026-08-04 **Context:** We are forking PDF4QT (MIT) into a headless PDF editing library + CLI for Linux |
 | `docs/setup-context7.md` | context7 MCP wiring (Hermes side) | > How to configure the context7 MCP server for the Hermes agent runtime. > The API key is a **secret** — it must never be committed to this repo. The `mcp_servers` config lives in… |
-| `plans/PLAN.md` | albdf — Master Plan (v3, 2026-09-17) | > **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/albdf.db` > (`python3 scripts/db.py status`). Implementation is delegated to agent roles in >… |
+| `plans/PLAN.md` | albdf — Master Plan (v3, 2026-09-17) | > **Canonical forward roadmap.** Granular status lives in `db/albdf.db` > (`python3 scripts/db.py status`). Execution contract: `AGENTS.md` + > `docs/coding-standard.md`; role… |
 | `plans/archive/2026-08-07_m13-gui-rtl-fixes.md` | M13 — GUI RTL text wiring (post-audit fix plan) | Date: 2026-08-07 Branch: workstreams off main, merged after gate Status: EXECUTION |
 | `plans/archive/2026-08-08-handoff.md` | HANDOFF — Server Migration 2026-08-08 | **Status: development STOPPED. Everything below is the authoritative state for resuming on the new server.** \| Repo \| Purpose \| Source of truth \| |
 | `plans/archive/P3-execution.md` | P3 Execution Plan — Vertical Mark Offsets (Orchestrated) | > **For Hermes:** orchestrated development via subagents. Each phase is a > self-contained delegate_task with its own RED/GREEN gate and commit. > Status:… |
@@ -130,41 +124,11 @@ bash ci/run-ci.sh   # full gate: Release + ctest + ASAN/UBSAN + clang-format
 
 ## Tracking DB status
 
-```text
-== Components ==
-  [32mdone[0m add-text               Add text (LTR + RTL) via CLI
-                owner: core-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m cli                    CLI surface (albdf binary)
-                owner: cli-agent  dir: src/PdfTool/
-  [32mdone[0m fork-base              PDF4QT fork: Pdf4QtLibCore + PdfTool
-                owner: core-agent  dir: src/
-  [32mdone[0m forms-signatures       Forms (AcroForm) + digital signatures
-                owner: core-agent  dir: src/PdfTool/
-  [32mdone[0m object-deletion        Whole-object deletion (text runs, images, elements)
-                owner: core-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m research               Research stream (Rosetta)
-                owner: rosetta  dir: docs/research/
-  [32mdone[0m rtl-search             RTL-aware search
-                owner: rtl-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m rtl-writer             RTL write pipeline (Arabic/Persian/Hebrew)
-                owner: rtl-agent  dir: src/Pdf4QtLibCore/
-  [32mdone[0m tests                  Test infrastructure: unit + golden + CLI
-                owner: test-agent  dir: src/tests/
-  [32mdone[0m text-recognition       Text recognition as objects
-                owner: core-agent  dir: src/Pdf4QtLibCore/
+_Not embedded: `db/albdf.db` is gitignored and machine-specific._
 
-== Tasks ==
-  #1    [32mdone[0m [fork-base] Vendor PDF4QT fork into src/, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad)
-        evidence: a52c18c
-  #2    [32mdone[0m [fork-base] Verify albdf headless run: QT_QPA_PLATFORM=offscreen build + fetch-text smoke test
-        evidence: 9ca9c38
-  #3    [32mdone[0m [cli] Add delete-object CLI command (wire TextFlowEditor::removeItem + write-back)
-        evidence: f354005
-  #4    [32mdone[0m [cli] Add add-text CLI command (LTR)
-        evidence: 327061b
-  #5    [32mdone[0m [object-deletion] Image XObject reference-counting + Form XObject nesting for deletion
-        evidence: f354005
-  #6    [32mdone[0m [rtl-writer] Add HarfBuzz + FriBi
+```bash
+python3 scripts/db.py init && python3 db/seed.py   # rebuild on a fresh clone
+python3 scripts/db.py status                       # live component/task status
 ```
 
 ## Contributing rules (summary)
