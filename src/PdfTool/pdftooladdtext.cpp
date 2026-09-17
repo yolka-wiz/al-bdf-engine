@@ -24,15 +24,14 @@
 #include "pdfcms.h"
 #include "pdfconstants.h"
 #include "pdfdocumentbuilder.h"
-#include "pdfdocumentwriter.h"
 #include "pdffont.h"
 #include "pdfmeshqualitysettings.h"
 #include "pdfobject.h"
 #include "pdfoptionalcontent.h"
 #include "pdfpagecontenteditorcontentstreambuilder.h"
 #include "pdfpagecontenteditorprocessor.h"
+#include "pdfpagecontentrewriter.h"
 #include "pdfrtltextengine.h"
-#include "pdfstreamfilters.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -56,7 +55,6 @@ QString PDFToolAddText::getStandardString(StandardString standardString) const
         return PDFToolTranslationContext::tr("Add a text label to a page of the document.");
 
     default:
-        Q_ASSERT(false);
         break;
     }
 
@@ -170,7 +168,12 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
     pdf::PDFMeshQualitySettings meshQualitySettings;
 
     const pdf::PDFPage* page = document.getCatalog()->getPage(pageIndex);
-    Q_ASSERT(page);
+    if (!page)
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Page %1 does not exist.").arg(pageNumber),
+                               options.outputCodec);
+        return ErrorInvalidArguments;
+    }
 
     // ------------------------------------------------------------------
     // RTL path (--rtl): FriBidi bidi + HarfBuzz shaping + embedded Type0
@@ -275,136 +278,32 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
             return ErrorFailedWriteToFile;
         }
 
-        pdf::PDFDocumentModifier modifier(&document);
-        pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+        // Append mode: the shaped fragment becomes an extra page content
+        // stream, so the existing /Contents (and every existing resource) stays
+        // untouched; the shared helper merges the new font into the page fonts
+        // and resolves an indirect /Resources instead of replacing it.
+        pdf::PDFPageContentRewriter::Settings rewriteSettings;
+        rewriteSettings.pageReference = page->getPageReference();
+        rewriteSettings.fontDictionary = rtlResult.fontDictionary;
+        rewriteSettings.contentBytes = rtlResult.contentFragment;
+        rewriteSettings.mode = pdf::PDFPageContentRewriter::ContentsMode::Append;
+        rewriteSettings.outputPath = options.addTextOutputDocument;
 
-        pdf::PDFDictionary fontDictionary = rtlResult.fontDictionary;
-        builder->replaceObjectsByReferences(fontDictionary);
-
-        // New content stream for the shaped text.
-        pdf::PDFArray filters;
-        filters.appendItem(pdf::PDFObject::createName("FlateDecode"));
-        const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(rtlResult.contentFragment);
-        pdf::PDFDictionary contentDictionary;
-        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
-                                   pdf::PDFObject::createInteger(compressedData.size()));
-        contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
-                                   pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-        pdf::PDFObject contentObject = pdf::PDFObject::createStream(
-            std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
-
-        // Merge the font into the page Resources (KEEPING the existing font
-        // entries — the RTL font gets its own key F2 so original text with F1
-        // stays intact) and append the new content stream to Contents.
-        pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
-
-        pdf::PDFObjectFactory pageFactory;
-        pageFactory.beginDictionary();
-        pageFactory.beginDictionaryItem("Resources");
-        pageFactory.beginDictionary();
-
-        // Existing font dictionary, if any. The page Resources may be an
-        // INDIRECT reference in real-world PDFs (e.g. "29 0 R") — resolve it
-        // through the builder's object table so existing fonts are preserved.
-        pdf::PDFDictionary mergedFontDict = fontDictionary;
-        if (const pdf::PDFDictionary* pageDict = pageObject.getDictionary())
+        pdf::PDFPageContentRewriter::Result rewriteResult =
+            pdf::PDFPageContentRewriter::rewrite(document, rewriteSettings);
+        if (!rewriteResult.isSuccess())
         {
-            const pdf::PDFObject& resourcesObject = pageDict->get("Resources");
-            const pdf::PDFDictionary* resourcesDict = nullptr;
-            if (resourcesObject.isDictionary())
+            if (rewriteResult.failure == pdf::PDFPageContentRewriter::Failure::Finalize)
             {
-                resourcesDict = resourcesObject.getDictionary();
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                                       options.outputCodec);
             }
-            else if (resourcesObject.isReference())
+            else
             {
-                resourcesDict = builder->getObjectByReference(resourcesObject.getReference()).getDictionary();
+                PDFConsole::writeError(
+                    PDFToolTranslationContext::tr("Failed to write document: %1").arg(rewriteResult.errorMessage),
+                    options.outputCodec);
             }
-
-            if (resourcesDict)
-            {
-                const pdf::PDFObject& existingFontsObject = resourcesDict->get("Font");
-                const pdf::PDFDictionary* existingFontsDict = nullptr;
-                if (existingFontsObject.isDictionary())
-                {
-                    existingFontsDict = existingFontsObject.getDictionary();
-                }
-                else if (existingFontsObject.isReference())
-                {
-                    existingFontsDict =
-                        builder->getObjectByReference(existingFontsObject.getReference()).getDictionary();
-                }
-
-                if (existingFontsDict)
-                {
-                    for (size_t i = 0; i < existingFontsDict->getCount(); ++i)
-                    {
-                        const QByteArray key = existingFontsDict->getKey(i).getString();
-                        if (!mergedFontDict.hasKey(key))
-                        {
-                            mergedFontDict.addEntry(pdf::PDFInplaceOrMemoryString(key),
-                                                    pdf::PDFObject(existingFontsDict->getValue(i)));
-                        }
-                    }
-                }
-            }
-        }
-        pageFactory.beginDictionaryItem("Font");
-        pageFactory << mergedFontDict;
-        pageFactory.endDictionaryItem();
-
-        pageFactory.endDictionary();
-        pageFactory.endDictionaryItem();
-
-        // Append the RTL content stream: Contents = [existing, new].
-        pageFactory.beginDictionaryItem("Contents");
-        pageFactory.beginArray();
-        const pdf::PDFDictionary* pageDict = pageObject.getDictionary();
-        const pdf::PDFObject existingContents = pageDict ? pageDict->get("Contents") : pdf::PDFObject();
-        if (existingContents.isReference())
-        {
-            pageFactory << existingContents;
-        }
-        else if (existingContents.isStream())
-        {
-            pageFactory << builder->addObject(existingContents);
-        }
-        else if (existingContents.isArray())
-        {
-            const pdf::PDFArray* contentsArray = existingContents.getArray();
-            if (contentsArray)
-            {
-                for (size_t i = 0; i < contentsArray->getCount(); ++i)
-                {
-                    pageFactory << contentsArray->getItem(i);
-                }
-            }
-        }
-        pageFactory << builder->addObject(std::move(contentObject));
-        pageFactory.endArray();
-        pageFactory.endDictionaryItem();
-
-        pageFactory.endDictionary();
-
-        pageObject = pdf::PDFObjectManipulator::merge(
-            pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
-        builder->setObject(page->getPageReference(), std::move(pageObject));
-
-        modifier.markPageContentsChanged();
-        if (!modifier.finalize())
-        {
-            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
-                                   options.outputCodec);
-            return ErrorFailedWriteToFile;
-        }
-
-        pdf::PDFDocumentWriter writer(nullptr);
-        pdf::PDFOperationResult writeResult =
-            writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
-        if (!writeResult)
-        {
-            PDFConsole::writeError(
-                PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
-                options.outputCodec);
             return ErrorFailedWriteToFile;
         }
 
@@ -501,84 +400,32 @@ int PDFToolAddText::execute(const PDFToolOptions& options)
         return ErrorFailedWriteToFile;
     }
 
-    // Write-back (same bridge as delete-object).
-    pdf::PDFDocumentModifier modifier(&document);
-    pdf::PDFDocumentBuilder* builder = modifier.getBuilder();
+    // Write-back (same bridge as delete-object): the serialized content
+    // replaces the page /Contents and the new resource dictionaries are merged
+    // into an indirect /Resources instead of clobbering it.
+    pdf::PDFPageContentRewriter::Settings rewriteSettings;
+    rewriteSettings.pageReference = page->getPageReference();
+    rewriteSettings.fontDictionary = fontDictionary;
+    rewriteSettings.xobjectDictionary = contentStreamBuilder.getXObjectDictionary();
+    rewriteSettings.graphicStateDictionary = contentStreamBuilder.getGraphicStateDictionary();
+    rewriteSettings.contentBytes = contentStreamBuilder.getOutputContent();
+    rewriteSettings.mode = pdf::PDFPageContentRewriter::ContentsMode::Replace;
+    rewriteSettings.outputPath = options.addTextOutputDocument;
 
-    pdf::PDFDictionary xobjectDictionary = contentStreamBuilder.getXObjectDictionary();
-    pdf::PDFDictionary graphicStateDictionary = contentStreamBuilder.getGraphicStateDictionary();
-
-    builder->replaceObjectsByReferences(fontDictionary);
-    builder->replaceObjectsByReferences(xobjectDictionary);
-    builder->replaceObjectsByReferences(graphicStateDictionary);
-
-    pdf::PDFArray filters;
-    filters.appendItem(pdf::PDFObject::createName("FlateDecode"));
-    const QByteArray compressedData = pdf::PDFFlateDecodeFilter::compress(contentStreamBuilder.getOutputContent());
-
-    pdf::PDFDictionary contentDictionary;
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Length"),
-                               pdf::PDFObject::createInteger(compressedData.size()));
-    contentDictionary.setEntry(pdf::PDFInplaceOrMemoryString("Filter"),
-                               pdf::PDFObject::createArray(std::make_shared<pdf::PDFArray>(filters)));
-    pdf::PDFObject contentObject = pdf::PDFObject::createStream(
-        std::make_shared<pdf::PDFStream>(std::move(contentDictionary), QByteArray(compressedData)));
-
-    pdf::PDFObject pageObject = builder->getObjectByReference(page->getPageReference());
-
-    pdf::PDFObjectFactory pageFactory;
-    pageFactory.beginDictionary();
-    pageFactory.beginDictionaryItem("Resources");
-    pageFactory.beginDictionary();
-
-    if (!fontDictionary.isEmpty())
+    pdf::PDFPageContentRewriter::Result rewriteResult = pdf::PDFPageContentRewriter::rewrite(document, rewriteSettings);
+    if (!rewriteResult.isSuccess())
     {
-        pageFactory.beginDictionaryItem("Font");
-        pageFactory << fontDictionary;
-        pageFactory.endDictionaryItem();
-    }
-    if (!xobjectDictionary.isEmpty())
-    {
-        pageFactory.beginDictionaryItem("XObject");
-        pageFactory << xobjectDictionary;
-        pageFactory.endDictionaryItem();
-    }
-    if (!graphicStateDictionary.isEmpty())
-    {
-        pageFactory.beginDictionaryItem("ExtGState");
-        pageFactory << graphicStateDictionary;
-        pageFactory.endDictionaryItem();
-    }
-
-    pageFactory.endDictionary();
-    pageFactory.endDictionaryItem();
-
-    pageFactory.beginDictionaryItem("Contents");
-    pageFactory << builder->addObject(std::move(contentObject));
-    pageFactory.endDictionaryItem();
-
-    pageFactory.endDictionary();
-
-    pageObject = pdf::PDFObjectManipulator::merge(
-        pageObject, pageFactory.takeObject(), pdf::PDFObjectManipulator::RemoveNullObjects);
-    builder->setObject(page->getPageReference(), std::move(pageObject));
-
-    modifier.markPageContentsChanged();
-    if (!modifier.finalize())
-    {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
-                               options.outputCodec);
-        return ErrorFailedWriteToFile;
-    }
-
-    pdf::PDFDocumentWriter writer(nullptr);
-    pdf::PDFOperationResult writeResult =
-        writer.write(options.addTextOutputDocument, modifier.getDocument().data(), true);
-    if (!writeResult)
-    {
-        PDFConsole::writeError(
-            PDFToolTranslationContext::tr("Failed to write document: %1").arg(writeResult.getErrorMessage()),
-            options.outputCodec);
+        if (rewriteResult.failure == pdf::PDFPageContentRewriter::Failure::Finalize)
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to finalize document modification."),
+                                   options.outputCodec);
+        }
+        else
+        {
+            PDFConsole::writeError(
+                PDFToolTranslationContext::tr("Failed to write document: %1").arg(rewriteResult.errorMessage),
+                options.outputCodec);
+        }
         return ErrorFailedWriteToFile;
     }
 
