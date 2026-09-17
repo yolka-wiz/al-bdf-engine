@@ -225,14 +225,16 @@ slop gate runs in CI.
 Highest structural leverage for expandability. The base file is **frozen**
 (§3.2) until the options have moved out.
 
-- [ ] **R3.1** Extract a core page-write-back helper
+- [x] **R3.1** Extract a core page-write-back helper
   (`PDFPageContentRewriter`: replace resources → compress content → build
   content/page dicts → merge → finalize) and use it in `add-text` (LTR+RTL) and
   `delete-object`; add tests for `/Contents` arrays and indirect resources.
-  `#TBD`, M.
-- [ ] **R3.2** Replace `Q_ASSERT`-as-validation in the custom commands with
+  `#48`, M. **DONE** (`d61aa37` + `94b95e6` + `f86a4e6`, test `843edf3`;
+  `UnitTestsPageContentRewriter` green) — merged via `m15/r3-r4-integration`.
+- [x] **R3.2** Replace `Q_ASSERT`-as-validation in the custom commands with
   explicit bounds checks + error codes (e.g. `pdftooladdtext.cpp:173`,
-  `pdftooldeleteobject.cpp:147`). `#TBD`, S.
+  `pdftooldeleteobject.cpp:147`). `#49`, S. **DONE** (in the R3.1 branch;
+  slop E1 gate green on both touched commands).
 - [ ] **R3.3** Introduce per-command `CommandSpec` (options declared + parsed
   into a typed struct by the command) and migrate commands incrementally;
   remove the 64-bit `Options` workaround once the base stops growing.
@@ -245,11 +247,14 @@ growing; `add-text`/`delete-object` share one write-back path.
 
 ### R4 — RTL backend seam (P2)
 
-- [ ] **R4.1** Introduce an internal `PDFBidi` / `PDFShaper` interface; move the
+- [x] **R4.1** Introduce an internal `PDFBidi` / `PDFShaper` interface; move the
   three `<fribidi.h>` call sites and the `<hb.h>` usage behind it; unit-test the
-  seam (bidirectional inversion, lam-alef collapse, digit folding). `#TBD`, M.
-- [ ] **R4.2** Consolidate the duplicated visual↔logical inversion logic
-  (`pdfrtltextnormalizer.cpp` vs `pdftextsearchengine.cpp`). `#TBD`, S.
+  seam (bidirectional inversion, lam-alef collapse, digit folding). `#50`, M.
+  **DONE** (`18e6414` + `fabfdbb`, test `30d97ff`; `UnitTestsRtlBidi` green) —
+  merged via `m15/r3-r4-integration`.
+- [x] **R4.2** Consolidate the duplicated visual↔logical inversion logic
+  (`pdfrtltextnormalizer.cpp` vs `pdftextsearchengine.cpp`). `#51`, S.
+  **DONE** (`d6ea522`; seam owns the only `<fribidi.h>` include in core).
 
 **Exit:** only the seam headers include FriBidi/HarfBuzz; RTL logic is testable
 without the full engine.
