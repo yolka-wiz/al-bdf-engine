@@ -29,23 +29,19 @@
 //     still works on the same page
 //   - rendering the RTL page produces no render errors
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QtTest>
 
 #include <QFile>
 #include <QImage>
-#include <QProcess>
-#include <QProcessEnvironment>
 #include <QTemporaryDir>
+
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
 
 namespace
 {
-struct ToolResult
-{
-    int exitCode = -1;
-    QByteArray stdoutData;
-    QByteArray stderrData;
-};
-
 // Rows (y) that contain ink (any pixel darker than `threshold`) in `image`,
 // ascending. Used to locate the vertical band a rendered text occupies.
 QVector<int> inkRows(const QImage& image, int threshold = 200)
@@ -88,25 +84,6 @@ QVector<int> diffRows(const QImage& base, const QImage& other, int delta = 12)
     return rows;
 }
 
-ToolResult runTool(const QString& toolPath, const QStringList& arguments, const QString& workingDir)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForStarted() || !process.waitForFinished(180000))
-    {
-        return result;
-    }
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
 } // namespace
 
 class RtlAddTextTest : public QObject
@@ -134,30 +111,30 @@ void RtlAddTextTest::test_hebrewRoundTrip()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/he.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("שלום עולם"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_HEBREW),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("he")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("שלום עולם"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_HEBREW),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("he")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "output document must be created");
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     // PDF content streams store VISUAL order: RTL text extracts in
     // right-to-left reading order (entire line reversed: "שלום עולם" ->
@@ -174,29 +151,29 @@ void RtlAddTextTest::test_persianExtraction()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/fa.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("سلام دنیا"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("سلام دنیا"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     // RTL extracts in visual order: "سلام دنیا" -> reversed runs. The
     // /ActualText overlay (DB #21) restores the full lam-alef ligature, so
@@ -223,30 +200,30 @@ void RtlAddTextTest::test_lamAlefFullLigatureExtraction()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/la.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("علا"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("علا"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "output document must be created");
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     const QString fetched = QString::fromUtf8(fetchResult.stdoutData);
     QVERIFY2(fetched.contains(QString::fromUtf8("لاع")),
@@ -268,30 +245,30 @@ void RtlAddTextTest::test_decomposedYehNoDoubleExtraction()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/yeh.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("عليكم"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("عليكم"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "output document must be created");
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     const QString fetched = QString::fromUtf8(fetchResult.stdoutData);
     QVERIFY2(!fetched.contains(QString::fromUtf8("يي")),
@@ -306,29 +283,29 @@ void RtlAddTextTest::test_rtlFontEmbedded()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/fa.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("سلام"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("سلام"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult infoResult = runTool(toolPath, {QStringLiteral("info-fonts"), outputPath}, tmpDir.path());
+    ToolResult infoResult = runAlbdfTool(toolPath, {QStringLiteral("info-fonts"), outputPath}, tmpDir.path());
     QCOMPARE(infoResult.exitCode, 0);
     QVERIFY2(infoResult.stdoutData.contains("Vazirmatn"), "RTL font must be embedded");
     QVERIFY2(infoResult.stdoutData.contains("Type 0"), "RTL font must be Type0/CID");
@@ -343,47 +320,47 @@ void RtlAddTextTest::test_rtlKeepsLtrIntact()
 
     // RTL first, then LTR on the same page.
     const QString rtlPath = tmpDir.path() + QStringLiteral("/rtl.pdf");
-    ToolResult rtlResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    rtlPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("سلام"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult rtlResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         rtlPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("سلام"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(rtlResult.exitCode, 0);
 
     const QString mixedPath = tmpDir.path() + QStringLiteral("/mixed.pdf");
-    ToolResult ltrResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    rtlPath,
-                                    mixedPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("600"),
-                                    QStringLiteral("--text"),
-                                    QStringLiteral("LTR still OK"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("16")},
-                                   tmpDir.path());
+    ToolResult ltrResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         rtlPath,
+                                         mixedPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("600"),
+                                         QStringLiteral("--text"),
+                                         QStringLiteral("LTR still OK"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("16")},
+                                        tmpDir.path());
     QCOMPARE(ltrResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), mixedPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), mixedPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains("LTR still OK"), "LTR text must survive RTL add");
     // RTL extracts in visual order: "سلام" -> "ملاس" here (full lam-alef).
@@ -401,42 +378,42 @@ void RtlAddTextTest::test_rtlRenderNoErrors()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/fa.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("سلام دنیا"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_PERSIAN),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("fa")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("سلام دنیا"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_PERSIAN),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("fa")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult renderResult = runTool(toolPath,
-                                      {QStringLiteral("render"),
-                                       outputPath,
-                                       QStringLiteral("--page-first"),
-                                       QStringLiteral("1"),
-                                       QStringLiteral("--page-last"),
-                                       QStringLiteral("1"),
-                                       QStringLiteral("--image-format"),
-                                       QStringLiteral("png"),
-                                       QStringLiteral("--image-res-dpi"),
-                                       QStringLiteral("72"),
-                                       QStringLiteral("--image-output-dir"),
-                                       tmpDir.path()},
-                                      tmpDir.path());
+    ToolResult renderResult = runAlbdfTool(toolPath,
+                                           {QStringLiteral("render"),
+                                            outputPath,
+                                            QStringLiteral("--page-first"),
+                                            QStringLiteral("1"),
+                                            QStringLiteral("--page-last"),
+                                            QStringLiteral("1"),
+                                            QStringLiteral("--image-format"),
+                                            QStringLiteral("png"),
+                                            QStringLiteral("--image-res-dpi"),
+                                            QStringLiteral("72"),
+                                            QStringLiteral("--image-output-dir"),
+                                            tmpDir.path()},
+                                           tmpDir.path());
     QCOMPARE(renderResult.exitCode, 0);
     // The "Rendering Errors" section header is always printed; check that no
     // actual error row follows it (an error row contains "Error" + a message).
@@ -458,29 +435,29 @@ void RtlAddTextTest::test_rtlNotMirrored()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/he.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BLANK_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("700"),
-                                    QStringLiteral("--text"),
-                                    QString::fromUtf8("אבג"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("24"),
-                                    QStringLiteral("--rtl"),
-                                    QStringLiteral("--font"),
-                                    QString::fromUtf8(TEST_FONT_HEBREW),
-                                    QStringLiteral("--lang"),
-                                    QStringLiteral("he")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BLANK_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("700"),
+                                         QStringLiteral("--text"),
+                                         QString::fromUtf8("אבג"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("24"),
+                                         QStringLiteral("--rtl"),
+                                         QStringLiteral("--font"),
+                                         QString::fromUtf8(TEST_FONT_HEBREW),
+                                         QStringLiteral("--lang"),
+                                         QStringLiteral("he")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(QString::fromUtf8(fetchResult.stdoutData).contains(QString::fromUtf8("גבא")),
              "RTL must extract in visual order (אבג -> גבא); glyph reversal would mirror the render");
@@ -520,44 +497,44 @@ void RtlAddTextTest::test_verticalMarkOffsets()
     // the shared output name).
     const auto addAndRender = [&](const QString& text, const QString& caseName) -> QString {
         const QString pdfPath = tmpDir.path() + QLatin1Char('/') + caseName + QStringLiteral(".pdf");
-        const ToolResult addResult = runTool(toolPath,
-                                             {QStringLiteral("add-text"),
-                                              QString::fromUtf8(TEST_BLANK_PDF),
-                                              pdfPath,
-                                              QStringLiteral("--page"),
-                                              QStringLiteral("1"),
-                                              QStringLiteral("--x"),
-                                              QStringLiteral("72"),
-                                              QStringLiteral("--y"),
-                                              QStringLiteral("700"),
-                                              QStringLiteral("--text"),
-                                              text,
-                                              QStringLiteral("--size"),
-                                              QStringLiteral("24"),
-                                              QStringLiteral("--rtl"),
-                                              QStringLiteral("--font"),
-                                              QString::fromUtf8(TEST_FONT_PERSIAN),
-                                              QStringLiteral("--lang"),
-                                              QStringLiteral("fa")},
-                                             tmpDir.path());
+        const ToolResult addResult = runAlbdfTool(toolPath,
+                                                  {QStringLiteral("add-text"),
+                                                   QString::fromUtf8(TEST_BLANK_PDF),
+                                                   pdfPath,
+                                                   QStringLiteral("--page"),
+                                                   QStringLiteral("1"),
+                                                   QStringLiteral("--x"),
+                                                   QStringLiteral("72"),
+                                                   QStringLiteral("--y"),
+                                                   QStringLiteral("700"),
+                                                   QStringLiteral("--text"),
+                                                   text,
+                                                   QStringLiteral("--size"),
+                                                   QStringLiteral("24"),
+                                                   QStringLiteral("--rtl"),
+                                                   QStringLiteral("--font"),
+                                                   QString::fromUtf8(TEST_FONT_PERSIAN),
+                                                   QStringLiteral("--lang"),
+                                                   QStringLiteral("fa")},
+                                                  tmpDir.path());
         if (addResult.exitCode != 0)
         {
             return QString();
         }
-        const ToolResult renderResult = runTool(toolPath,
-                                                {QStringLiteral("render"),
-                                                 pdfPath,
-                                                 QStringLiteral("--page-first"),
-                                                 QStringLiteral("1"),
-                                                 QStringLiteral("--page-last"),
-                                                 QStringLiteral("1"),
-                                                 QStringLiteral("--image-format"),
-                                                 QStringLiteral("png"),
-                                                 QStringLiteral("--image-res-dpi"),
-                                                 QStringLiteral("72"),
-                                                 QStringLiteral("--image-output-dir"),
-                                                 tmpDir.path()},
-                                                tmpDir.path());
+        const ToolResult renderResult = runAlbdfTool(toolPath,
+                                                     {QStringLiteral("render"),
+                                                      pdfPath,
+                                                      QStringLiteral("--page-first"),
+                                                      QStringLiteral("1"),
+                                                      QStringLiteral("--page-last"),
+                                                      QStringLiteral("1"),
+                                                      QStringLiteral("--image-format"),
+                                                      QStringLiteral("png"),
+                                                      QStringLiteral("--image-res-dpi"),
+                                                      QStringLiteral("72"),
+                                                      QStringLiteral("--image-output-dir"),
+                                                      tmpDir.path()},
+                                                     tmpDir.path());
         if (renderResult.exitCode != 0)
         {
             return QString();

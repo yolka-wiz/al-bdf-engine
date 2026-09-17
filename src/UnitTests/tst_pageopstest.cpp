@@ -34,49 +34,20 @@
 //   - every modified document reopens cleanly through albdf info (round-trip)
 //   - invalid arguments fail with a non-zero exit code (contract: 7)
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QtTest>
 
 #include <QCryptographicHash>
 #include <QFile>
 #include <QImage>
-#include <QProcess>
-#include <QProcessEnvironment>
 #include <QTemporaryDir>
+
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
 
 namespace
 {
-struct ToolResult
-{
-    int exitCode = -1;
-    QByteArray stdoutData;
-    QByteArray stderrData;
-};
-
-ToolResult runTool(const QString& toolPath, const QStringList& arguments, const QString& workingDir)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForStarted())
-    {
-        return result;
-    }
-    if (!process.waitForFinished(180000))
-    {
-        process.kill();
-        return result;
-    }
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
-
 QByteArray sha256OfFile(const QString& path)
 {
     QFile file(path);
@@ -94,20 +65,20 @@ QSize renderPageSize(const QString& toolPath, const QString& pdfPath, const QStr
     {
         return QSize();
     }
-    ToolResult result = runTool(toolPath,
-                                {QStringLiteral("render"),
-                                 pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QString::number(page),
-                                 QStringLiteral("--page-last"),
-                                 QString::number(page),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("72"),
-                                 QStringLiteral("--image-output-dir"),
-                                 renderDir.path()},
-                                workingDir);
+    ToolResult result = runAlbdfTool(toolPath,
+                                     {QStringLiteral("render"),
+                                      pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QString::number(page),
+                                      QStringLiteral("--page-last"),
+                                      QString::number(page),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("72"),
+                                      QStringLiteral("--image-output-dir"),
+                                      renderDir.path()},
+                                     workingDir);
     if (result.exitCode != 0)
     {
         return QSize();
@@ -151,15 +122,15 @@ void PageOpsTest::rotateChangesGeometry()
 
     // Rotate page 1 by 90 degrees clockwise: rendered geometry must swap.
     const QString outputPath = tmpDir.path() + QStringLiteral("/rotated.pdf");
-    ToolResult rotateResult = runTool(toolPath,
-                                      {QStringLiteral("rotate"),
-                                       QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                       outputPath,
-                                       QStringLiteral("--page"),
-                                       QStringLiteral("1"),
-                                       QStringLiteral("--angle"),
-                                       QStringLiteral("90")},
-                                      tmpDir.path());
+    ToolResult rotateResult = runAlbdfTool(toolPath,
+                                           {QStringLiteral("rotate"),
+                                            QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                            outputPath,
+                                            QStringLiteral("--page"),
+                                            QStringLiteral("1"),
+                                            QStringLiteral("--angle"),
+                                            QStringLiteral("90")},
+                                           tmpDir.path());
     QCOMPARE(rotateResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "rotated document must be created");
 
@@ -167,7 +138,7 @@ void PageOpsTest::rotateChangesGeometry()
     QCOMPARE(rotatedSize, QSize(792, 612));
 
     // Round-trip: the modified document must reopen cleanly.
-    ToolResult infoResult = runTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
+    ToolResult infoResult = runAlbdfTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
     QCOMPARE(infoResult.exitCode, 0);
 
     // Other pages are untouched: page 2 keeps its geometry.
@@ -182,37 +153,37 @@ void PageOpsTest::rotateInvalidArguments()
     QVERIFY(tmpDir.isValid());
 
     // Invalid angle.
-    ToolResult badAngle = runTool(toolPath,
-                                  {QStringLiteral("rotate"),
-                                   QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                   tmpDir.path() + QStringLiteral("/out.pdf"),
-                                   QStringLiteral("--page"),
-                                   QStringLiteral("1"),
-                                   QStringLiteral("--angle"),
-                                   QStringLiteral("45")},
-                                  tmpDir.path());
+    ToolResult badAngle = runAlbdfTool(toolPath,
+                                       {QStringLiteral("rotate"),
+                                        QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                        tmpDir.path() + QStringLiteral("/out.pdf"),
+                                        QStringLiteral("--page"),
+                                        QStringLiteral("1"),
+                                        QStringLiteral("--angle"),
+                                        QStringLiteral("45")},
+                                       tmpDir.path());
     QVERIFY2(badAngle.exitCode != 0, "invalid angle must fail with non-zero exit code");
 
     // Missing --page.
-    ToolResult noPage = runTool(toolPath,
-                                {QStringLiteral("rotate"),
-                                 QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                 tmpDir.path() + QStringLiteral("/out.pdf"),
-                                 QStringLiteral("--angle"),
-                                 QStringLiteral("90")},
-                                tmpDir.path());
+    ToolResult noPage = runAlbdfTool(toolPath,
+                                     {QStringLiteral("rotate"),
+                                      QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                      tmpDir.path() + QStringLiteral("/out.pdf"),
+                                      QStringLiteral("--angle"),
+                                      QStringLiteral("90")},
+                                     tmpDir.path());
     QVERIFY2(noPage.exitCode != 0, "missing --page must fail with non-zero exit code");
 
     // Out-of-range page number.
-    ToolResult badPage = runTool(toolPath,
-                                 {QStringLiteral("rotate"),
-                                  QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                  tmpDir.path() + QStringLiteral("/out.pdf"),
-                                  QStringLiteral("--page"),
-                                  QStringLiteral("99"),
-                                  QStringLiteral("--angle"),
-                                  QStringLiteral("90")},
-                                 tmpDir.path());
+    ToolResult badPage = runAlbdfTool(toolPath,
+                                      {QStringLiteral("rotate"),
+                                       QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                       tmpDir.path() + QStringLiteral("/out.pdf"),
+                                       QStringLiteral("--page"),
+                                       QStringLiteral("99"),
+                                       QStringLiteral("--angle"),
+                                       QStringLiteral("90")},
+                                      tmpDir.path());
     QVERIFY2(badPage.exitCode != 0, "out-of-range page must fail with non-zero exit code");
 }
 
@@ -232,11 +203,11 @@ void PageOpsTest::rotateOutputDeterministic()
                                   QStringLiteral("180")};
 
     const QString firstPath = tmpDir.path() + QStringLiteral("/first.pdf");
-    ToolResult first = runTool(toolPath, baseArgs + QStringList{firstPath}, tmpDir.path());
+    ToolResult first = runAlbdfTool(toolPath, baseArgs + QStringList{firstPath}, tmpDir.path());
     QCOMPARE(first.exitCode, 0);
 
     const QString secondPath = tmpDir.path() + QStringLiteral("/second.pdf");
-    ToolResult second = runTool(toolPath, baseArgs + QStringList{secondPath}, tmpDir.path());
+    ToolResult second = runAlbdfTool(toolPath, baseArgs + QStringList{secondPath}, tmpDir.path());
     QCOMPARE(second.exitCode, 0);
 
     const QByteArray firstHash = sha256OfFile(firstPath);
@@ -252,23 +223,23 @@ void PageOpsTest::movePageMovesContent()
 
     // Move page 1 to position 3: [1,2,3,4,5] -> [2,3,1,4,5].
     const QString outputPath = tmpDir.path() + QStringLiteral("/moved.pdf");
-    ToolResult moveResult = runTool(toolPath,
-                                    {QStringLiteral("move-page"),
-                                     QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                     outputPath,
-                                     QStringLiteral("--from"),
-                                     QStringLiteral("1"),
-                                     QStringLiteral("--to"),
-                                     QStringLiteral("3")},
-                                    tmpDir.path());
+    ToolResult moveResult = runAlbdfTool(toolPath,
+                                         {QStringLiteral("move-page"),
+                                          QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                          outputPath,
+                                          QStringLiteral("--from"),
+                                          QStringLiteral("1"),
+                                          QStringLiteral("--to"),
+                                          QStringLiteral("3")},
+                                         tmpDir.path());
     QCOMPARE(moveResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "moved document must be created");
 
     // Round-trip: reopen cleanly and keep the page count.
-    ToolResult infoResult = runTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
+    ToolResult infoResult = runAlbdfTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
     QCOMPARE(infoResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.count("MULTIPAGE PAGE") == 5, "all five pages must survive the move");
 
@@ -285,15 +256,15 @@ void PageOpsTest::movePageMovesContent()
 
     // Determinism: repeat the same operation and compare hashes.
     const QString secondPath = tmpDir.path() + QStringLiteral("/moved2.pdf");
-    ToolResult again = runTool(toolPath,
-                               {QStringLiteral("move-page"),
-                                QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                secondPath,
-                                QStringLiteral("--from"),
-                                QStringLiteral("1"),
-                                QStringLiteral("--to"),
-                                QStringLiteral("3")},
-                               tmpDir.path());
+    ToolResult again = runAlbdfTool(toolPath,
+                                    {QStringLiteral("move-page"),
+                                     QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                     secondPath,
+                                     QStringLiteral("--from"),
+                                     QStringLiteral("1"),
+                                     QStringLiteral("--to"),
+                                     QStringLiteral("3")},
+                                    tmpDir.path());
     QCOMPARE(again.exitCode, 0);
     QCOMPARE(sha256OfFile(outputPath), sha256OfFile(secondPath));
 }
@@ -308,17 +279,17 @@ void PageOpsTest::movePageInvalidArguments()
         QStringLiteral("move-page"), QString::fromUtf8(TEST_MULTIPAGE_PDF), tmpDir.path() + QStringLiteral("/out.pdf")};
 
     ToolResult noFrom =
-        runTool(toolPath, common + QStringList{QStringLiteral("--to"), QStringLiteral("2")}, tmpDir.path());
+        runAlbdfTool(toolPath, common + QStringList{QStringLiteral("--to"), QStringLiteral("2")}, tmpDir.path());
     QVERIFY2(noFrom.exitCode != 0, "missing --from must fail");
 
-    ToolResult zeroFrom = runTool(
+    ToolResult zeroFrom = runAlbdfTool(
         toolPath,
         common +
             QStringList{QStringLiteral("--from"), QStringLiteral("0"), QStringLiteral("--to"), QStringLiteral("2")},
         tmpDir.path());
     QVERIFY2(zeroFrom.exitCode != 0, "zero --from must fail");
 
-    ToolResult tooFar = runTool(
+    ToolResult tooFar = runAlbdfTool(
         toolPath,
         common +
             QStringList{QStringLiteral("--from"), QStringLiteral("1"), QStringLiteral("--to"), QStringLiteral("99")},
@@ -334,21 +305,21 @@ void PageOpsTest::deletePageRemovesPage()
 
     // Delete page 3 of the 5-page fixture.
     const QString outputPath = tmpDir.path() + QStringLiteral("/deleted.pdf");
-    ToolResult deleteResult = runTool(toolPath,
-                                      {QStringLiteral("delete-page"),
-                                       QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                       outputPath,
-                                       QStringLiteral("--page"),
-                                       QStringLiteral("3")},
-                                      tmpDir.path());
+    ToolResult deleteResult = runAlbdfTool(toolPath,
+                                           {QStringLiteral("delete-page"),
+                                            QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                            outputPath,
+                                            QStringLiteral("--page"),
+                                            QStringLiteral("3")},
+                                           tmpDir.path());
     QCOMPARE(deleteResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "deleted document must be created");
 
     // Round-trip: reopen cleanly.
-    ToolResult infoResult = runTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
+    ToolResult infoResult = runAlbdfTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
     QCOMPARE(infoResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.count("MULTIPAGE PAGE") == 4, "page count must drop to 4");
     QVERIFY2(!fetchResult.stdoutData.contains("MULTIPAGE PAGE THREE"), "deleted page text must be gone");
@@ -365,16 +336,16 @@ void PageOpsTest::deletePageMultiplePages()
 
     // Delete pages 1 and 3 via a page selection.
     const QString outputPath = tmpDir.path() + QStringLiteral("/deleted-multi.pdf");
-    ToolResult deleteResult = runTool(toolPath,
-                                      {QStringLiteral("delete-page"),
-                                       QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                       outputPath,
-                                       QStringLiteral("--page-select"),
-                                       QStringLiteral("1,3")},
-                                      tmpDir.path());
+    ToolResult deleteResult = runAlbdfTool(toolPath,
+                                           {QStringLiteral("delete-page"),
+                                            QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                            outputPath,
+                                            QStringLiteral("--page-select"),
+                                            QStringLiteral("1,3")},
+                                           tmpDir.path());
     QCOMPARE(deleteResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.count("MULTIPAGE PAGE") == 3, "page count must drop to 3");
     QVERIFY2(!fetchResult.stdoutData.contains("MULTIPAGE PAGE ONE") &&
@@ -386,13 +357,13 @@ void PageOpsTest::deletePageMultiplePages()
 
     // Determinism: repeat and compare hashes.
     const QString secondPath = tmpDir.path() + QStringLiteral("/deleted-multi2.pdf");
-    ToolResult again = runTool(toolPath,
-                               {QStringLiteral("delete-page"),
-                                QString::fromUtf8(TEST_MULTIPAGE_PDF),
-                                secondPath,
-                                QStringLiteral("--page-select"),
-                                QStringLiteral("1,3")},
-                               tmpDir.path());
+    ToolResult again = runAlbdfTool(toolPath,
+                                    {QStringLiteral("delete-page"),
+                                     QString::fromUtf8(TEST_MULTIPAGE_PDF),
+                                     secondPath,
+                                     QStringLiteral("--page-select"),
+                                     QStringLiteral("1,3")},
+                                    tmpDir.path());
     QCOMPARE(again.exitCode, 0);
     QCOMPARE(sha256OfFile(outputPath), sha256OfFile(secondPath));
 }
@@ -408,17 +379,17 @@ void PageOpsTest::deletePageInvalidArguments()
                                 tmpDir.path() + QStringLiteral("/out.pdf")};
 
     // No page specified at all.
-    ToolResult none = runTool(toolPath, common, tmpDir.path());
+    ToolResult none = runAlbdfTool(toolPath, common, tmpDir.path());
     QVERIFY2(none.exitCode != 0, "delete-page without --page must fail");
 
     // Out-of-range page number.
     ToolResult badPage =
-        runTool(toolPath, common + QStringList{QStringLiteral("--page"), QStringLiteral("99")}, tmpDir.path());
+        runAlbdfTool(toolPath, common + QStringList{QStringLiteral("--page"), QStringLiteral("99")}, tmpDir.path());
     QVERIFY2(badPage.exitCode != 0, "out-of-range --page must fail");
 
     // Deleting every page must be rejected (document must keep at least one page).
-    ToolResult allPages =
-        runTool(toolPath, common + QStringList{QStringLiteral("--page-select"), QStringLiteral("1-5")}, tmpDir.path());
+    ToolResult allPages = runAlbdfTool(
+        toolPath, common + QStringList{QStringLiteral("--page-select"), QStringLiteral("1-5")}, tmpDir.path());
     QVERIFY2(allPages.exitCode != 0, "deleting all pages must fail");
 }
 

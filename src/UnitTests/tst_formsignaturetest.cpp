@@ -19,11 +19,16 @@
 // The upstream PDF4QT portions remain under the MIT License; see the
 // upstream copyright headers and the LICENSE file.
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QCoreApplication>
 #include <QFile>
 #include <QProcess>
 #include <QTemporaryDir>
 #include <QtTest>
+
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
 
 /// Integration tests for the form-list / form-fill / sign commands.
 ///
@@ -46,15 +51,6 @@ private slots:
     void test_signTamperDetected();
 
 private:
-    struct ToolResult
-    {
-        int exitCode = -1;
-        QString stdOut;
-        QString stdErr;
-    };
-
-    ToolResult runTool(const QString& toolPath, const QStringList& arguments, const QString& workDir) const;
-
     QString m_formPdf;
     QString m_certP12;
     QTemporaryDir m_tmpDir;
@@ -147,83 +143,65 @@ void FormSignatureTest::initTestCase()
     QVERIFY(QFile::exists(m_certP12));
 }
 
-FormSignatureTest::ToolResult
-FormSignatureTest::runTool(const QString& toolPath, const QStringList& arguments, const QString& workDir) const
-{
-    ToolResult result;
-    QProcess process;
-    process.setWorkingDirectory(workDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForFinished(60000))
-    {
-        return result;
-    }
-    result.exitCode = process.exitCode();
-    result.stdOut = QString::fromUtf8(process.readAllStandardOutput());
-    result.stdErr = QString::fromUtf8(process.readAllStandardError());
-    return result;
-}
-
 void FormSignatureTest::test_formList()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
-    const ToolResult result = runTool(toolPath, {QStringLiteral("form-list"), m_formPdf}, m_tmpDir.path());
+    const ToolResult result = runAlbdfTool(toolPath, {QStringLiteral("form-list"), m_formPdf}, m_tmpDir.path());
     QCOMPARE(result.exitCode, 0);
-    QVERIFY(result.stdOut.contains(QStringLiteral("name")));
-    QVERIFY(result.stdOut.contains(QStringLiteral("John")));
-    QVERIFY(result.stdOut.contains(QStringLiteral("agree")));
-    QVERIFY(result.stdOut.contains(QStringLiteral("country")));
-    QVERIFY(result.stdOut.contains(QStringLiteral("US")));
+    QVERIFY(QString::fromUtf8(result.stdoutData).contains(QStringLiteral("name")));
+    QVERIFY(QString::fromUtf8(result.stdoutData).contains(QStringLiteral("John")));
+    QVERIFY(QString::fromUtf8(result.stdoutData).contains(QStringLiteral("agree")));
+    QVERIFY(QString::fromUtf8(result.stdoutData).contains(QStringLiteral("country")));
+    QVERIFY(QString::fromUtf8(result.stdoutData).contains(QStringLiteral("US")));
 }
 
 void FormSignatureTest::test_formFill()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString filledPath = m_tmpDir.filePath(QStringLiteral("filled.pdf"));
-    const ToolResult fillResult = runTool(toolPath,
-                                          {QStringLiteral("form-fill"),
-                                           m_formPdf,
-                                           filledPath,
-                                           QStringLiteral("--field"),
-                                           QStringLiteral("name"),
-                                           QStringLiteral("--value"),
-                                           QStringLiteral("Ali"),
-                                           QStringLiteral("--field"),
-                                           QStringLiteral("agree"),
-                                           QStringLiteral("--value"),
-                                           QStringLiteral("On"),
-                                           QStringLiteral("--field"),
-                                           QStringLiteral("country"),
-                                           QStringLiteral("--value"),
-                                           QStringLiteral("DE")},
-                                          m_tmpDir.path());
+    const ToolResult fillResult = runAlbdfTool(toolPath,
+                                               {QStringLiteral("form-fill"),
+                                                m_formPdf,
+                                                filledPath,
+                                                QStringLiteral("--field"),
+                                                QStringLiteral("name"),
+                                                QStringLiteral("--value"),
+                                                QStringLiteral("Ali"),
+                                                QStringLiteral("--field"),
+                                                QStringLiteral("agree"),
+                                                QStringLiteral("--value"),
+                                                QStringLiteral("On"),
+                                                QStringLiteral("--field"),
+                                                QStringLiteral("country"),
+                                                QStringLiteral("--value"),
+                                                QStringLiteral("DE")},
+                                               m_tmpDir.path());
     QCOMPARE(fillResult.exitCode, 0);
     QVERIFY(QFile::exists(filledPath));
 
-    const ToolResult listResult = runTool(toolPath, {QStringLiteral("form-list"), filledPath}, m_tmpDir.path());
+    const ToolResult listResult = runAlbdfTool(toolPath, {QStringLiteral("form-list"), filledPath}, m_tmpDir.path());
     QCOMPARE(listResult.exitCode, 0);
-    QVERIFY(listResult.stdOut.contains(QStringLiteral("Ali")));
-    QVERIFY(listResult.stdOut.contains(QStringLiteral("On")));
-    QVERIFY(listResult.stdOut.contains(QStringLiteral("DE")));
-    QVERIFY(!listResult.stdOut.contains(QStringLiteral("John"))); // old value gone
+    QVERIFY(QString::fromUtf8(listResult.stdoutData).contains(QStringLiteral("Ali")));
+    QVERIFY(QString::fromUtf8(listResult.stdoutData).contains(QStringLiteral("On")));
+    QVERIFY(QString::fromUtf8(listResult.stdoutData).contains(QStringLiteral("DE")));
+    QVERIFY(!QString::fromUtf8(listResult.stdoutData).contains(QStringLiteral("John"))); // old value gone
 }
 
 void FormSignatureTest::test_formFillRtlAppearance()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString filledPath = m_tmpDir.filePath(QStringLiteral("filled-rtl.pdf"));
-    const ToolResult fillResult = runTool(toolPath,
-                                          {QStringLiteral("form-fill"),
-                                           m_formPdf,
-                                           filledPath,
-                                           QStringLiteral("--field"),
-                                           QStringLiteral("name"),
-                                           QStringLiteral("--value"),
-                                           QString::fromUtf8("سلام"),
-                                           QStringLiteral("--font"),
-                                           QString::fromUtf8(TEST_FONT_ARABIC)},
-                                          m_tmpDir.path());
+    const ToolResult fillResult = runAlbdfTool(toolPath,
+                                               {QStringLiteral("form-fill"),
+                                                m_formPdf,
+                                                filledPath,
+                                                QStringLiteral("--field"),
+                                                QStringLiteral("name"),
+                                                QStringLiteral("--value"),
+                                                QString::fromUtf8("سلام"),
+                                                QStringLiteral("--font"),
+                                                QString::fromUtf8(TEST_FONT_ARABIC)},
+                                               m_tmpDir.path());
     QCOMPARE(fillResult.exitCode, 0);
     QVERIFY(QFile::exists(filledPath));
 
@@ -241,53 +219,54 @@ void FormSignatureTest::test_formFillRtlAppearance()
     QVERIFY2(data.contains("/FontFile2"), "output PDF must contain /FontFile2 embedded TTF font");
 
     // Round-trip: the logical value must survive form-fill -> form-list.
-    const ToolResult listResult = runTool(toolPath, {QStringLiteral("form-list"), filledPath}, m_tmpDir.path());
+    const ToolResult listResult = runAlbdfTool(toolPath, {QStringLiteral("form-list"), filledPath}, m_tmpDir.path());
     QCOMPARE(listResult.exitCode, 0);
-    QVERIFY(listResult.stdOut.contains(QString::fromUtf8("سلام")));
+    QVERIFY(QString::fromUtf8(listResult.stdoutData).contains(QString::fromUtf8("سلام")));
 }
 
 void FormSignatureTest::test_signAndVerify()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString signedPath = m_tmpDir.filePath(QStringLiteral("signed.pdf"));
-    const ToolResult signResult = runTool(toolPath,
-                                          {QStringLiteral("sign"),
-                                           m_formPdf,
-                                           signedPath,
-                                           QStringLiteral("--cert"),
-                                           m_certP12,
-                                           QStringLiteral("--password"),
-                                           QStringLiteral("testpass"),
-                                           QStringLiteral("--reason"),
-                                           QStringLiteral("unit test")},
-                                          m_tmpDir.path());
+    const ToolResult signResult = runAlbdfTool(toolPath,
+                                               {QStringLiteral("sign"),
+                                                m_formPdf,
+                                                signedPath,
+                                                QStringLiteral("--cert"),
+                                                m_certP12,
+                                                QStringLiteral("--password"),
+                                                QStringLiteral("testpass"),
+                                                QStringLiteral("--reason"),
+                                                QStringLiteral("unit test")},
+                                               m_tmpDir.path());
     QCOMPARE(signResult.exitCode, 0);
     QVERIFY(QFile::exists(signedPath));
 
     const ToolResult verifyResult =
-        runTool(toolPath, {QStringLiteral("verify-signatures"), signedPath}, m_tmpDir.path());
+        runAlbdfTool(toolPath, {QStringLiteral("verify-signatures"), signedPath}, m_tmpDir.path());
     QCOMPARE(verifyResult.exitCode, 0);
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("Signature")));
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("OK")));
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("albdf test")));
+    QVERIFY(QString::fromUtf8(verifyResult.stdoutData).contains(QStringLiteral("Signature")));
+    QVERIFY(QString::fromUtf8(verifyResult.stdoutData).contains(QStringLiteral("OK")));
+    QVERIFY(QString::fromUtf8(verifyResult.stdoutData).contains(QStringLiteral("albdf test")));
 }
 
 void FormSignatureTest::test_signTamperDetected()
 {
     const QString toolPath = QCoreApplication::applicationDirPath() + QStringLiteral("/albdf");
     const QString signedPath = m_tmpDir.filePath(QStringLiteral("signed2.pdf"));
-    const ToolResult signResult = runTool(toolPath,
-                                          {QStringLiteral("sign"),
-                                           m_formPdf,
-                                           signedPath,
-                                           QStringLiteral("--cert"),
-                                           m_certP12,
-                                           QStringLiteral("--password"),
-                                           QStringLiteral("testpass")},
-                                          m_tmpDir.path());
+    const ToolResult signResult = runAlbdfTool(toolPath,
+                                               {QStringLiteral("sign"),
+                                                m_formPdf,
+                                                signedPath,
+                                                QStringLiteral("--cert"),
+                                                m_certP12,
+                                                QStringLiteral("--password"),
+                                                QStringLiteral("testpass")},
+                                               m_tmpDir.path());
     QCOMPARE(signResult.exitCode, 0);
     QVERIFY(QFile::exists(signedPath));
-    qDebug() << "signed2 size:" << QFileInfo(signedPath).size() << "stderr:" << signResult.stdErr;
+    qDebug() << "signed2 size:" << QFileInfo(signedPath).size()
+             << "stderr:" << QString::fromUtf8(signResult.stderrData);
 
     // Tamper: flip a byte inside the first content stream payload (structure
     // stays valid; the signed bytes change).
@@ -305,13 +284,15 @@ void FormSignatureTest::test_signTamperDetected()
     file.close();
 
     const ToolResult verifyResult =
-        runTool(toolPath, {QStringLiteral("verify-signatures"), signedPath}, m_tmpDir.path());
+        runAlbdfTool(toolPath, {QStringLiteral("verify-signatures"), signedPath}, m_tmpDir.path());
     QCOMPARE(verifyResult.exitCode, 0);
     // The tampered row: Certificate=Error, Signature=Error (double Error).
     // An intact signature shows "Error ... OK" (self-signed cert untrusted,
     // but the signature itself validates). Assert the distinguishing pattern.
-    QVERIFY(verifyResult.stdOut.contains(QStringLiteral("albdf test      Error            Error")));
-    QVERIFY(!verifyResult.stdOut.contains(QStringLiteral("albdf test      Error            OK")));
+    QVERIFY(
+        QString::fromUtf8(verifyResult.stdoutData).contains(QStringLiteral("albdf test      Error            Error")));
+    QVERIFY(
+        !QString::fromUtf8(verifyResult.stdoutData).contains(QStringLiteral("albdf test      Error            OK")));
 }
 
 QTEST_GUILESS_MAIN(FormSignatureTest)
