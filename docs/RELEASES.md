@@ -1,5 +1,8 @@
 # albdf — release notes
 
+> The concise, user-facing changelog lives in [`/CHANGELOG.md`](../CHANGELOG.md);
+> this file holds the detailed per-release engineering notes.
+
 ## albdf 0.4.0 — RTL appearance streams (M14) + multi-platform release
 
 Date: 2026-08-15
