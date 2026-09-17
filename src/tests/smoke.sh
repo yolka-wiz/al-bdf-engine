@@ -40,13 +40,14 @@ page_count() { # page_count <pdf> -> prints page count from `info`
     "$PDFTOOL" info "$1" 2>/dev/null | awk '/Page count/ {print $3}'
 }
 
-# command present? `albdf <cmd> --help` prints the *command's* usage line
-# for known commands and the generic main usage for unknown ones.
+# command present? `albdf <cmd> --help` prints the *command's* usage line for
+# known commands. An unknown command writes its error to stderr and nothing to
+# stdout (see main.cpp), so an empty first line means the command is absent.
 command_present() {
     local main_line; local cmd_line
     main_line="$("$PDFTOOL" --help 2>/dev/null | head -1)"
     cmd_line="$("$PDFTOOL" "$1" --help 2>/dev/null | head -1)"
-    [ -n "$main_line" ] && [ "$cmd_line" != "$main_line" ]
+    [ -n "$main_line" ] && [ -n "$cmd_line" ] && [ "$cmd_line" != "$main_line" ]
 }
 
 # --- checks ----------------------------------------------------------------
@@ -57,6 +58,22 @@ if "$PDFTOOL" --version 2>/dev/null | grep -qE "albdf (0\.[0-9]+\.[0-9]+|1\.6\.0
     pass "version string"
 else
     fail "version string (got: $("$PDFTOOL" --version 2>/dev/null | head -1))"
+fi
+
+echo "== cli contract =="
+# Exit-code contract (src/PdfTool/AGENT.md §5): help/version paths succeed with
+# 0; unknown commands and malformed options are invalid arguments -> 7.
+expect_exit 0 "version flag exits 0" "$PDFTOOL" --version
+expect_exit 0 "help flag exits 0" "$PDFTOOL" --help
+expect_exit 0 "help command exits 0" "$PDFTOOL" help
+expect_exit 7 "unknown command exits 7" "$PDFTOOL" definitely-not-a-command
+expect_exit 7 "unknown option exits 7" \
+    "$PDFTOOL" info --definitely-not-an-option "$FIXTURES/test-baseline.pdf"
+expect_exit 0 "add-text --help exits 0" "$PDFTOOL" add-text --help
+if command_present "add-text"; then
+    pass "add-text --help prints command usage"
+else
+    fail "add-text --help prints command usage"
 fi
 
 # fixture registry: name -> pages -> expected text marker (single grep -E pattern)
