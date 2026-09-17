@@ -21,10 +21,9 @@
 
 #include "pdftextsearchengine.h"
 
+#include "pdfbidi.h"
 #include "pdfdocument.h"
 #include "pdfdocumenttextflow.h"
-
-#include <fribidi.h>
 
 #include <algorithm>
 #include <map>
@@ -81,11 +80,12 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
     }
 
     // 1. Normalize the query (logical order), then invert it to visual order
-    //    so it matches the visual-order extracted text. fribidi_log2vis also
-    //    SHAPES Arabic into presentation forms (FEE2/...), so normalize once
+    //    so it matches the visual-order extracted text. PDFBidi::logicalToVisual
+    //    shapes Arabic into presentation forms (FriBidi), so normalize once
     //    more after inversion (NFKC folds presentation forms back to base).
     const QString normalizedQuery = PDFRTLTextNormalizer::normalize(query, options.normalizer);
-    const QString visualQuery = PDFRTLTextNormalizer::normalize(invertToVisual(normalizedQuery), options.normalizer);
+    const QString visualQuery =
+        PDFRTLTextNormalizer::normalize(PDFBidi::logicalToVisual(normalizedQuery), options.normalizer);
     if (visualQuery.isEmpty())
     {
         return matches;
@@ -328,50 +328,6 @@ std::vector<PDFTextSearchEngine::Match> PDFTextSearchEngine::searchFlow(const PD
     }
 
     return matches;
-}
-
-QString PDFTextSearchEngine::invertToVisual(const QString& query) const
-{
-    if (query.isEmpty())
-    {
-        return QString();
-    }
-
-    // FriBidi operates on FriBidiChar (uint32). Convert from UTF-16.
-    const std::vector<char16_t> units(query.utf16(), query.utf16() + query.size());
-    std::vector<FriBidiChar> logical(units.size());
-    for (size_t i = 0; i < units.size(); ++i)
-    {
-        logical[i] = static_cast<FriBidiChar>(units[i]);
-    }
-
-    std::vector<FriBidiChar> visual(units.size());
-    std::vector<FriBidiStrIndex> positionsLToV(units.size());
-    std::vector<FriBidiStrIndex> positionsVToL(units.size());
-    std::vector<FriBidiLevel> levels(units.size());
-
-    // Auto-detect base direction from the query content (RTL if any strong
-    // RTL char is present; FriBidi's FRIBIDI_PAR_ON resolves that).
-    FriBidiParType baseDir = FRIBIDI_PAR_ON;
-    FriBidiLevel maxLevel = fribidi_log2vis(logical.data(),
-                                            static_cast<FriBidiStrIndex>(logical.size()),
-                                            &baseDir,
-                                            visual.data(),
-                                            positionsLToV.data(),
-                                            positionsVToL.data(),
-                                            levels.data());
-    if (maxLevel == 0)
-    {
-        return query;
-    }
-
-    QString result;
-    result.reserve(static_cast<int>(visual.size()));
-    for (const FriBidiChar c : visual)
-    {
-        result.append(QChar(static_cast<ushort>(c)));
-    }
-    return result;
 }
 
 } // namespace pdf

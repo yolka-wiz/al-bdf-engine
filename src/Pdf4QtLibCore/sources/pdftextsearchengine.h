@@ -40,8 +40,8 @@ class PDFDocumentTextFlow;
 /// LOGICAL order. The engine:
 ///   1. Extracts the per-page text flow (visual order, per-character rects)
 ///   2. Normalizes each item (PDFRTLTextNormalizer)
-///   3. Inverts the normalized query to visual order via FriBidi
-///      (fribidi_log2vis) so it matches the extracted text
+///   3. Inverts the normalized query to visual order via PDFBidi::logicalToVisual
+///      (FriBidi) so it matches the extracted text
 ///   4. Performs case-insensitive substring matching and maps matched
 ///      normalized indices back to original character bounding rects
 ///
@@ -95,10 +95,6 @@ public:
                                   PDFInteger pageFirst,
                                   PDFInteger pageLast,
                                   const Options& options);
-
-private:
-    /// Invert a logical query to visual order using FriBidi.
-    QString invertToVisual(const QString& query) const;
 };
 
 } // namespace pdf
