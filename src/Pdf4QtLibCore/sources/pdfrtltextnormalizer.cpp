@@ -21,9 +21,9 @@
 
 #include "pdfrtltextnormalizer.h"
 
-#include <QStringView>
+#include "pdfbidi.h"
 
-#include <fribidi.h>
+#include <QStringView>
 
 #include <vector>
 
@@ -227,62 +227,9 @@ QString PDFRTLTextNormalizer::normalize(const QString& text, const Options& opti
 
 QString PDFRTLTextNormalizer::invertToLogical(const QString& visual)
 {
-    if (visual.isEmpty())
-    {
-        return QString();
-    }
-
-    // FriBidi operates on FriBidiChar (uint32). Convert from UTF-16.
-    const std::vector<char16_t> units(visual.utf16(), visual.utf16() + visual.size());
-    std::vector<FriBidiChar> visualChars(units.size());
-    for (size_t i = 0; i < units.size(); ++i)
-    {
-        visualChars[i] = static_cast<FriBidiChar>(units[i]);
-    }
-
-    // Emulate fribidi_vis2log (removed in FriBidi 1.0): compute the bidi
-    // types and embedding levels of the VISUAL string, then apply the L2/L3
-    // reorder (fribidi_reorder_line). The reorder permutation is its own
-    // inverse for a string's own levels, so reordering the visual string
-    // recovers the logical order. positionsLToV is input+output and must
-    // start as the identity (logical position == visual position).
-    std::vector<FriBidiCharType> bidiTypes(units.size());
-    std::vector<FriBidiLevel> levels(units.size());
-    std::vector<FriBidiStrIndex> positionsLToV(units.size());
-
-    fribidi_get_bidi_types(visualChars.data(), static_cast<FriBidiStrIndex>(visualChars.size()), bidiTypes.data());
-
-    // Auto-detect the base direction from the visual content, mirroring the
-    // search engine's invertToVisual (FRIBIDI_PAR_ON).
-    FriBidiParType baseDir = FRIBIDI_PAR_ON;
-    const FriBidiLevel maxLevel = fribidi_get_par_embedding_levels_ex(
-        bidiTypes.data(), nullptr, static_cast<FriBidiStrIndex>(visualChars.size()), &baseDir, levels.data());
-    if (maxLevel == 0)
-    {
-        // No reordering (pure LTR or error) — return the input unchanged.
-        return visual;
-    }
-
-    for (size_t i = 0; i < positionsLToV.size(); ++i)
-    {
-        positionsLToV[i] = static_cast<FriBidiStrIndex>(i);
-    }
-    fribidi_reorder_line(FRIBIDI_FLAGS_DEFAULT,
-                         bidiTypes.data(),
-                         static_cast<FriBidiStrIndex>(visualChars.size()),
-                         0,
-                         baseDir,
-                         levels.data(),
-                         nullptr,
-                         positionsLToV.data());
-
-    QString result;
-    result.reserve(static_cast<int>(visualChars.size()));
-    for (size_t i = 0; i < visualChars.size(); ++i)
-    {
-        result.append(QChar(static_cast<ushort>(visualChars[positionsLToV[i]])));
-    }
-    return result;
+    // FriBidi implementation lives behind the PDFBidi seam (R4.2); this public
+    // entry point is kept so the GUI clipboard/write path is unchanged.
+    return PDFBidi::visualToLogical(visual);
 }
 
 } // namespace pdf

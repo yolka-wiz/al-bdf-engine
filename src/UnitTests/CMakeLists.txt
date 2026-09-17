@@ -59,6 +59,11 @@ add_albdf_test(UnitTests tst_lexicalanalyzertest.cpp)
 # (visual->logical re-inversion for the GUI clipboard copy path).
 add_albdf_test(UnitTestsRtlNormalizer tst_rtlnormalizertest.cpp HEADLESS)
 
+# R4.1/R4.2 RTL backend seam unit test: PDFBidi logical<->visual inversion +
+# embedding-level run splitting, plus the lam-alef/digit folding the call
+# sites rely on. Pure unit test (no CLI invocation).
+add_albdf_test(UnitTestsRtlBidi tst_rtlbiditest.cpp HEADLESS)
+
 add_albdf_test(UnitTestsImageOptimizer tst_imageoptimizertest.cpp)
 
 add_albdf_test(UnitTestsFontEncoding tst_fontencodingtest.cpp)
