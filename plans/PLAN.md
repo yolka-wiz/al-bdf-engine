@@ -206,9 +206,11 @@ copy-pasted in 8 files and the CMake test block repeats 16×.
 - [ ] **R2.2 ∥** Add a CMake helper `add_albdf_test(<name> <source> [deps…])`
   encapsulating the repeated `set_target_properties`/`add_test` block; migrate
   `src/UnitTests/CMakeLists.txt`. `#TBD`, S–M.
-- [ ] **R2.3 ∥** Implement `scripts/check-slop.sh` (the mechanical rules in
+- [x] **R2.3 ∥** Implement `scripts/check-slop.sh` (the mechanical rules in
   §3.2) with its own test, and wire it into `ci/run-ci.sh` + `.githooks/pre-commit`.
-  `#TBD`, M.
+  `#TBD`, M. **DONE** (script + wiring; enforced in the CI `gate`/`asan` jobs
+  via run-ci stage 5 and in the pre-commit hook). `--self-test`, diff-scoped by
+  default (origin/main, else fork base), `--all` advisory.
 - [ ] **R2.4** Add at least one negative/exit-code test per CLI command; roll
   out per command once R1.2 + R2.1 land. `#TBD`, M.
 

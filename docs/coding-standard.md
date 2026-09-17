@@ -202,14 +202,20 @@ form of `plans/PLAN.md` §3.
 
 | Rule | Mechanism |
 |---|---|
-| S2, S6 | `check-slop.sh` (frozen-LOC baseline; function/file length) |
+| S6 | `check-slop.sh` (frozen-file LOC baseline — shrink allowed, growth is not) |
 | C3 | `check-slop.sh` (marker regex needs `(#NN)`) |
-| E1 | `check-slop.sh` (`Q_ASSERT`/`assert` in `src/PdfTool/**`) |
-| E2, U2, U3 | `check-slop.sh` (edited vendored file detection; SPDX on new files) |
-| S1, S3, S4, S5, S7 | orchestrator review |
-| E3–E7, D1–D3, C1–C5, T1–T6, P1–P7 | orchestrator review + existing CI |
+| E1 | `check-slop.sh` (`Q_ASSERT`/`assert` in changed `src/PdfTool/**` files) |
+| U3 | `check-slop.sh` (SPDX on newly added authored files) |
+| U2 | `check-slop.sh` (edited vendored file detection — warning only) |
+| S7 | `check-slop.sh` (raw `new`/`delete` — warning only) |
+| S1, S2, S3, S4, S5 | orchestrator review |
+| E2–E7, D1–D3, C1–C5, T1–T6, P1–P7 | orchestrator review + existing CI |
 | Formatting | `clang-format` gate (authored files only) |
 | Memory/safety | ASAN/UBSAN CI job |
 
-`scripts/check-slop.sh` does not exist yet — it is roadmap task **R2.3**.
-Until it lands, these rules are enforced by review.
+`scripts/check-slop.sh` implements the mechanical checks above (roadmap R2.3)
+and runs in CI (stage 5) + `.githooks/pre-commit`. It is **diff-scoped by
+default** — changed authored files vs `origin/main` (falling back to the fork
+base `6bf5047`), like the clang-format gate; `--all` is a full-repo advisory
+scan. Function/file-length limits (S2) are not yet mechanized (the frozen-file
+baseline covers the S6 case), so S2 stays a review rule.

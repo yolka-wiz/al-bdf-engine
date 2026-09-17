@@ -1,26 +1,30 @@
 #!/bin/bash
 # albdf CI gate — run on a bare container after reinstall-toolchain.sh.
 #
-#   ci/run-ci.sh [--skip-asan] [--skip-format] [--skip-release] [--only-format] [--gui]
+#   ci/run-ci.sh [--skip-asan] [--skip-format] [--skip-slop] [--skip-release] \
+#                [--only-format] [--only-slop] [--gui]
 #
 # Stages:
 #   1. configure + build (Release, offscreen-capable)
 #   2. ctest (offscreen)
 #   3. ASAN/UBSAN build + ctest (Debug + sanitizers)
 #   4. clang-format gate (authored files only — vendored upstream is exempt)
+#   5. anti-slop gate (scripts/check-slop.sh, changed authored files)
 #   gui. optional GUI stage (non-gating): configure + build the vendored
 #        PDF4QT GUI layer (ALBDF_BUILD_GUI=ON) into src/build-gui, then the
 #        headless GUI smoke (src/tests/gui-smoke.sh, offscreen -> xvfb
-#        fallback). Runs INSTEAD of the four headless stages — the headless
+#        fallback). Runs INSTEAD of the five headless stages — the headless
 #        gate is never touched when --gui is used.
 #
 # Stage-selection flags (backward compatible — the bare invocation still
-# runs all four stages, as the local bare-container flow expects):
+# runs all five stages, as the local bare-container flow expects):
 #   --skip-release  skip stages 1-2 (assumes a green Release build already
 #                   exists; used by the hosted-CI ASAN job)
 #   --skip-asan     skip stage 3
 #   --skip-format   skip stage 4
+#   --skip-slop     skip stage 5
 #   --only-format   run only stage 4 (used by the hosted-CI format job)
+#   --only-slop     run only stage 5 (used by the hosted-CI format job)
 #   --gui           run only the GUI stage (used by the hosted-CI gui job);
 #                   also selectable via the ALBDF_CI_STAGE=gui env var
 #
@@ -31,15 +35,19 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_DIR="$REPO_DIR/src"
 SKIP_ASAN=0
 SKIP_FORMAT=0
+SKIP_SLOP=0
 SKIP_RELEASE=0
 ONLY_FORMAT=0
+ONLY_SLOP=0
 GUI=0
 for arg in "$@"; do
     case "$arg" in
         --skip-asan) SKIP_ASAN=1 ;;
         --skip-format) SKIP_FORMAT=1 ;;
+        --skip-slop) SKIP_SLOP=1 ;;
         --skip-release) SKIP_RELEASE=1 ;;
         --only-format) ONLY_FORMAT=1 ;;
+        --only-slop) ONLY_SLOP=1 ;;
         --gui) GUI=1 ;;
     esac
 done
@@ -112,9 +120,9 @@ if [ "$GUI" -eq 1 ]; then
     exit "$FAILED"
 fi
 
-if [ "$ONLY_FORMAT" -eq 0 ]; then
+if [ "$ONLY_FORMAT" -eq 0 ] && [ "$ONLY_SLOP" -eq 0 ]; then
     if [ "$SKIP_RELEASE" -eq 0 ]; then
-        step "1/4 configure + build (Release)"
+        step "1/5 configure + build (Release)"
         cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
               -DALBDF_BUILD_TESTS=ON > /tmp/ci-build.log 2>&1
@@ -122,7 +130,7 @@ if [ "$ONLY_FORMAT" -eq 0 ]; then
         cmake --build build >> /tmp/ci-build.log 2>&1
         if [ $? -ne 0 ]; then echo "build FAILED"; tail -20 /tmp/ci-build.log; FAILED=1; fi
 
-        step "2/4 ctest (offscreen)"
+        step "2/5 ctest (offscreen)"
         export QT_QPA_PLATFORM=offscreen
         ctest --test-dir build --output-on-failure > /tmp/ci-ctest.log 2>&1
         if [ $? -ne 0 ]; then echo "ctest FAILED"; tail -20 /tmp/ci-ctest.log; FAILED=1; else
@@ -131,7 +139,7 @@ if [ "$ONLY_FORMAT" -eq 0 ]; then
     fi
 
     if [ "$SKIP_ASAN" -eq 0 ]; then
-        step "3/4 ASAN/UBSAN build + ctest"
+        step "3/5 ASAN/UBSAN build + ctest"
         cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN" \
               -DALBDF_BUILD_TESTS=ON \
@@ -154,8 +162,8 @@ if [ "$ONLY_FORMAT" -eq 0 ]; then
     fi
 fi
 
-if [ "$SKIP_FORMAT" -eq 0 ]; then
-    step "4/4 clang-format gate (authored files)"
+if [ "$SKIP_FORMAT" -eq 0 ] && [ "$ONLY_SLOP" -eq 0 ]; then
+    step "4/5 clang-format gate (authored files)"
     UNFORMATTED=0
     for f in $AUTHORED_FILES; do
         if ! clang-format --dry-run --Werror "$REPO_DIR/$f" > /dev/null 2>&1; then
@@ -168,6 +176,18 @@ if [ "$SKIP_FORMAT" -eq 0 ]; then
         FAILED=1
     else
         echo "clang-format gate OK ($(echo "$AUTHORED_FILES" | wc -l) files)"
+    fi
+fi
+
+if [ "$SKIP_SLOP" -eq 0 ] && [ "$ONLY_FORMAT" -eq 0 ]; then
+    step "5/5 anti-slop gate (changed authored files)"
+    # Diff-scoped like the format gate; the script resolves its own base
+    # (origin/main, else the fork base) and exits 2 on a bad ref.
+    bash "$REPO_DIR/scripts/check-slop.sh" > /tmp/ci-slop.log 2>&1
+    if [ $? -ne 0 ]; then
+        echo "anti-slop gate FAILED"; cat /tmp/ci-slop.log; FAILED=1
+    else
+        cat /tmp/ci-slop.log
     fi
 fi
 

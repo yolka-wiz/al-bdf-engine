@@ -7,6 +7,10 @@
 #    and vendored skills/), enforcing the "structured, not minimal" doc rule.
 # 3. Scans staged files for high-signal secret patterns (API keys, tokens,
 #    private keys). Fails the commit if found.
+# 4. Runs the anti-slop gate (scripts/check-slop.sh --staged) on staged source
+#    files: frozen-file growth, unowned TODO/FIXME/HACK/XXX, missing SPDX on
+#    new files, assert-as-validation in src/PdfTool/**. Fatal — the same check
+#    is CI stage 5, so bypassing it only defers the failure.
 #
 # Install:  scripts/install-hooks.sh   (sets core.hooksPath to .githooks)
 # Skip:     git commit --no-verify      (or SKIP=1 git commit ...)
@@ -63,6 +67,23 @@ if [ -n "$STAGED" ]; then
         echo "Remove the secret (or rotate it if it was ever pushed) and re-commit."
         echo "To bypass (NOT recommended): git commit --no-verify"
         exit 1
+    fi
+fi
+
+# ---- 4. Anti-slop gate on staged source files ------------------------------
+# Fatal on a real violation (exit 1). Any other non-zero (should be impossible
+# for --staged) warns instead of blocking, so a broken gate cannot wedge commits.
+if [ -x "$REPO_DIR/scripts/check-slop.sh" ]; then
+    bash "$REPO_DIR/scripts/check-slop.sh" --staged
+    SLOP_RC=$?
+    if [ "$SLOP_RC" -eq 1 ]; then
+        echo
+        echo "pre-commit: anti-slop gate FAILED (staged source files above)."
+        echo "Own markers (TODO(#123)), add the SPDX header, or shrink the frozen file."
+        echo "To bypass: git commit --no-verify"
+        exit 1
+    elif [ "$SLOP_RC" -ne 0 ]; then
+        echo "pre-commit: anti-slop gate could not run (rc=$SLOP_RC) — skipping (not blocking)."
     fi
 fi
 
