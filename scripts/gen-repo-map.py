@@ -127,7 +127,7 @@ def section_dirs():
         "ci/": "CI gate: run-ci.sh (build + ctest + ASAN/UBSAN + clang-format)",
         "db/": "Tracking DB: schema.sql + seed.py committed; albdf.db gitignored (db.py CLI)",
         "docs/": "PROBLEMS.md, RELEASES.md, ADRs (decisions/), research notes, man page, coding standard",
-        "plans/": "PLAN.md roadmap (M0–M8.1) + per-problem fix plans (P3-execution.md, …)",
+        "plans/": "PLAN.md active roadmap (v3) + archive/ of completed execution plans",
         "scripts/": "Tooling: db.py (tracking DB), gen-repo-map.py (this file), install-hooks.sh",
         "skills/": "Vendored Qt Company agent skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review)",
         "src/": "The fork: Pdf4QtLibCore (engine) + PdfTool (CLI) + UnitTests + tests",

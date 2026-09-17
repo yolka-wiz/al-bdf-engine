@@ -3,7 +3,7 @@
 Status: **RESOLVED** (2026-08-05) · Owner: rtl-agent · Effort: **M**
 Fixed by `109a4af` (Ts emission) + `9a4587d` (flow phantom-space guard) +
 `4ed7ab2` (kasra band calibration); unblocked by P6 `74a1166` (CIDToGIDMap).
-Execution detail: `plans/P3-execution.md`.
+Execution detail: `plans/archive/P3-execution.md`.
 
 ## Symptom
 
