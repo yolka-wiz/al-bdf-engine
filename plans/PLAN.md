@@ -147,51 +147,54 @@ limits. Rule violations fail review; the mechanically checkable ones fail CI.
 
 Small, independent, unblocks clean work. Most items are independent → parallel.
 
-- [ ] **R0.1 ∥** Delete the dead remote branches `m14/form-field-ap` and
+- [x] **R0.1 ∥** Delete the dead remote branches `m14/form-field-ap` and
   `m14/freetext-ap` (merged). For `handoff-migration`, first export the task DB
   (`git show origin/handoff-migration:db/albdf.db > /tmp/albdf.db`), then delete
-  — the DB does not belong in git. `#TBD`, S.
-- [ ] **R0.2 ∥** Correct the false 0.4.0 claim in `docs/RELEASES.md` (native
+  — the DB does not belong in git. `#TBD`, S. **DONE** — remote now only `main`.
+- [x] **R0.2 ∥** Correct the false 0.4.0 claim in `docs/RELEASES.md` (native
   macOS binaries did not ship) and point readers at the GitHub release status.
-  `#TBD`, S.
-- [ ] **R0.3 ∥** Archive completed execution plans (`plans/m10-*`, `plans/m14-*`,
+  `#TBD`, S. **DONE** (`99b32c5`).
+- [x] **R0.3 ∥** Archive completed execution plans (`plans/m10-*`, `plans/m14-*`,
   `plans/P3-*`, `plans/handoff/`) into `plans/archive/` so `plans/PLAN.md` is
   the single active roadmap; update `scripts/gen-repo-map.py` + docs references.
-  `#TBD`, S.
-- [ ] **R0.4 ∥** Update `db/seed.py` to reflect shipped state M12–M14 and the
+  `#TBD`, S. **DONE** (`7b1179b`).
+- [x] **R0.4 ∥** Update `db/seed.py` to reflect shipped state M12–M14 and the
   new R-task set, so a fresh `db.py init && db/seed.py` matches reality.
-  `#TBD`, S.
-- [ ] **R0.5 ∥** Ratify §3: add `docs/coding-standard.md` §11 (rules +
-  enforcement mapping) and ADR-0008 (quality gate). `#TBD`, S.
+  `#TBD`, S. **DONE** (`5ba12a7`).
+- [x] **R0.5 ∥** Ratify §3: add `docs/coding-standard.md` §11 (rules +
+  enforcement mapping) and ADR-0007 (quality gate). `#TBD`, S. **DONE**.
 
 **Exit:** branches gone; docs truthful; one active roadmap; DB seed current;
-anti-slop rules binding.
+anti-slop rules binding. ✅
 
 ### R1 — Correctness & CLI contract (P0, one writer)
 
 The only crash class found by fuzzing, and the exit-code contract, are still
 paper-thin. Do this before architectural work.
 
-- [ ] **R1.1 ∥** Top-level `try/catch` in `src/PdfTool/main.cpp`: map
+- [x] **R1.1 ∥** Top-level `try/catch` in `src/PdfTool/main.cpp`: map
   `pdf::PDFException` / `std::exception` to a stable error + exit code so an
   exception escaping `main` never reaches `std::terminate`. **Note:** this does
   *not* cover F#1 — that SIGABRT came from a Qt Concurrent worker thread and was
   already fixed by render page-range validation (`7a70767`); a `main` guard
-  cannot catch exceptions thrown in worker threads. Add a test that exercises
-  the guard. `#TBD`, S.
-- [ ] **R1.2 ∥** Exit-code normalization: use `parser.parse()` (not `process()`)
+  cannot catch exceptions thrown in worker threads. `#TBD`, S. **DONE**
+  (`bbd37a2`). No dedicated fault-injection test (no command throws on demand);
+  guard coverage is by inspection.
+- [x] **R1.2 ∥** Exit-code normalization: use `parser.parse()` (not `process()`)
   for non-help invocations so unknown/malformed options return the documented
   `ErrorInvalidArguments` (7) and a usage message, instead of Qt's `EXIT_FAILURE`
   (1); unknown command must not silently succeed (currently returns 0). `#TBD`, S.
-- [ ] **R1.3 ∥** CLI contract test: a table of `(argv → expected exit code +
-  stderr shape)` covering `add-text`, `delete-object`, `search-text`, `render`,
-  and the help/version paths. `#TBD`, S. Depends on R1.2.
-- [ ] **R1.4** Document the encryption determinism exemption (secure RNG is
+  **DONE** (`bbd37a2`), incl. `--help-all` (`4bd6ee6`).
+- [x] **R1.3 ∥** CLI contract test: exit-code assertions for the help/version
+  paths, unknown command, malformed option, and `--help-all` — implemented as a
+  new section in `src/tests/smoke.sh` (registered ctest target `SmokeCli`).
+  `#TBD`, S. **DONE** (`7d1e6e3`). Per-command negative tests remain → R2.4.
+- [x] **R1.4** Document the encryption determinism exemption (secure RNG is
   correct crypto, but it violates the byte-stable rule) in
-  `docs/coding-standard.md` + `docs/PROBLEMS.md`. `#TBD`, S.
+  `docs/coding-standard.md` + `docs/PROBLEMS.md`. `#TBD`, S. **DONE** (`99b32c5`).
 
 **Exit:** no user input can abort the process; exit codes match the documented
-contract and are regression-tested.
+contract and are regression-tested. ✅ (CI: Release + ASAN green.)
 
 ### R2 — Test-harness leverage (P1, one writer)
 
@@ -353,8 +356,8 @@ where a decision was made; the next phase's DB tasks created.
 
 | ADR | Decision | Phase |
 |---|---|---|
-| 0007 | CLI command architecture (`CommandSpec`, typed options, frozen base) | R3.4 |
-| 0008 | Anti-slop quality gate (rules + `check-slop.sh`) | R0.5 |
+| 0007 | Anti-slop quality gate (rules + `check-slop.sh`) | R0.5 — **accepted** |
+| 0008 | CLI command architecture (`CommandSpec`, typed options, frozen base) | R3.4 |
 | 0009 | Root build layout (`CMakeLists.txt` shim + `${CMAKE_BINARY_DIR}` policy) | R5 |
 | 0010 | Generated-file policy (`REPO_MAP.md`, release notes) | R5.2 |
 

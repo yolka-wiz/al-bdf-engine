@@ -24,7 +24,7 @@ docs/
   RELEASES.md          # per-release notes, newest on top
   albdf.1            # the man page (troff/groff, NOT markdown)
   setup-context7.md    # host-side MCP wiring for the context7 tools
-  decisions/           # ADR-0001..0006 (fork, no-gui, rtl, license, gpl, forms/signatures)
+  decisions/           # ADR-0001..0007 (fork, no-gui, rtl, license, gpl, forms/signatures, anti-slop)
   research/            # 001/002/003 briefs + findings, baseline-upstream.md, baseline-out/
   context7/            # vendored library docs: harfbuzz.md, fribidi.md, freetype.md, README.md
   specs/               # reserved for formal specs (currently empty)
@@ -47,12 +47,12 @@ is written*, that belongs in `coding-standard.md`, not a one-off note.
 
 ## ADRs (decisions/)
 
-- One file per decision, numbered sequentially: `docs/decisions/0007-<slug>.md`.
+- One file per decision, numbered sequentially: `docs/decisions/0008-<slug>.md`.
 - Every ADR file gets a matching `decisions` row via
-  `db.py decision-add --file docs/decisions/0007-x.md --title "..." --summary "..."`.
+  `db.py decision-add --file docs/decisions/0008-x.md --title "..." --summary "..."`.
 - Keep statuses in sync: `proposed` → `accepted` / `superseded` / `rejected`.
-- Existing numbering starts at 0001-fork-pdf4qt → 0006-forms-signatures-cli. The next
-  free number is **0007**.
+- Existing numbering starts at 0001-fork-pdf4qt → 0007-antislop-quality-gate. The next
+  free number is **0008**.
 
 ## Research notes (research/)
 
