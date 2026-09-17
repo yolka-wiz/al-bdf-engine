@@ -7,10 +7,26 @@
 
 ## Current status
 
-**Not yet enabled.** Branch protection is documented policy only: the remote
-currently returns "Branch not protected" for `main`. Until an admin applies
-the rule below, contributors **must not push to `main`** — work on a branch
-and open a pull request (see `CONTRIBUTING.md` §3b).
+**Partially enforced via a repository ruleset.** The classic branch-protection
+API returns "Branch not protected", but an active repository ruleset named
+`pr check` (id `20521594`, created 2026-08-06) does guard `main`:
+
+| Rule | Active | Notes |
+|---|---|---|
+| Require a pull request | ✅ | 1 approving review by someone other than the author |
+| Dismiss stale approvals on push | ❌ | not set in the ruleset |
+| Require status checks | ❌ | intended below, **not yet part of the ruleset** |
+| Require branches up to date | ❌ | not set |
+| Require conversation resolution | ❌ | not set |
+| Block branch deletion | ✅ | `main` cannot be deleted |
+| Block force pushes (non-fast-forward) | ✅ | |
+| Enforce admins / disallow bypass | ❌ | admins can bypass the review requirement |
+
+Allowed merge methods: merge, squash, rebase (no linear-history enforcement).
+The table under **Rule: protect `main`** is the *intended* target state; align
+the ruleset with it via **Settings → Rules** (or the REST API below). Until
+then, contributors **must not push to `main`** — work on a branch and open a
+pull request (see `CONTRIBUTING.md` §3b).
 
 ## Rule: protect `main`
 
