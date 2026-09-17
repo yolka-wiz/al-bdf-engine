@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
                 return pdftool::PDFToolAbstractApplication::ExitSuccess;
             }
 
-            if (globalParseOk || parser.isSet(helpOption))
+            if (globalParseOk || parser.isSet(helpOption) || parser.isSet(QStringLiteral("help-all")))
             {
                 writeStdout(parser.helpText());
                 return pdftool::PDFToolAbstractApplication::ExitSuccess;
@@ -123,7 +123,11 @@ int main(int argc, char *argv[])
             return pdftool::PDFToolAbstractApplication::ExitSuccess;
         }
 
-        if (parser.isSet(helpOption))
+        // addHelpOption() registers two options: "-h/--help" and "--help-all"
+        // (the latter adds generic Qt options upstream). process() handled both;
+        // since we parse manually, treat "--help-all" as help too or a command
+        // would silently run when only help was requested.
+        if (parser.isSet(helpOption) || parser.isSet(QStringLiteral("help-all")))
         {
             writeStdout(parser.helpText());
             return pdftool::PDFToolAbstractApplication::ExitSuccess;
