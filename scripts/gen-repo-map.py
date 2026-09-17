@@ -6,6 +6,11 @@ so REPO_MAP.md always reflects the committed tree. It is deliberately
 DETERMINISTIC: no timestamps, no absolute paths, sorted output — running it
 twice on the same tree produces byte-identical output (repo determinism law).
 
+Generated-file policy: REPO_MAP.md stays committed (a fresh clone has a usable
+index without running anything); it is a build product of this script, never
+hand-edited, and the tree scan is driven by `git ls-files` so a machine-local
+untracked dist/ or build/ cannot change the committed bytes.
+
 Run manually:  python3 scripts/gen-repo-map.py
 Output:        REPO_MAP.md (repo root)
 """
@@ -57,6 +62,24 @@ def first_paragraph(path):
         # break at last space
         text = cut[: cut.rfind(" ")] + "…"
     return title, text
+
+
+def top_level_dirs():
+    """Top-level directories present in the *tracked* tree.
+
+    Sourced from git's file list rather than os.listdir so untracked/gitignored
+    build output (dist/, build*/, src/build/) cannot leak into the generated map:
+    a fresh clone must produce byte-identical output (determinism law D1). Falls
+    back to a filtered os.listdir when git is unavailable (exported tarball).
+    """
+    dirs = {rel.split("/", 1)[0] for rel in git("ls-files").splitlines() if "/" in rel}
+    if dirs:
+        return dirs
+    ignored = {"dist", "build", "build-asan", "vendor-upstream-pdf4qt"}
+    return {
+        d for d in os.listdir(REPO)
+        if os.path.isdir(os.path.join(REPO, d)) and not d.startswith(".") and d not in ignored
+    }
 
 
 def walk_md(root, skip_dirs):
@@ -127,24 +150,23 @@ def section_dirs():
         "ci/": "CI gate: run-ci.sh (build + ctest + ASAN/UBSAN + clang-format)",
         "db/": "Tracking DB: schema.sql + seed.py committed; albdf.db gitignored (db.py CLI)",
         "docs/": "PROBLEMS.md, RELEASES.md, ADRs (decisions/), research notes, man page, coding standard",
+        "packaging/": "Linux desktop integration: .desktop file, AppImage build script, app icon",
         "plans/": "PLAN.md active roadmap (v3) + archive/ of completed execution plans",
         "scripts/": "Tooling: db.py (tracking DB), gen-repo-map.py (this file), install-hooks.sh",
         "skills/": "Vendored Qt Company agent skills (qt-cmake-project, qt-cpp-docs, qt-cpp-review)",
         "src/": "The fork: Pdf4QtLibCore (engine) + PdfTool (CLI) + UnitTests + tests",
         ".githooks/": "Git hooks: pre-commit regenerates REPO_MAP.md + markdown structure gate",
     }
+    # Curated keys carry a trailing slash for display; compare against the bare
+    # git-reported dir names (no slash) to avoid the duplicate "unmapped" rows.
+    known_names = {k.rstrip("/") for k in known}
+    dirs = top_level_dirs()
     lines = [heading("Top-level directory map", 2), "", "| Path | Purpose |", "|---|---|"]
-    existing = sorted(
-        d for d in os.listdir(REPO)
-        if os.path.isdir(os.path.join(REPO, d)) and not d.startswith(".") and d != "src"
-    )
-    # Always show src first-ish? Keep sorted but ensure known order stable.
     for d in sorted(known):
-        status = "" if os.path.isdir(os.path.join(REPO, d)) else " *(MISSING)*"
+        status = "" if d.rstrip("/") in dirs else " *(MISSING)*"
         lines.append(f"| `{d}` | {known[d]}{status} |")
-    for d in existing:
-        if d not in known:
-            lines.append(f"| `{d}/` | *(unmapped — add to scripts/gen-repo-map.py)* |")
+    for d in sorted(x for x in dirs if not x.startswith(".") and x not in known_names):
+        lines.append(f"| `{d}/` | *(unmapped — add to scripts/gen-repo-map.py)* |")
     lines.append("")
     return lines
 
@@ -194,28 +216,20 @@ def section_src_map():
 
 
 def section_db_status():
-    lines = [heading("Tracking DB status", 2), ""]
-    db = os.path.join(REPO, "db", "albdf.db")
-    if not os.path.exists(db):
-        lines.append("_DB not present (gitignored). Rebuild:_")
-        lines.append("")
-        lines.append("```bash")
-        lines.append("python3 scripts/db.py init && python3 db/seed.py")
-        lines.append("```")
-        lines.append("")
-        return lines
-    try:
-        status = subprocess.run(
-            [sys.executable, os.path.join(REPO, "scripts", "db.py"), "status"],
-            capture_output=True, text=True, timeout=15,
-        ).stdout
-    except Exception:
-        status = ""
-    lines.append("```text")
-    lines.append(status.strip()[:2000] if status else "(db.py status unavailable)")
-    lines.append("```")
-    lines.append("")
-    return lines
+    # `db/albdf.db` is gitignored, so embedding its live contents would make this
+    # committed file depend on the machine that ran the generator (and leak ANSI
+    # color codes). Emit the deterministic rebuild/query pointer instead.
+    return [
+        heading("Tracking DB status", 2),
+        "",
+        "_Not embedded: `db/albdf.db` is gitignored and machine-specific._",
+        "",
+        "```bash",
+        "python3 scripts/db.py init && python3 db/seed.py   # rebuild on a fresh clone",
+        "python3 scripts/db.py status                       # live component/task status",
+        "```",
+        "",
+    ]
 
 
 def section_rules():
