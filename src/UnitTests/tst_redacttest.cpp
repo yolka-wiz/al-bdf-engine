@@ -49,50 +49,21 @@
 // The suite also asserts the exit-code contract: missing output argument is
 // ErrorInvalidArguments (7), a missing input file is ErrorDocumentReading (4).
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QtTest>
 
 #include <QCryptographicHash>
 #include <QFile>
 #include <QImage>
-#include <QProcess>
-#include <QProcessEnvironment>
 #include <QTemporaryDir>
 #include <QTextStream>
 
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
+
 namespace
 {
-struct ToolResult
-{
-    int exitCode = -1;
-    QByteArray stdoutData;
-    QByteArray stderrData;
-};
-
-ToolResult runTool(const QString& toolPath, const QStringList& arguments, const QString& workingDir)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForStarted())
-    {
-        return result;
-    }
-    if (!process.waitForFinished(180000))
-    {
-        process.kill();
-        return result;
-    }
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
-
 QByteArray sha256OfFile(const QString& path)
 {
     QFile file(path);
@@ -114,20 +85,20 @@ QImage renderPage(const QString& toolPath, const QString& pdfPath, const QString
     {
         return QImage();
     }
-    ToolResult result = runTool(toolPath,
-                                {QStringLiteral("render"),
-                                 pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QString::number(page),
-                                 QStringLiteral("--page-last"),
-                                 QString::number(page),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("72"),
-                                 QStringLiteral("--image-output-dir"),
-                                 renderDir.path()},
-                                workingDir);
+    ToolResult result = runAlbdfTool(toolPath,
+                                     {QStringLiteral("render"),
+                                      pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QString::number(page),
+                                      QStringLiteral("--page-last"),
+                                      QString::number(page),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("72"),
+                                      QStringLiteral("--image-output-dir"),
+                                      renderDir.path()},
+                                     workingDir);
     if (result.exitCode != 0)
     {
         return QImage();
@@ -221,7 +192,8 @@ void RedactTest::redactionRegionRendersSolidBlackBar()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/redacted.pdf");
-    ToolResult redactResult = runTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
+    ToolResult redactResult =
+        runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
     QCOMPARE(redactResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "redacted document must be created");
 
@@ -270,7 +242,8 @@ void RedactTest::redactionPreservesPageSize()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/redacted.pdf");
-    ToolResult redactResult = runTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
+    ToolResult redactResult =
+        runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
     QCOMPARE(redactResult.exitCode, 0);
 
     // The page is 612x792 pt; at 72 dpi it must render 612x792 pixels —
@@ -291,12 +264,13 @@ void RedactTest::redactedOutputRoundTrip()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/redacted.pdf");
-    ToolResult redactResult = runTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
+    ToolResult redactResult =
+        runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath, outputPath}, tmpDir.path());
     QCOMPARE(redactResult.exitCode, 0);
 
     // The redacted document must reopen cleanly through `info` with exactly
     // one page (the fixture is single-page).
-    ToolResult infoResult = runTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
+    ToolResult infoResult = runAlbdfTool(toolPath, {QStringLiteral("info"), outputPath}, tmpDir.path());
     QCOMPARE(infoResult.exitCode, 0);
     QVERIFY2(infoResult.stdoutData.contains("Page count"), "info output must report a page count");
 
@@ -325,11 +299,11 @@ void RedactTest::redactionOutputDeterministic()
     QVERIFY(tmpDir.isValid());
 
     const QString firstPath = tmpDir.path() + QStringLiteral("/first.pdf");
-    ToolResult first = runTool(toolPath, {QStringLiteral("redact"), fixturePath, firstPath}, tmpDir.path());
+    ToolResult first = runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath, firstPath}, tmpDir.path());
     QCOMPARE(first.exitCode, 0);
 
     const QString secondPath = tmpDir.path() + QStringLiteral("/second.pdf");
-    ToolResult second = runTool(toolPath, {QStringLiteral("redact"), fixturePath, secondPath}, tmpDir.path());
+    ToolResult second = runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath, secondPath}, tmpDir.path());
     QCOMPARE(second.exitCode, 0);
 
     const QByteArray firstHash = sha256OfFile(firstPath);
@@ -347,19 +321,19 @@ void RedactTest::redactInvalidArguments()
     QVERIFY(tmpDir.isValid());
 
     // Missing output document: ErrorInvalidArguments (7) — contract code.
-    ToolResult noOutput = runTool(toolPath, {QStringLiteral("redact"), fixturePath}, tmpDir.path());
+    ToolResult noOutput = runAlbdfTool(toolPath, {QStringLiteral("redact"), fixturePath}, tmpDir.path());
     QCOMPARE(noOutput.exitCode, 7);
 
     // No arguments at all: also invalid (7).
-    ToolResult noArgs = runTool(toolPath, {QStringLiteral("redact")}, tmpDir.path());
+    ToolResult noArgs = runAlbdfTool(toolPath, {QStringLiteral("redact")}, tmpDir.path());
     QCOMPARE(noArgs.exitCode, 7);
 
     // Nonexistent input: ErrorDocumentReading (4) — non-zero.
-    ToolResult missingInput = runTool(toolPath,
-                                      {QStringLiteral("redact"),
-                                       tmpDir.path() + QStringLiteral("/nope.pdf"),
-                                       tmpDir.path() + QStringLiteral("/out.pdf")},
-                                      tmpDir.path());
+    ToolResult missingInput = runAlbdfTool(toolPath,
+                                           {QStringLiteral("redact"),
+                                            tmpDir.path() + QStringLiteral("/nope.pdf"),
+                                            tmpDir.path() + QStringLiteral("/out.pdf")},
+                                           tmpDir.path());
     QVERIFY2(missingInput.exitCode != 0, "nonexistent input must fail with non-zero exit code");
     QVERIFY2(!QFile::exists(tmpDir.path() + QStringLiteral("/out.pdf")), "no output must be written on failure");
 }

@@ -32,55 +32,21 @@
 // signal and never hang. A valid render must keep working and stay
 // byte-deterministic across runs.
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QtTest>
 
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
-#include <QProcessEnvironment>
 #include <QTemporaryDir>
+
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
 
 namespace
 {
-struct ToolResult
-{
-    int exitCode = -1;
-    QProcess::ExitStatus exitStatus = QProcess::CrashExit;
-    bool finishedInTime = false;
-    QByteArray stdoutData;
-    QByteArray stderrData;
-};
-
-ToolResult
-runTool(const QString& toolPath, const QStringList& arguments, const QString& workingDir, int timeoutMs = 180000)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForStarted())
-    {
-        return result;
-    }
-    result.finishedInTime = process.waitForFinished(timeoutMs);
-    if (!result.finishedInTime)
-    {
-        process.kill();
-        process.waitForFinished(5000);
-        return result;
-    }
-    result.exitStatus = process.exitStatus();
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
-
 QByteArray sha256OfFile(const QString& path)
 {
     QFile file(path);
@@ -126,20 +92,20 @@ void RenderTest::renderPageFirstZeroFailsWithErrorCode()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(m_toolPath,
-                                {QStringLiteral("render"),
-                                 m_pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QStringLiteral("0"),
-                                 QStringLiteral("--page-last"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("72"),
-                                 QStringLiteral("--image-output-dir"),
-                                 tmpDir.path()},
-                                m_workingDir);
+    ToolResult result = runAlbdfTool(m_toolPath,
+                                     {QStringLiteral("render"),
+                                      m_pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QStringLiteral("0"),
+                                      QStringLiteral("--page-last"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("72"),
+                                      QStringLiteral("--image-output-dir"),
+                                      tmpDir.path()},
+                                     m_workingDir);
 
     QVERIFY2(result.finishedInTime, "render must terminate, not hang");
     QCOMPARE(result.exitStatus, QProcess::NormalExit);
@@ -153,20 +119,20 @@ void RenderTest::renderPageLastHugeFailsWithErrorCode()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(m_toolPath,
-                                {QStringLiteral("render"),
-                                 m_pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--page-last"),
-                                 QStringLiteral("999999999"),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("72"),
-                                 QStringLiteral("--image-output-dir"),
-                                 tmpDir.path()},
-                                m_workingDir);
+    ToolResult result = runAlbdfTool(m_toolPath,
+                                     {QStringLiteral("render"),
+                                      m_pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--page-last"),
+                                      QStringLiteral("999999999"),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("72"),
+                                      QStringLiteral("--image-output-dir"),
+                                      tmpDir.path()},
+                                     m_workingDir);
 
     QVERIFY2(result.finishedInTime, "render must terminate, not hang");
     QCOMPARE(result.exitStatus, QProcess::NormalExit);
@@ -181,21 +147,21 @@ void RenderTest::renderHugeDpiDoesNotHang()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(m_toolPath,
-                                {QStringLiteral("render"),
-                                 m_pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--page-last"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("999999"),
-                                 QStringLiteral("--image-output-dir"),
-                                 tmpDir.path()},
-                                m_workingDir,
-                                60000);
+    ToolResult result = runAlbdfTool(m_toolPath,
+                                     {QStringLiteral("render"),
+                                      m_pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--page-last"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("999999"),
+                                      QStringLiteral("--image-output-dir"),
+                                      tmpDir.path()},
+                                     m_workingDir,
+                                     60000);
 
     QVERIFY2(result.finishedInTime, "render with huge dpi must terminate within 60 s, not hang");
     QCOMPARE(result.exitStatus, QProcess::NormalExit);
@@ -209,20 +175,20 @@ void RenderTest::renderValidSinglePagePositiveControl()
     QTemporaryDir tmpDir;
     QVERIFY(tmpDir.isValid());
 
-    ToolResult result = runTool(m_toolPath,
-                                {QStringLiteral("render"),
-                                 m_pdfPath,
-                                 QStringLiteral("--page-first"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--page-last"),
-                                 QStringLiteral("1"),
-                                 QStringLiteral("--image-format"),
-                                 QStringLiteral("png"),
-                                 QStringLiteral("--image-res-dpi"),
-                                 QStringLiteral("72"),
-                                 QStringLiteral("--image-output-dir"),
-                                 tmpDir.path()},
-                                m_workingDir);
+    ToolResult result = runAlbdfTool(m_toolPath,
+                                     {QStringLiteral("render"),
+                                      m_pdfPath,
+                                      QStringLiteral("--page-first"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--page-last"),
+                                      QStringLiteral("1"),
+                                      QStringLiteral("--image-format"),
+                                      QStringLiteral("png"),
+                                      QStringLiteral("--image-res-dpi"),
+                                      QStringLiteral("72"),
+                                      QStringLiteral("--image-output-dir"),
+                                      tmpDir.path()},
+                                     m_workingDir);
 
     QCOMPARE(result.exitStatus, QProcess::NormalExit);
     QCOMPARE(result.exitCode, 0);
@@ -257,8 +223,8 @@ void RenderTest::renderOutputIsByteDeterministic()
     QStringList argsB = common;
     argsB << QStringLiteral("--image-output-dir") << dirB.path();
 
-    ToolResult resultA = runTool(m_toolPath, argsA, m_workingDir);
-    ToolResult resultB = runTool(m_toolPath, argsB, m_workingDir);
+    ToolResult resultA = runAlbdfTool(m_toolPath, argsA, m_workingDir);
+    ToolResult resultB = runAlbdfTool(m_toolPath, argsB, m_workingDir);
     QCOMPARE(resultA.exitStatus, QProcess::NormalExit);
     QCOMPARE(resultA.exitCode, 0);
     QCOMPARE(resultB.exitStatus, QProcess::NormalExit);

@@ -28,42 +28,15 @@
 //     the expected position
 //   - the render of the untouched page 2 is unchanged (golden hash)
 
+#include "testsupport/tst_toolrunner.h"
+
 #include <QtTest>
 
 #include <QFile>
-#include <QProcess>
-#include <QProcessEnvironment>
 #include <QTemporaryDir>
 
-namespace
-{
-struct ToolResult
-{
-    int exitCode = -1;
-    QByteArray stdoutData;
-    QByteArray stderrData;
-};
-
-ToolResult runTool(const QString& toolPath, const QStringList& arguments, const QString& workingDir)
-{
-    ToolResult result;
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
-    process.setProcessEnvironment(env);
-    process.setWorkingDirectory(workingDir);
-    process.setProcessChannelMode(QProcess::SeparateChannels);
-    process.start(toolPath, arguments);
-    if (!process.waitForStarted() || !process.waitForFinished(180000))
-    {
-        return result;
-    }
-    result.exitCode = process.exitCode();
-    result.stdoutData = process.readAllStandardOutput();
-    result.stderrData = process.readAllStandardError();
-    return result;
-}
-} // namespace
+using testsupport::runAlbdfTool;
+using testsupport::ToolResult;
 
 class AddTextTest : public QObject
 {
@@ -84,25 +57,25 @@ void AddTextTest::test_addTextExtractable()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/added.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BASELINE_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("600"),
-                                    QStringLiteral("--text"),
-                                    QStringLiteral("Inserted label"),
-                                    QStringLiteral("--size"),
-                                    QStringLiteral("18")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BASELINE_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("600"),
+                                         QStringLiteral("--text"),
+                                         QStringLiteral("Inserted label"),
+                                         QStringLiteral("--size"),
+                                         QStringLiteral("18")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
     QVERIFY2(QFile::exists(outputPath), "output document must be created");
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.contains("Inserted label"), "added text must be extractable");
 }
@@ -114,22 +87,22 @@ void AddTextTest::test_originalTextIntact()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/added.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BASELINE_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("2"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("600"),
-                                    QStringLiteral("--text"),
-                                    QStringLiteral("More text")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BASELINE_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("2"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("600"),
+                                         QStringLiteral("--text"),
+                                         QStringLiteral("More text")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult fetchResult = runTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
+    ToolResult fetchResult = runAlbdfTool(toolPath, {QStringLiteral("fetch-text"), outputPath}, tmpDir.path());
     QCOMPARE(fetchResult.exitCode, 0);
     QVERIFY2(fetchResult.stdoutData.contains("Hello PDF4QT baseline!"), "original text on page 1 must remain");
     QVERIFY2(fetchResult.stdoutData.contains("Second page with numbers 12345"), "original text on page 2 must remain");
@@ -143,29 +116,29 @@ void AddTextTest::test_addedTextInRecognize()
     QVERIFY(tmpDir.isValid());
 
     const QString outputPath = tmpDir.path() + QStringLiteral("/added.pdf");
-    ToolResult addResult = runTool(toolPath,
-                                   {QStringLiteral("add-text"),
-                                    QString::fromUtf8(TEST_BASELINE_PDF),
-                                    outputPath,
-                                    QStringLiteral("--page"),
-                                    QStringLiteral("1"),
-                                    QStringLiteral("--x"),
-                                    QStringLiteral("72"),
-                                    QStringLiteral("--y"),
-                                    QStringLiteral("600"),
-                                    QStringLiteral("--text"),
-                                    QStringLiteral("Inserted label")},
-                                   tmpDir.path());
+    ToolResult addResult = runAlbdfTool(toolPath,
+                                        {QStringLiteral("add-text"),
+                                         QString::fromUtf8(TEST_BASELINE_PDF),
+                                         outputPath,
+                                         QStringLiteral("--page"),
+                                         QStringLiteral("1"),
+                                         QStringLiteral("--x"),
+                                         QStringLiteral("72"),
+                                         QStringLiteral("--y"),
+                                         QStringLiteral("600"),
+                                         QStringLiteral("--text"),
+                                         QStringLiteral("Inserted label")},
+                                        tmpDir.path());
     QCOMPARE(addResult.exitCode, 0);
 
-    ToolResult recognizeResult = runTool(toolPath,
-                                         {QStringLiteral("recognize-text"),
-                                          outputPath,
-                                          QStringLiteral("--page-first"),
-                                          QStringLiteral("1"),
-                                          QStringLiteral("--page-last"),
-                                          QStringLiteral("1")},
-                                         tmpDir.path());
+    ToolResult recognizeResult = runAlbdfTool(toolPath,
+                                              {QStringLiteral("recognize-text"),
+                                               outputPath,
+                                               QStringLiteral("--page-first"),
+                                               QStringLiteral("1"),
+                                               QStringLiteral("--page-last"),
+                                               QStringLiteral("1")},
+                                              tmpDir.path());
     QCOMPARE(recognizeResult.exitCode, 0);
     QVERIFY2(recognizeResult.stdoutData.contains("Inserted label"), "recognize-text must list the added text");
 }
