@@ -100,3 +100,116 @@ When in doubt, follow the surrounding PDF4QT code style; this standard codifies 
 - No self-reported completion: closing a task requires evidence (`--ref <sha>` + passing test).
 - If a task is blocked, record it (`db.py task-block`) — never silently skip.
 - Unfamiliar PDF/Qt APIs: consult `docs/research/` (Rosetta output) or upstream source first.
+
+## 11. Anti-slop rules (binding, enforced)
+
+Most code here is agent-written; slop accumulates silently. These rules stop
+it. The mechanically checkable ones fail CI via `scripts/check-slop.sh`
+(roadmap R2.3); the rest fail the orchestrator's review. They are the detailed
+form of `plans/PLAN.md` §3.
+
+### 11.1 Structure & size
+
+- **S1** One concept per file; one CLI command per file pair.
+- **S2** Functions ≤ **80** lines; new authored files ≤ **1500** lines.
+  Grandfathered long functions may not grow (see **S6**).
+- **S3** Rule of three: a block copied a third time must be extracted.
+- **S4** No magic numbers/strings — name constants. CLI command names are
+  constants, not literals spread through the code.
+- **S5** Typed data over stringly-typed dispatch. No new
+  `if (command == "text")`-style branches.
+- **S6** **Frozen files** may not grow: `src/PdfTool/pdftoolabstractapplication.{h,cpp}`
+  until R3 completes. New options/fields belong to the command that defines them.
+- **S7** **Performance hygiene:** pick the right data structure/algorithm up
+  front (pass large types by `const&`, avoid copies/allocations inside loops).
+  Do not micro-optimize at the cost of clarity; if an optimization is
+  non-obvious, say why in a comment (still a WHY comment, see C1).
+
+### 11.2 Error handling & correctness
+
+- **E1** No `assert`/`Q_ASSERT` as input validation or control flow — return an
+  error code / `std::optional`. Asserts vanish in Release.
+- **E2** No empty `catch`, no swallowed errors, no `Q_UNUSED`-the-failure.
+- **E3** Exceptions never cross the CLI boundary (or a C ABI); `main.cpp` holds
+  the single top-level guard.
+- **E4** Every failure path sets a documented exit code and a stable stderr
+  message.
+- **E5** Exit codes are a public contract: `0` success, `7` invalid arguments,
+  the documented set in `src/PdfTool/AGENT.md`. Changes need a test + CHANGELOG +
+  man-page update.
+- **E6** Bounds-check all index math — PDFs are hostile input.
+- **E7** **Violation protocol.** If a rule must be broken, stop and state:
+  (1) which rule, (2) why it is necessary, (3) the trade-off. In an autonomous
+  batch, record it in the task/DB instead of stalling. Undeclared violations
+  are slop.
+
+### 11.3 Determinism
+
+- **D1** No `QDateTime::currentDateTime()`, random IDs, UUIDs, or pointer-order
+  in document output. Byte-stable output is a hard requirement.
+- **D2** Any nondeterminism exemption must be documented here or in
+  `docs/PROBLEMS.md` (encryption uses a secure RNG — the one known exemption;
+  tests must not hash `encrypt` output).
+- **D3** Anything that renders has a golden-image/hash test.
+
+### 11.4 Comments & documentation
+
+- **C1** Comments explain **WHY**. No WHAT narration, no restating the code.
+- **C2** No commented-out code — git remembers it; delete it.
+- **C3** `TODO`/`FIXME`/`HACK` must carry a DB ref: `// TODO(#123): …`.
+  Unowned markers are forbidden.
+- **C4** Public API gets Doxygen (`\param`, `\returns`).
+- **C5** No AI-slop phrasing, banner noise, or decorative attribution.
+
+### 11.5 Dependencies & upstream
+
+- **U1** A new dependency requires an ADR + approval (ADR-0004/0005). YAGNI.
+- **U2** Vendored upstream files are never reformatted and are edited only in
+  `sync(upstream):` commits (cherry-pick hygiene).
+- **U3** New authored files carry `SPDX-License-Identifier: GPL-3.0-or-later`
+  and the standard notice.
+
+### 11.6 Testing
+
+- **T1** RED test first, then GREEN — for every bug fix and feature.
+- **T2** Every CLI command has: help text, argument validation, at least one
+  positive and one negative (exit-code) test.
+- **T3** Tests are deterministic, headless (`QT_QPA_PLATFORM=offscreen`), with
+  no network and no sleeps; fuzz seeds are fixed.
+- **T4** Never weaken or delete a test to go green; golden updates are explicit,
+  reviewed, committed with a reason.
+- **T5** **No test-gaming.** Never hardcode a result or special-case an input
+  just to satisfy a test. If a test looks wrong, flag it and fix the test (or
+  the spec) explicitly — do not silently work around it. Correctness must come
+  from logic.
+- **T6** Tests assert **behavior**, not implementation details (no testing
+  private helpers, internal call order, or data-structure internals).
+
+### 11.7 Process & agent hygiene
+
+- **P1** One logical change per commit; Conventional Commits; the body explains
+  WHY.
+- **P2** Every commit compiles and passes tests — no `wip` commits.
+- **P3** Evidence gate: close a task only with `--ref <sha>` + a passing test.
+- **P4** A subagent's summary is a handoff, not a delivery — the orchestrator
+  verifies (files exist, build green, tests pass) before closing.
+- **P5** Never `git add -A`; in parallel batches stage only your own paths.
+- **P6** Never hand-edit generated artifacts (`REPO_MAP.md`, version strings) —
+  regenerate or derive them.
+- **P7** No secrets, no personal data, no large binaries in git.
+
+### 11.8 Enforcement map
+
+| Rule | Mechanism |
+|---|---|
+| S2, S6 | `check-slop.sh` (frozen-LOC baseline; function/file length) |
+| C3 | `check-slop.sh` (marker regex needs `(#NN)`) |
+| E1 | `check-slop.sh` (`Q_ASSERT`/`assert` in `src/PdfTool/**`) |
+| E2, U2, U3 | `check-slop.sh` (edited vendored file detection; SPDX on new files) |
+| S1, S3, S4, S5, S7 | orchestrator review |
+| E3–E7, D1–D3, C1–C5, T1–T6, P1–P7 | orchestrator review + existing CI |
+| Formatting | `clang-format` gate (authored files only) |
+| Memory/safety | ASAN/UBSAN CI job |
+
+`scripts/check-slop.sh` does not exist yet — it is roadmap task **R2.3**.
+Until it lands, these rules are enforced by review.

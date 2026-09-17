@@ -1,190 +1,389 @@
-# albdf — Master Project Plan (v2, finalized 2026-08-04)
+# albdf — Master Plan (v3, 2026-09-17)
 
-> **For Hermes/orchestrator:** this is the roadmap. Granular status lives in `db/albdf.db`
-> (`python3 scripts/db.py status`). Implementation is delegated to agent roles in
-> `agents/roles/`, executing per `AGENTS.md` + `docs/coding-standard.md`.
+> **Canonical forward roadmap.** Granular status lives in `db/albdf.db`
+> (`python3 scripts/db.py status`). Execution contract: `AGENTS.md` +
+> `docs/coding-standard.md`; role contracts in `agents/roles/`.
 >
-> **Execution constraint (user directive):** max **3 parallel subagents** at any time.
-> The orchestrator dispatches ≤3 `delegate_task` workers; anything beyond queues.
+> **v3 changes:** records the repository/release hygiene pass (§1, R0),
+> reorders the remaining work by priority (R0–R6), adds an explicit
+> parallel-execution plan (§5), and makes the **anti-slop quality bar** a
+> binding gate (§3; full rules in `docs/coding-standard.md` §11).
+> Historical milestones M0–M14 are condensed in Appendix A. Supersedes v2.
 
-**Goal:** a headless PDF editing **library + CLI** for Linux — fork of MIT PDF4QT with
-object-level deletion, add-text, and correct **RTL (Arabic/Persian/Hebrew) write + search**.
+**Goal:** a headless PDF editing **library + CLI** for Linux — a fork of MIT
+PDF4QT that adds object deletion, add-text, and correct **RTL
+(Arabic/Persian/Hebrew) write + search** — engineered so it can grow for years.
 
-**Architecture:** fork `Pdf4QtLibCore` + `albdf` (MIT) → extend the CLI with
-`delete-object` / `add-text` → add greenfield RTL pipeline (FriBidi + HarfBuzz + ToUnicode)
-→ deterministic golden-tested core. GUI explicitly out of scope for v1 (ADR-0002).
+**Architecture:** `Pdf4QtLibCore` (engine) + `albdf` (CLI, dir `src/PdfTool/`)
++ `UnitTests`/`tests`. Optional vendored GUI behind `ALBDF_BUILD_GUI=ON`.
+Core + CLI + tests are always headless and deterministic (ADR-0002).
 
-**Tech stack:** C++20, Qt 6.8+ (6.10.2 installed), CMake; deps registered in the DB
-(`scripts/db.py deps`): FreeType, OpenJPEG, LCMS2, OpenSSL, ZLIB, libjpeg-turbo, libpng,
-TBB, blend2d (inherited, via vcpkg), HarfBuzz + FriBidi (to add, M4).
-
----
-
-## Operating rules (non-negotiable)
-
-1. **Test before you build.** Every milestone starts by TESTING the existing software we
-   import (baseline), then ships with tests that prove the new behavior. No untested step.
-2. **≤3 parallel subagents.** Dispatch cap. Queue the rest. Never spawn 4+ workers.
-3. **Cherry-pick, don't rewrite.** Import upstream PDF4QT code via the vendored tree +
-   upstream remote; test what we import; register every imported lib in the DB (`dep-add`).
-4. **Steps have checkmarks.** Each milestone has explicit exit criteria (below). A milestone
-   is DONE only when its checkboxes are all ticked with evidence (test output + commit sha).
-5. **Every step is tested** — build, unit, golden, or CLI smoke. No "it compiles, ship it".
-6. **Register imports.** Every third-party lib lands in the `deps` register with license,
-   purpose, tested flag. Rejected = not allowed in the core.
+**Operating constraint:** max **3 parallel subagents**. The orchestrator
+dispatches ≤3 workers per batch; anything beyond queues. See §5 for which
+tracks may run together.
 
 ---
 
-## Milestones (each = reviewable, testable increment; checkboxes = exit criteria)
+## 0. How to read this plan
 
-### M0 — Infrastructure (DONE 2026-08-04)
-- [x] Repo `albdf/`: AGENTS.md, coding-standard, .clang-format, plan, ADRs 0001–0004
-- [x] Tracking DB + `scripts/db.py` (components/tasks/decisions/research/questions/skills/deps + FTS5)
-- [x] Agent roles (core/cli/rtl/test/research/orchestrator) + vendored Qt skills
-- [x] Research brief 001 delivered to Rosetta; 3 research subagents dispatched (PDF4QT deep dive,
-      RTL reference impls, skills+AGENTS.md conventions)
-- [x] Build env: cmake 4.2 + cmake 3.28/3.31 (blend2d workaround), Qt 6.10.2, apt mirror fixed
-- [x] Imported-libs register seeded (13 deps; blend2d build failure documented → vcpkg path)
-
-### M0.5 — BASELINE: test the software we want to fork (core-agent) ← user directive
-**Goal: prove upstream PDF4QT builds and works BEFORE we change a single line of it.**
-- [x] Build pristine PDF4QT (core lib + albdf CLI only, GUI stripped) on this container
-- [x] Run upstream `UnitTests/` — record pass/fail baseline
-- [x] CLI smoke: `fetch-text`, `render`, `info`, `unite` on a generated test PDF — record outputs
-- [x] Golden-baseline: render a fixed corpus → PNGs, store as reference for regression
-- [x] Register result in DB: task #2 (`--ref <sha>`), deps marked `tested=1`
-- **Exit:** baseline doc `docs/research/baseline-upstream.md` with commands + outputs;
-  `ctest` green on pristine tree; any upstream failures listed (so we know they're NOT ours)
-
-### M1 — Fork & vendor into `src/` (core-agent)
-- [x] Copy vendored tree into `src/`, strip GUI apps (Viewer/Editor/PageMaster/Diff/LaunchPad/plugins)
-- [x] Add upstream git remote (user Q3: cherry-pick policy) — decided: keep for cherry-picks
-- [x] Verify headless build: `QT_QPA_PLATFORM=offscreen` + `fetch-text` smoke
-- [x] Confirm baseline outputs still match M0.5 (no behavior change from stripping)
-- **Exit:** fork builds; baseline diff = empty; commit with evidence
-
-### M2 — Text recognition + object deletion via CLI (core-agent, cli-agent)
-- [x] Text recognition output: page objects → JSON/XML with bbox, text, char boxes (reuse pdfoutputformatter)
-- [x] `delete-object` command: wire `PDFDocumentTextFlowEditor::removeItem` + content-stream write-back
-- [x] Deletion safety: image XObject refcount, Form XObject nesting, inline images (task #5)
-- [x] Golden tests: deleted text gone from extraction; rest of page unchanged
-- **Exit:** CLI lists objects, deletes text run/image, saves; tests green
-
-### M3 — Add-text (LTR) via CLI (core-agent, cli-agent)
-- [x] `add-text` command: reuse `PDFTextLayoutGenerator` + content-stream builder; font embed path — `327061b`
-- [x] Golden test: inserted text visible + extractable
-- **Exit:** `add-text "hello" --page 1 --x .. --y ..` works; test green
-
-### M4 — RTL write pipeline (rtl-agent) — the differentiator
-- [x] HarfBuzz + FriBidi deps in build (registered in DB) — `fe016c4`
-- [x] Bidi runs → HarfBuzz shaping → visual-order `Tj` emission (absolute `Tm` positioning) — `fe016c4`
-- [x] Type0/Identity-H font embedding + `/W` advances — `fe016c4`
-- [x] ToUnicode CMap from HarfBuzz clusters (subset-GID pitfall) + `/ActualText` — `fe016c4`
-- [x] Golden images + pdftotext extraction checks for Arabic/Persian/Hebrew — `fe016c4`
-- **Exit:** `add-text --rtl "سلام دنیا"` renders connected, extractable in correct order — DONE (7/7 RTL tests; Hebrew exact round-trip; ligature degradation documented)
-
-### M5 — RTL search (rtl-agent)
-- [x] Normalization: tashkeel, presentation forms, lam-alef, Persian↔Arabic, digits, ZWNJ — `aa92bee`
-- [x] Bidi inversion of extracted visual-order text; substring match + highlight geometry — `aa92bee`
-- [x] RTL corpus tests (ZWNJ/lam-alef/digits/mixed-bidi edge cases) — `aa92bee`
-- [x] **Exit:** search finds RTL strings in our own add-text output (foreign-PDF pass = fetch-text normalization, same engine) — `aa92bee`
-
-### M6 — Test hardening + CI (test-agent, parallel from M2)
-- [x] Golden-image harness (deterministic render diff) — earlier
-- [x] RTL corpus fixtures committed — earlier (blank.pdf + fonts + README)
-- [x] CI: offscreen `ctest` + ASAN/UBSAN + clang-format gate — `b6f4bf6`, `dc45fcb`
-- [x] **Exit:** CI green on bare container — `ci/run-ci.sh` all-green incl. ASAN 10/10
-
-### M7 — Polish & release (all agents)
-- [x] CLI docs (`--help` complete, man page), deterministic saves — `479ebe0` (README + `docs/albdf.1`)
-- [x] Perf smoke: 1000-page doc open/render/delete — info 0.03s, fetch 0.04s, render 0.03s, search 0.04s (1000 matches), delete 0.02s
-- [x] **Exit:** release candidate; version tag — **0.1.0** (`aef2575`)
-
-### M8 — Forms & signatures (feature/forms-signatures, merged `382dc4b`)
-- [x] `form-list` — enumerate AcroForm fields (name, type, value, page, rect, readonly) — `3b3e563`
-- [x] `form-fill` — set field values (text/button/choice), regenerate appearance, write new doc — `b8efe4a`
-- [x] `sign` — PKCS#7 detached digital signature (invisible or visible widget), PAdES byte-range flow — `02b8719`
-- [x] `verify-signatures` (upstream tool) validates signed docs; one-byte tamper → `Signature: Error` — tested
-- [x] `UnitTestsFormSignature` — form-list/form-fill/sign/verify/tamper round-trip — `6a2a325`; suite **11/11**
-- [x] ADR-0006, README section, DB synced — `b2276d7`
-- [x] **Exit:** forms+signatures scriptable headlessly; CI all green on merged main
-
-### M8.1 — Real-world compatibility sweep (compat agents, merged `382dc4b`)
-- [x] `fix(add-text)`: content-stream floats in FixedNotation (precision 8) — strict parsers reject scientific notation — `591dfee`
-- [x] S#1 field observation documented (dense-page RTL phrase split is flow geometry, not add-text defect)
-- [x] CI format gate exempts upstream-derived content-stream builder
-- [x] **Exit:** 11-file corpus (testing-temp) exercised; agent-a interrupted before committing (work lost), agent-b's fix merged
-
-### M9 — Wave 1: extraction fidelity + page ops + infra (merged `30ff948`, 2026-08-06)
-- [x] **P1** ligature degradation in extraction — `/ActualText` overlay in `PDFTextLayoutGenerator` + `replaceCharacters` (writer emits full cluster text) — `800f91e`, `c94f00b`
-- [x] **P2** decomposed-yeh duplication in extraction — same overlay dedups `یی`→`ی` — `800f91e`
-- [x] **R#3** presentation-form NFKC pass pinned by regression test (fails if removed) — `271bfe8`
-- [x] **R#4 documented** — content editor drops `/ActualText` marked content on mixed add-text (future item, do not attempt in P1/P2 wave)
-- [x] **Page ops CLI** — `rotate`, `move-page`, `delete-page` + `UnitTestsPageOps` — `4402b1c`..`411d8f7` (suite 12/12)
-- [x] **W1 hosted CI** — GitHub Actions gate/asan/format jobs + vcpkg binary cache — `88413dc`
-- [x] **W7 packaging** — deterministic `scripts/package.sh` (sha256-reproducible tarball + optional deb) — `78f608d`
-- [x] **W8 tracking** — tracked perf benchmark `scripts/benchmark.sh` (5s threshold, JSON, non-gating CI job) — `b197861`
-- [x] CI fork-base fixed post-history-rewrite (`a52c18c`→`6bf5047`) — `30ff948`
-- [x] **Exit:** Wave-1 merged, DB tasks #21–#27 closed with evidence; hosted CI runs on GitHub (push → main)
-
-### M10 — Wave 2 (queued; depends on M9 landing)
-- [ ] **S#1 cross-LINE search** (rtl-agent, DB #28) — extend joined-visual-string search past the `\n` boundary (currently cross-item only). Depends on P1/P2 extraction fixes (now landed).
-- [ ] **Object-level redaction** (core-agent, DB #29) — wire upstream `redact` as an albdf CLI command. Depends on #24 (CLI registry now free).
-- [ ] **W5 fuzzing** (infra-agent, DB #30) — input fuzz harness for CLI commands. Depends on #25 (run-ci.sh settled, now on hosted CI).
-- **Exit:** Wave-2 merged, full CI green on GitHub, tasks closed.
-
-### M11 — Public exposure & hardening (landed 2026-08-07)
-- [x] History scrubbed of personal emails (filter-repo, all 96 commits → `Yolka <yolka@albdf.local>`); tag 0.1.0 re-pushed
-- [x] SECURITY.md, CONTRIBUTING §3b, docs/branch-protection.md, CODEOWNERS, pre-commit secret scan
-- [x] **Apply branch protection on GitHub** — ruleset `pr check` active (PR + 1 approval, no deletions, no non-fast-forward; admin bypass for the owner)
-- [x] First public release notes pass / changelog polish — **albdf 0.2.0** (docs/RELEASES.md, tag 0.2.0, GitHub release)
+- **Priority:** `P0` = now (correctness/hygiene, unblocks the rest);
+  `P1` = next (leverage/architecture); `P2` = later (ergonomics/release);
+  **Deferred** = explicitly not now; **Dropped** = non-goal.
+- **`∥`** marks a task that may run concurrently with other `∥` tasks in the
+  same phase. One writer per file (see §5).
+- **DB ref:** every active task must exist in the tracking DB before work
+  starts (`db.py task-add`). IDs shown as `#TBD` must be created.
+- **Evidence gate:** a task closes only with `db.py task-done <id> --ref <sha>`
+  and a passing test. No evidence, no close (`AGENTS.md` §3).
 
 ---
 
-## Dependency graph
+## 1. Snapshot (2026-09-17)
 
-```
-M0 ──► M0.5 ──► M1 ──► M2 ──► M3 ──► M4 ──► M5
-                            ▲        ▲
-M6 (tests) ─────────────────┴────────┘ (parallel from M2)
-```
+**Shipped:** 0.1.0 → 0.4.0 — RTL write + search, object deletion, add-text,
+forms & signatures, page ops, redaction, deterministic builds, hosted CI,
+optional GUI. Details in Appendix A and `docs/RELEASES.md`.
 
-M0.5 is the new gate: we cannot touch upstream code until the baseline is recorded.
+**Repository hygiene pass landed** (`main`, PR #9 — commits `edb44f3`,
+`3cdc791`, `87ce856`, `2796128`):
 
-## Execution cadence (per milestone)
+- README rewritten user-facing (260 → ~110 lines); `CHANGELOG.md` added;
+  `.editorconfig` / `.gitattributes`; man page version corrected.
+- Root `CMakeLists.txt` shim: `cmake -S . -B build` works; `src/`-rooted build
+  unchanged. `config.h` now written to `${CMAKE_BINARY_DIR}` to stay on the
+  core include path under either invocation.
+- CI clang-format gate unblocked (missing `pdfutils.h` exemption) — `main`
+  format job green again.
+- GitHub metadata fixed (description, 12 topics, wiki off); releases
+  normalized to `albdf X.Y.Z` and `0.1.0` / `0.4.0` created.
+- `docs/branch-protection.md` corrected to describe the real `pr check`
+  ruleset (1 approval; deletion/force-push blocked; checks not enforced).
 
-1. Orchestrator: mark milestone in_progress in DB; assign to role agent(s); ≤3 parallel.
-2. Each task: subagent reads AGENTS.md + role file + task; writes failing test first; implements;
-   runs test; commits with evidence; updates DB (`task-done --ref <sha>`).
-3. Orchestrator: spec-compliance review → code-quality review (qt-cpp-review skill + lint).
-4. Milestone exit criteria checked; ADRs updated; next milestone starts.
+**Known gaps carried into the roadmap:**
 
-## Key decisions (ADRs in `docs/decisions/`)
+- `0.4.0` has **no binary assets** — the multi-platform release workflow failed
+  on macOS + linux-aarch64 (logs expired). → R6.
+- `docs/RELEASES.md` still claims 0.4.0 shipped native macOS binaries (false).
+- Dead remote branches: `handoff-migration` (contains a force-added
+  `db/albdf.db`), `m14/form-field-ap`, `m14/freetext-ap` (merged).
+- `REPO_MAP.md` has duplicated "unmapped" rows from the generator.
+- The dev `Dockerfile` installs Ubuntu 24.04's Qt **6.4.2**, but
+  `src/CMakeLists.txt` requires Qt **≥ 6.8**, so the documented dev container
+  cannot configure. → R5.
+- Root build path is reasoned but not compile-verified from the repo root.
+- `main`'s CI status checks are *not* required by the ruleset; only the
+  clang-format failure was fixed.
 
-| ADR | Decision | Status |
+---
+
+## 2. Non-goals (unchanged)
+
+- **No GUI in the product roadmap.** The vendored GUI stays optional; core +
+  CLI + tests never depend on it (ADR-0002).
+- **No OCR.** Scanned-PDF text recovery is out of scope.
+- **No TTS.** Compiled out by design (fork divergence).
+- **No rewrite of upstream.** Extend via additive changes; never reformat
+  vendored files (cherry-pick hygiene).
+- **No new dependencies "just in case".** Every dep needs an ADR (ADR-0004/0005).
+
+---
+
+## 3. Code quality bar — anti-slop (binding)
+
+This project is built largely by agents; slop accumulates silently. The rules
+below are the defense. **Full numbered rules live in
+`docs/coding-standard.md` §11**; this section is the summary and the hard
+limits. Rule violations fail review; the mechanically checkable ones fail CI.
+
+### 3.1 Principles
+
+1. **Small and typed.** One concept per file; typed options/structs over
+   stringly-typed dispatch; name constants, never magic literals.
+2. **No assert-as-validation.** `Q_ASSERT`/`assert` is never user-input
+   validation or control flow — return an error code/`std::optional`.
+3. **Errors are a contract.** Exceptions never cross the CLI boundary; every
+   failure path returns a documented exit code + stderr message; no empty
+   `catch`.
+4. **Determinism is a feature.** No time/random/UUID/pointer-order in document
+   output; any exemption is documented (encryption is one).
+5. **Comments explain WHY.** No WHAT narration, no commented-out code, no
+   unowned `TODO`/`FIXME`/`HACK` (must carry a DB ref: `// TODO(#123): …`).
+6. **Test-first.** A RED test precedes every fix/feature; every CLI command
+   has help + arg validation + a positive and a negative (exit-code) test.
+7. **One writer per file in a batch.** Subagent output is a handoff, not a
+   delivery — the orchestrator verifies before closing.
+8. **Leave it greener.** No net growth of known-slop files; extract on the
+   rule of three; delete dead code (git remembers it).
+
+### 3.2 Hard limits (enforced)
+
+| Limit | Value | Applies to |
 |---|---|---|
-| 0001 | Fork PDF4QT (MIT) as base | accepted |
-| 0002 | No GUI in v1 — library+CLI only | accepted |
-| 0003 | RTL write+search is greenfield differentiator | accepted |
-| 0004 | License posture: MIT fork + permissive deps only | superseded (ADR-0005) |
-| 0005 | Relicense to GPL-3.0-or-later | accepted |
-| 0006 | Forms and digital signatures via CLI | accepted |
+| Function length | ≤ 80 lines | new/changed authored code |
+| File length | ≤ 1500 lines | new authored files |
+| Duplication | extract at 3rd copy | authored code |
+| Frozen files | may not grow | `pdftoolabstractapplication.{h,cpp}` (until R3) |
+| New deps | ADR required | any |
+| Unowned TODO/FIXME/HACK | forbidden | all |
+| `Q_ASSERT` for input | forbidden | `src/PdfTool/**`, core boundaries |
+| Raw `new`/`delete` | forbidden | new code |
+| `using namespace` in headers | forbidden | all |
+| Vendored-file edits | `sync(upstream):` commits only | `src/**` upstream-derived |
+| Missing SPDX header | forbidden | new authored files |
 
-## Risks & mitigations
+### 3.3 Enforcement
+
+- **Mechanical gate:** `scripts/check-slop.sh` (R2.3) checks the table above
+  and runs in CI + the pre-commit hook.
+- **Existing gates:** clang-format (authored files only), ASAN/UBSAN, ctest.
+- **Review gate:** the orchestrator's spec + quality review (`qt-cpp-review`
+  skill) checks the non-mechanical principles before a task closes.
+
+---
+
+## 4. Roadmap (priority-ordered)
+
+### R0 — Repo & release hygiene (P0, finish what v3 started)
+
+Small, independent, unblocks clean work. Most items are independent → parallel.
+
+- [ ] **R0.1 ∥** Delete the dead remote branches `m14/form-field-ap` and
+  `m14/freetext-ap` (merged). For `handoff-migration`, first export the task DB
+  (`git show origin/handoff-migration:db/albdf.db > /tmp/albdf.db`), then delete
+  — the DB does not belong in git. `#TBD`, S.
+- [ ] **R0.2 ∥** Correct the false 0.4.0 claim in `docs/RELEASES.md` (native
+  macOS binaries did not ship) and point readers at the GitHub release status.
+  `#TBD`, S.
+- [ ] **R0.3 ∥** Archive completed execution plans (`plans/m10-*`, `plans/m14-*`,
+  `plans/P3-*`, `plans/handoff/`) into `plans/archive/` so `plans/PLAN.md` is
+  the single active roadmap; update `scripts/gen-repo-map.py` + docs references.
+  `#TBD`, S.
+- [ ] **R0.4 ∥** Update `db/seed.py` to reflect shipped state M12–M14 and the
+  new R-task set, so a fresh `db.py init && db/seed.py` matches reality.
+  `#TBD`, S.
+- [ ] **R0.5 ∥** Ratify §3: add `docs/coding-standard.md` §11 (rules +
+  enforcement mapping) and ADR-0008 (quality gate). `#TBD`, S.
+
+**Exit:** branches gone; docs truthful; one active roadmap; DB seed current;
+anti-slop rules binding.
+
+### R1 — Correctness & CLI contract (P0, one writer)
+
+The only crash class found by fuzzing, and the exit-code contract, are still
+paper-thin. Do this before architectural work.
+
+- [ ] **R1.1 ∥** Top-level `try/catch` in `src/PdfTool/main.cpp`: map
+  `pdf::PDFException` / `std::exception` to a stable error + exit code; never
+  reach `std::terminate` from user input (closes F#1's root cause). Add a test
+  that exercises the guard. `#TBD`, S.
+- [ ] **R1.2 ∥** Exit-code normalization: use `parser.parse()` (not `process()`)
+  for non-help invocations so unknown/malformed options return the documented
+  `ErrorInvalidArguments` (7) and a usage message, instead of Qt's `EXIT_FAILURE`
+  (1); unknown command must not silently succeed (currently returns 0). `#TBD`, S.
+- [ ] **R1.3 ∥** CLI contract test: a table of `(argv → expected exit code +
+  stderr shape)` covering `add-text`, `delete-object`, `search-text`, `render`,
+  and the help/version paths. `#TBD`, S. Depends on R1.2.
+- [ ] **R1.4** Document the encryption determinism exemption (secure RNG is
+  correct crypto, but it violates the byte-stable rule) in
+  `docs/coding-standard.md` + `docs/PROBLEMS.md`. `#TBD`, S.
+
+**Exit:** no user input can abort the process; exit codes match the documented
+contract and are regression-tested.
+
+### R2 — Test-harness leverage (P1, one writer)
+
+Make new tests cheap before doing large refactors; the same `runTool` is
+copy-pasted in 8 files and the CMake test block repeats 16×.
+
+- [ ] **R2.1 ∥** Extract `src/UnitTests/testsupport/tst_toolrunner.h` (shared
+  `runTool`/binary-path helpers) and migrate all 8 call sites. `#TBD`, S.
+- [ ] **R2.2 ∥** Add a CMake helper `add_albdf_test(<name> <source> [deps…])`
+  encapsulating the repeated `set_target_properties`/`add_test` block; migrate
+  `src/UnitTests/CMakeLists.txt`. `#TBD`, S–M.
+- [ ] **R2.3 ∥** Implement `scripts/check-slop.sh` (the mechanical rules in
+  §3.2) with its own test, and wire it into `ci/run-ci.sh` + `.githooks/pre-commit`.
+  `#TBD`, M.
+- [ ] **R2.4** Add at least one negative/exit-code test per CLI command; roll
+  out per command once R1.2 + R2.1 land. `#TBD`, M.
+
+**Exit:** new CLI test requires ≤20 lines; `UnitTests/CMakeLists.txt` shrinks;
+slop gate runs in CI.
+
+### R3 — CLI architecture & shared write-back (P1)
+
+Highest structural leverage for expandability. The base file is **frozen**
+(§3.2) until the options have moved out.
+
+- [ ] **R3.1** Extract a core page-write-back helper
+  (`PDFPageContentRewriter`: replace resources → compress content → build
+  content/page dicts → merge → finalize) and use it in `add-text` (LTR+RTL) and
+  `delete-object`; add tests for `/Contents` arrays and indirect resources.
+  `#TBD`, M.
+- [ ] **R3.2** Replace `Q_ASSERT`-as-validation in the custom commands with
+  explicit bounds checks + error codes (e.g. `pdftooladdtext.cpp:173`,
+  `pdftooldeleteobject.cpp:147`). `#TBD`, S.
+- [ ] **R3.3** Introduce per-command `CommandSpec` (options declared + parsed
+  into a typed struct by the command) and migrate commands incrementally;
+  remove the 64-bit `Options` workaround once the base stops growing.
+  `#TBD`, L. Framework is one writer; command migrations may then parallelize.
+- [ ] **R3.4** ADR-0007 documenting the command architecture and the frozen
+  base. `#TBD`, S.
+
+**Exit:** adding a command touches only its own file; `PDFToolOptions` stops
+growing; `add-text`/`delete-object` share one write-back path.
+
+### R4 — RTL backend seam (P2)
+
+- [ ] **R4.1** Introduce an internal `PDFBidi` / `PDFShaper` interface; move the
+  three `<fribidi.h>` call sites and the `<hb.h>` usage behind it; unit-test the
+  seam (bidirectional inversion, lam-alef collapse, digit folding). `#TBD`, M.
+- [ ] **R4.2** Consolidate the duplicated visual↔logical inversion logic
+  (`pdfrtltextnormalizer.cpp` vs `pdftextsearchengine.cpp`). `#TBD`, S.
+
+**Exit:** only the seam headers include FriBidi/HarfBuzz; RTL logic is testable
+without the full engine.
+
+### R5 — Build ergonomics (P2)
+
+- [ ] **R5.1** Variable-ize build output paths (`ALBDF_BIN_DIR` etc.) and
+  replace the hardcoded `src/build` in `scripts/package.sh`,
+  `scripts/benchmark.sh`, `scripts/fuzz.sh`, and CI; add a CI job that builds
+  from the repo root to keep the shim honest. `#TBD`, M.
+- [ ] **R5.2** Fix `scripts/gen-repo-map.py` duplicate "unmapped" rows; decide
+  the generated-file policy (keep committing `REPO_MAP.md` or generate on
+  demand). `#TBD`, S.
+- [ ] **R5.3** Add a `--warnings-as-errors` build to CI. `#TBD`, S.
+- [ ] **R5.4** Fix the dev `Dockerfile`: it installs Qt 6.4 but the project needs
+  ≥ 6.8 (replicate the CI path — official Qt archives — or pin a base image
+  with 6.8); verify `docker build` + a full `ci/run-ci.sh` run inside it. `#TBD`, M.
+
+**Exit:** `cmake -S . -B build` verified in CI; no root-relative path is
+hardcoded in scripts.
+
+### R6 — Release engineering (P2)
+
+- [ ] **R6.1** Diagnose and fix the macOS + linux-aarch64 release-build
+  failures; re-run the workflow for `0.4.0` to attach the missing artifacts.
+  `#TBD`, M.
+- [ ] **R6.2** Generate release notes from `CHANGELOG.md` (single source of
+  truth) and keep the workflow title scheme (`albdf X.Y.Z`). `#TBD`, S.
+- [ ] **R6.3** Cut `0.5.0` once R1–R3 land (correctness + architecture are
+  user-visible quality). `#TBD`, S.
+
+**Exit:** all four platform builds green on a tag; release assets attached;
+notes auto-derived.
+
+### R7 — Deferred / not now
+
+- **Cross-line RTL search (S#1):** documented limitation; low user impact
+  versus effort. Revisit only with a concrete user need.
+- **Content-editor refactor beyond R#4:** upstream-derived; avoid.
+- **Per-command `CommandSpec` completion:** if R3.3 stops at the framework,
+  finish opportunistically — never let the base regrow first.
+- **GUI as a product:** out of the roadmap (ADR-0002).
+- **OCR / TTS:** non-goals.
+- **Upstream rename tracking (D#4):** monitor for security fixes via the
+  remote; no work until upstream cuts a release we need.
+
+---
+
+## 5. Parallel execution plan
+
+**Rules (binding for all batches):**
+
+1. **≤3 subagents.** One **writer per file** per batch.
+2. Each subagent is told its exact file allow-list and to **stage only its own
+   paths** (never `git add -A`).
+3. The orchestrator integrates sequentially (rebase), then runs the full gate
+   before closing tasks.
+4. Embed pre-verified API contracts in dispatch briefs (exact class/method
+   names, headers, patterns) — subagents otherwise burn budget re-reading.
+5. A subagent's summary is a **handoff**; verify files exist, build is green,
+   tests pass before trusting it.
+
+**Track map:**
+
+| Track | Files owned | Can run with | Notes |
+|---|---|---|---|
+| R0 hygiene | branches, `docs/RELEASES.md`, `plans/`, `db/seed.py`, docs | R6 (workflows) | mostly independent |
+| R1 correctness | `main.cpp`, `pdftoolabstractapplication.*` | R2, R4, R6 | single writer (shared base) |
+| R2 harness | `UnitTests/**`, `ci/run-ci.sh`, `scripts/check-slop.sh` | R1, R4, R6 | avoid `pdftoolabstractapplication` |
+| R3 architecture | `Pdf4QtLibCore` new files, `PdfTool` commands | R4 (different core files) | serial vs R2 (CMake) |
+| R4 RTL seam | `pdfrtl*`, `pdfshaper*`, `pdfbidi*` | R1, R2, R6 | new headers |
+| R5 build | root `CMakeLists.txt`, `scripts/*`, CI | R4, R6 | coordinate with R2 on `ci/` |
+| R6 release | `.github/workflows/**` | all | isolated |
+
+**Suggested batch order:** Batch 1 = R0.1–R0.5 (parallel, 3+ optional) + R6.1
+(kick off the long release diagnosis). Batch 2 = R1 + R2.1 + R4.1. Batch 3 =
+R3.1 then R3.3. Batch 4 = R5 then R6.2/R6.3.
+
+---
+
+## 6. Definition of Done
+
+**Per task:** RED test first → implementation → GREEN → `clang-format` clean →
+`ci/run-ci.sh` green → Conventional Commit explaining WHY → DB
+`task-done --ref <sha>`.
+
+**Per phase:** all checkboxes ticked with evidence; exit criteria met; docs
+(`AGENT.md`, `docs/PROBLEMS.md`, man page, `CHANGELOG.md`) updated; ADRs written
+where a decision was made; the next phase's DB tasks created.
+
+---
+
+## 7. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| blend2d build on this container (CMake recursion bugs) | vcpkg (in progress); documented in deps register #11 |
-| PDF4QT upstream drift | upstream remote + cherry-picks; baseline (M0.5) anchors behavior |
-| RTL pipeline bugs (subset GIDs, lam-alef, ZWNJ) | golden corpus (M6); /ActualText belt-and-braces |
-| ≤3 subagent cap slows parallel work | queue tasks; batch by dependency; tests written early |
-| Scope creep (GUI, OCR, edit-existing-text) | explicitly out; DB questions track proposals |
-| License contamination | ADR-0004 + deps register: every import vetted before approval |
+| Agent slop accumulates | §3 anti-slop gate (CI + review); frozen base; rule of three |
+| Refactors break RTL output | golden-image + corpus tests; ASAN; byte-determinism checks |
+| Parallel agents clobber files | one writer per file; stage own paths; sequential integration |
+| Root build shim untested | R5.1 adds a root-build CI job before relying on it |
+| Release workflow stays red | R6.1 owns it; assets verified before 0.5.0 |
+| Subagent budget exhaustion | pre-verified contracts in briefs; orchestrator finishes work |
+| Upstream drift | upstream remote + cherry-picks; baseline anchors behavior |
+| Scope creep | §2 non-goals; proposals go to DB, not code |
 
-## Open questions (DB `questions`)
+---
 
-All answered as of 2026-08-05: name **albdf**, hosting GitHub
-(`yolka-wiz/al-bdf-engine`), upstream remote kept for cherry-picks,
-context7 key received and wired via Hermes MCP, CLI commands preserved
-(~30 kept + new added), agent roles confirmed, skills installed, Rosetta
-delivered research briefs.
+## 8. Proposed ADRs
+
+| ADR | Decision | Phase |
+|---|---|---|
+| 0007 | CLI command architecture (`CommandSpec`, typed options, frozen base) | R3.4 |
+| 0008 | Anti-slop quality gate (rules + `check-slop.sh`) | R0.5 |
+| 0009 | Root build layout (`CMakeLists.txt` shim + `${CMAKE_BINARY_DIR}` policy) | R5 |
+| 0010 | Generated-file policy (`REPO_MAP.md`, release notes) | R5.2 |
+
+---
+
+## Appendix A — Shipped history (M0–M14)
+
+- **M0 / M0.5 / M1** — infra, agent roles, tracking DB; pristine-upstream
+  baseline; fork vendored into `src/` with GUI stripped.
+- **M2 / M3** — `recognize-text` + `delete-object`; `add-text` (LTR).
+- **M4 / M5** — RTL write (FriBidi + HarfBuzz + Type0/Identity-H + ToUnicode +
+  `/ActualText`); RTL search (normalization + bidi inversion).
+- **M6 / M7** — golden tests + ASAN/UBSAN + format gate; `0.1.0`.
+- **M8 / M8.1** — forms + signatures; real-world compatibility sweep.
+- **M9 (Wave 1)** — extraction fidelity (P1/P2), page ops, hosted CI,
+  deterministic packaging, tracked benchmark.
+- **M10 (Wave 2)** — cross-item search, redaction, fuzz harness + fixes,
+  render argument validation (F#1/F#2).
+- **M11** — history scrub, SECURITY/CODEOWNERS, branch ruleset, `0.2.0`.
+- **M12 / M13** — GUI restored behind `ALBDF_BUILD_GUI`; GUI RTL wiring;
+  `0.3.0`.
+- **M14** — RTL appearance streams (FreeText + form fields), upstream sync,
+  multi-platform release workflow; `0.4.0`.
+- **v3 hygiene pass** — README/CHANGELOG/docs, root build shim, CI green,
+  metadata + releases normalized (2026-09-17).
+
+---
+
+## Appendix B — Open questions
+
+- Should the tracking DB live in git (e.g. a dedicated `handoff` branch) or
+  stay gitignored with a reproducible `seed.py`? (R0.1 forces the decision.)
+- Should `REPO_MAP.md` remain committed or be generated on demand? (R5.2.)
+- Does the project want `v`-prefixed tags (`v0.5.0`) for a conventional
+  release URL scheme? Current tags are unprefixed; titles are `albdf X.Y.Z`.
