@@ -102,7 +102,7 @@ TASKS = [
     ("forms-signatures", "M14 RTL form-field AP: headless form-fill emits NO appearance stream (no-op); fix to embed shaped Type0 font via PDFRTLTextEngine + add --font option", 1, None, "yolka", "done", "M14 shipped: form-field AP via PDFRTLTextEngine + --font; R#5 resolved. Merge b149864 (impl 21c4287).", "b149864"),
     ("rtl-writer", "M14 RTL FreeText annotation AP: QPainter path cannot embed Type0; additive early-return branch in updateAnnotationAppearanceStreams", 1, None, "yolka", "done", "M14 shipped: FreeText RTL AP embeds shaped Type0 font. Merge 4b9a5dd (impl 507ff44).", "4b9a5dd"),
     # v3 roadmap (plan §R0–R2), open.
-    ("cli", "R1: top-level exception guard + enforce exit-code contract (unknown cmd/args)", 1, "S", "cli-agent", "open", "plan v3 R1.1/R1.2; closes fuzz F#1 crash class; unknown command currently exits 0", None),
+    ("cli", "R1: top-level exception guard + enforce exit-code contract (unknown cmd/args)", 1, "S", "cli-agent", "open", "plan v3 R1.1/R1.2; guard is defense-in-depth (a main() guard cannot catch Qt Concurrent worker-thread exceptions; F#1 was fixed by render page-range validation 7a70767); unknown command currently exits 0", None),
     ("tests", "R1: CLI exit-code contract regression test (QProcess, real binary)", 1, "S", "test-agent", "open", "plan v3 R1.3; depends on R1.2", None),
     ("tests", "R2: shared runTool test helper + add_albdf_test() CMake function", 1, "S", "test-agent", "open", "plan v3 R2.1/R2.2; dedupe 8 runTool copies + 16 CMake blocks", None),
     ("tests", "R2: scripts/check-slop.sh anti-slop gate + wire into CI/pre-commit", 1, "M", "infra-agent", "open", "plan v3 R2.3; enforces coding-standard §11", None),

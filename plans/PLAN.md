@@ -173,9 +173,12 @@ The only crash class found by fuzzing, and the exit-code contract, are still
 paper-thin. Do this before architectural work.
 
 - [ ] **R1.1 ∥** Top-level `try/catch` in `src/PdfTool/main.cpp`: map
-  `pdf::PDFException` / `std::exception` to a stable error + exit code; never
-  reach `std::terminate` from user input (closes F#1's root cause). Add a test
-  that exercises the guard. `#TBD`, S.
+  `pdf::PDFException` / `std::exception` to a stable error + exit code so an
+  exception escaping `main` never reaches `std::terminate`. **Note:** this does
+  *not* cover F#1 — that SIGABRT came from a Qt Concurrent worker thread and was
+  already fixed by render page-range validation (`7a70767`); a `main` guard
+  cannot catch exceptions thrown in worker threads. Add a test that exercises
+  the guard. `#TBD`, S.
 - [ ] **R1.2 ∥** Exit-code normalization: use `parser.parse()` (not `process()`)
   for non-help invocations so unknown/malformed options return the documented
   `ErrorInvalidArguments` (7) and a usage message, instead of Qt's `EXIT_FAILURE`
