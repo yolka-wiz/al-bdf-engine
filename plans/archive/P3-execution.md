@@ -8,7 +8,7 @@
 **above** the baseline by emitting per-glyph `Ts` (text rise) in the RTL
 content-stream emitter, without breaking extraction, search, or golden images.
 
-**Design doc:** `plans/P3-vertical-mark-offsets.md` (root cause verified: lines
+**Design doc:** `plans/archive/P3-vertical-mark-offsets.md` (root cause verified: lines
 356–357 capture `yOffset`, 467–474 discard it; TJ is horizontal-only).
 
 **Tech stack:** C++20, Qt 6.8, CMake + Ninja, vcpkg manifest
