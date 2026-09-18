@@ -281,10 +281,11 @@ hardcoded in scripts.
 ### R6 — Release engineering (P2)
 
 - [ ] **R6.1** Diagnose and fix the macOS + linux-aarch64 release-build
-  failures; re-run the workflow for `0.4.0` to attach the missing artifacts.
-  `#TBD`, M.
+  failures; re-run the workflow for `0.4.0` to attach the missing artifacts;
+  add a `windows-x86_64` (MSVC 2022) leg so every tag ships Linux (×2), macOS
+  (×2), and Windows binaries. `#52`, M.
 - [ ] **R6.2** Generate release notes from `CHANGELOG.md` (single source of
-  truth) and keep the workflow title scheme (`albdf X.Y.Z`). `#TBD`, S.
+  truth) and keep the workflow title scheme (`albdf X.Y.Z`). `#53`, S.
 - [ ] **R6.3** Cut `0.5.0` once R1–R3 land (correctness + architecture are
   user-visible quality). `#TBD`, S.
 
