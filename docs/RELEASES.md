@@ -3,6 +3,36 @@
 > The concise, user-facing changelog lives in [`/CHANGELOG.md`](../CHANGELOG.md);
 > this file holds the detailed per-release engineering notes.
 
+## albdf (unreleased) — R3.1/R3.2 + R4.1/R4.2 + multi-platform release binaries
+
+Branch: `m15/multiplatform-releases` (PR #19), target `main`.
+
+### Release engineering (R6.1)
+
+- **Multi-platform matrix hardened + Windows added.** The release build
+  matrix is now `{linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64,
+  windows-x86_64}` (MSVC 2022). This fixes the `0.4.0` failure mode where the
+  macOS + linux-aarch64 legs failed and no binary artifact was attached.
+  Hardening: per-platform `timeout-minutes` (120 on arm64 + macOS, 90 default)
+  for cold-cache stalls; macOS `brew install` retries once on transient
+  tap-fetch stalls.
+- **Windows packaging.** New aqtinstall Windows block in the shared
+  setup-toolchain action (Qt 6.8.3, `win64_msvc2022_64`, 3-attempt mirror
+  retry). `scripts/package.sh` detects Windows and packages `albdf.exe` +
+  `Pdf4QtLibCore*.dll` (under `bin/`, no RPATH check). Git Bash on the runner
+  reuses the existing deterministic `.tar.gz` path.
+- **Per-platform `qt-arch`** in the matrix instead of a single default,
+  removing runner-arch ambiguity.
+
+### Verified
+
+- Local static gates: `bash -n scripts/package.sh`, `bash -n scripts/*.sh
+  ci/run-ci.sh`. `clang-format` N/A (no .cpp/.h changed).
+- Release workflow dry-run (`workflow_dispatch`) + tag assets: **pending,
+  after merge**.
+
+---
+
 ## albdf 0.4.0 — RTL appearance streams (M14) + multi-platform release
 
 Date: 2026-08-15
