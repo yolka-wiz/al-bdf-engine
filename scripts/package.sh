@@ -26,9 +26,11 @@
 #   SOURCE_DATE_EPOCH=<epoch> bash scripts/package.sh   # fixed tarball mtime
 #
 # Outputs (in OUT_DIR by default):
-#   albdf-<version>-<os>-<arch>.tar.gz       the release artifact
-#   albdf-<version>-<os>-<arch>.tar.gz.sha256
+#   albdf-<version>-<platform>.tar.gz       the release artifact (all platforms)
+#   albdf-<version>-<platform>.tar.gz.sha256
 #   albdf-<version>_<debarch>.deb             only with --deb (skeleton)
+#   platform = linux-x86_64 / linux-aarch64 / macos-arm64 / macos-x86_64
+#             / windows-x86_64
 #
 # Exit code: 0 = packaged + validated; 1 = any step failed.
 set -u
@@ -64,16 +66,32 @@ fail() { echo "package: ERROR: $*" >&2; exit 1; }
 
 # ---- inputs ---------------------------------------------------------------
 # Shared-library glob differs per platform: .so* on Linux, .dylib* on macOS.
+_IS_WINDOWS=0
 case "$(uname -s)" in
-    Darwin) LIB_GLOB='libPdf4QtLibCore*.dylib' ;;
-    *)      LIB_GLOB='libPdf4QtLibCore.so*' ;;
+    MINGW*|MSYS*|CYGWIN*) _IS_WINDOWS=1 ;;
+esac
+[ "${OS:-}" = "Windows_NT" ] && _IS_WINDOWS=1
+
+case "$_IS_WINDOWS" in
+    1)      LIB_GLOB='Pdf4QtLibCore*.dll' ;;
+    *)
+        case "$(uname -s)" in
+            Darwin) LIB_GLOB='libPdf4QtLibCore*.dylib' ;;
+            *)      LIB_GLOB='libPdf4QtLibCore.so*' ;;
+        esac
+        ;;
 esac
 # Library subdir in the build/install trees: upstream CMake installs the
 # shared library into lib/ on Linux but bin/ on macOS/Windows (the
 # PDF4QT_INSTALL_LIB_DIR else() branch uses CMAKE_INSTALL_BINDIR).
-case "$(uname -s)" in
-    Darwin) LIB_SUBDIR="bin" ;;
-    *)      LIB_SUBDIR="lib" ;;
+case "$_IS_WINDOWS" in
+    1)      LIB_SUBDIR="bin" ;;
+    *)
+        case "$(uname -s)" in
+            Darwin) LIB_SUBDIR="bin" ;;
+            *)      LIB_SUBDIR="lib" ;;
+        esac
+        ;;
 esac
 
 [ -x "$BUILD_DIR/bin/albdf" ] || \
@@ -87,11 +105,13 @@ if [ -z "$VERSION" ]; then
 fi
 [ -n "$VERSION" ] || fail "could not determine version (pass --version or fix src/CMakeLists.txt)"
 
-# Platform naming: linux-x86_64 / linux-aarch64 / macos-arm64 / macos-x86_64.
+# Platform naming: linux-x86_64 / linux-aarch64 / macos-arm64 / macos-x86_64
+# / windows-x86_64.
 OS_NAME="$(uname -s)"
 case "$OS_NAME" in
     Linux)  PLATFORM_OS="linux" ;;
     Darwin) PLATFORM_OS="macos" ;;
+    MINGW*|MSYS*|CYGWIN*|Windows) PLATFORM_OS="windows" ;;
     *)      PLATFORM_OS="$(printf '%s' "$OS_NAME" | tr '[:upper:]' '[:lower:]')" ;;
 esac
 ARCH="$(uname -m)"
@@ -101,6 +121,10 @@ case "$ARCH" in
     *)       DEB_ARCH="$ARCH" ; PLATFORM_ARCH="$ARCH" ;;
 esac
 PLATFORM="${PLATFORM_OS}-${PLATFORM_ARCH}"
+# Output archive extension: .tar.gz everywhere. Git Bash on the Windows
+# runner provides tar + gzip, so the same deterministic path works across
+# all platforms — no separate zip/Compress-Archive branch needed.
+ARCHIVE_EXT="tar.gz"
 
 # ---- helpers --------------------------------------------------------------
 # sha256sum (Linux) vs shasum -a 256 (macOS).
@@ -145,8 +169,13 @@ fi
 
 echo "== staging install (prefix=$STAGE) =="
 cmake --install "$BUILD_DIR" --prefix "$STAGE" >/dev/null || fail "cmake --install failed"
-[ -x "$STAGE/bin/albdf" ] || fail "installed tree missing bin/albdf"
-ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "installed tree missing libPdf4QtLibCore"
+# Binary is albdf on unix, albdf.exe on Windows.
+if [ "$_IS_WINDOWS" -eq 1 ]; then
+    [ -f "$STAGE/bin/albdf.exe" ] || fail "installed tree missing bin/albdf.exe"
+else
+    [ -x "$STAGE/bin/albdf" ] || fail "installed tree missing bin/albdf"
+fi
+ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "libPdf4QtLibCore not found under $STAGE/$LIB_SUBDIR"
 [ -f "$STAGE/include/Pdf4QtLibCore/pdfglobal.h" ] || fail "installed tree missing headers"
 [ -f "$STAGE/include/Pdf4QtLibCore/pdf4qtlibcore_export.h" ] || fail "installed tree missing generated export header"
 [ -f "$STAGE/share/man/man1/albdf.1" ] || fail "installed tree missing man page"
@@ -155,39 +184,47 @@ ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "installed tree missin
 # ---- validate the INSTALLED binary (headless) -----------------------------
 echo "== validating installed binary (offscreen) =="
 export QT_QPA_PLATFORM=offscreen
-VER="$(QT_QPA_PLATFORM=offscreen "$STAGE/bin/albdf" --version 2>&1)" || fail "installed albdf --version exited non-zero"
+if [ "$_IS_WINDOWS" -eq 1 ]; then
+    ALBDF_BIN="$STAGE/bin/albdf.exe"
+else
+    ALBDF_BIN="$STAGE/bin/albdf"
+fi
+VER="$(QT_QPA_PLATFORM=offscreen "$ALBDF_BIN" --version 2>&1)" || fail "installed albdf --version exited non-zero"
 case "$VER" in *albdf*) ;; *) fail "installed albdf --version output unexpected: $VER" ;; esac
-INFO="$(QT_QPA_PLATFORM=offscreen "$STAGE/bin/albdf" info "$FIXTURE" 2>&1)" || fail "installed albdf info exited non-zero on $(basename "$FIXTURE")"
+INFO="$(QT_QPA_PLATFORM=offscreen "$ALBDF_BIN" info "$FIXTURE" 2>&1)" || fail "installed albdf info exited non-zero on $(basename "$FIXTURE")"
 case "$INFO" in *"Page count"*) ;; *) fail "installed albdf info output missing 'Page count': $(echo "$INFO" | head -3)" ;; esac
 echo "  OK: --version -> $VER ; info $(basename "$FIXTURE") -> page count present"
 
 # The installed binary must be relocatable: no build-tree path in RUNPATH
-# (Linux) / LC_RPATH (macOS).
-if [ "$PLATFORM_OS" = "macos" ] && command -v otool >/dev/null 2>&1; then
-    RPATH="$(otool -l "$STAGE/bin/albdf" 2>/dev/null | grep -A2 LC_RPATH || true)"
-    if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
-        fail "installed albdf still carries the build-tree LC_RPATH ($RPATH); INSTALL_RPATH=@loader_path fix missing"
+# (Linux) / LC_RPATH (macOS). Windows has no RPATH (DLL resolves next to the
+# .exe), so the check is N/A there.
+if [ "$_IS_WINDOWS" -eq 0 ]; then
+    if [ "$PLATFORM_OS" = "macos" ] && command -v otool >/dev/null 2>&1; then
+        RPATH="$(otool -l "$STAGE/bin/albdf" 2>/dev/null | grep -A2 LC_RPATH || true)"
+        if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
+            fail "installed albdf still carries the build-tree LC_RPATH ($RPATH); INSTALL_RPATH=@loader_path fix missing"
+        fi
+        echo "  LC_RPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
+    elif command -v readelf >/dev/null 2>&1; then
+        RPATH="$(readelf -d "$STAGE/bin/albdf" 2>/dev/null | grep -E 'RUNPATH|RPATH' || true)"
+        if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
+            fail "installed albdf still carries the build-tree RUNPATH ($RPATH); INSTALL_RPATH=\$ORIGIN fix missing"
+        fi
+        echo "  RUNPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
     fi
-    echo "  LC_RPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
-elif command -v readelf >/dev/null 2>&1; then
-    RPATH="$(readelf -d "$STAGE/bin/albdf" 2>/dev/null | grep -E 'RUNPATH|RPATH' || true)"
-    if printf '%s' "$RPATH" | grep -F "$BUILD_DIR" >/dev/null; then
-        fail "installed albdf still carries the build-tree RUNPATH ($RPATH); INSTALL_RPATH=\$ORIGIN fix missing"
-    fi
-    echo "  RUNPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
 fi
 
-# ---- deterministic tarball -------------------------------------------------
+# ---- deterministic tarball (.tar.gz on all platforms) --------------------
 MTIME="${SOURCE_DATE_EPOCH:-$(git -C "$REPO_DIR" log -1 --format=%ct 2>/dev/null || date +%s)}"
 mkdir -p "$OUT_DIR"
-TARBALL="$OUT_DIR/albdf-${VERSION}-${PLATFORM}.tar.gz"
-echo "== creating tarball (SOURCE_DATE_EPOCH=$MTIME, tar=$TAR_BIN) =="
+TARBALL="$OUT_DIR/albdf-${VERSION}-${PLATFORM}.${ARCHIVE_EXT}"
+echo "== creating archive (SOURCE_DATE_EPOCH=$MTIME, tar=$TAR_BIN) =="
 if [ "$TAR_DETERMINISTIC" -eq 1 ]; then
     "$TAR_BIN" --use-compress-program='gzip -n' -cf "$TARBALL" -C "$STAGE" \
         --sort=name --numeric-owner --owner=0 --group=0 --mtime=@"$MTIME" .
 else
-    # bsdtar fallback: no GNU-only flags; mtime normalization via -m is not
-    # available, so determinism is best-effort here.
+    # bsdtar / Git-Bash-tar fallback: no GNU-only flags; mtime normalization
+    # via -m is not available, so determinism is best-effort here.
     (cd "$STAGE" && "$TAR_BIN" -czf "$TARBALL" .)
 fi
 sha256_of "$TARBALL" > "$TARBALL.sha256"

@@ -150,3 +150,37 @@ runs:
         echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}" >> "${GITHUB_ENV}"
         # Ensure the Qt lib dir is also on LD_LIBRARY_PATH for the build steps.
         echo "LD_LIBRARY_PATH=${QT_ROOT_DIR}/lib:/tmp/icu-build/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
+
+    - name: Install Qt 6.8.3 + tools (Windows, qtbase + qtsvg, MSVC)
+      if: runner.os == 'Windows' && inputs.install-qt == 'true'
+      shell: pwsh
+      run: |
+        # Mirror the Linux aqt path — official Qt archives (not chocolatey),
+        # reproducible and CI-cacheable. win64_msvc2022_64 == Qt's archive
+        # name for the MSVC 2022 64-bit build.
+        python -m pip install --quiet "aqtinstall==3.3.*"
+        $qtDir = "${env:RUNNER_TEMP}\qt"
+        $qtArch = "${{ inputs.qt-arch }}"
+        $lastExitCode = 0
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+          Write-Host "== aqt install attempt ${attempt}/3 (windows ${qtArch}) =="
+          try {
+            python -m aqt install-qt windows desktop 6.8.3 $qtArch `
+                --archives qtbase qtsvg --outputdir $qtDir --timeout 30
+            if ($LASTEXITCODE -eq 0) { break }
+          } catch { }
+          if ($attempt -lt 3) { Start-Sleep -Seconds 10 }
+        }
+        $qmake = Get-ChildItem -Path $qtDir -Recurse -Filter "qmake.exe" |
+            Select-Object -First 1
+        if (-not $qmake) { Write-Error "qmake.exe not found after Qt install"; exit 1 }
+        $qtRoot = $qmake.Directory.Parent.FullName
+        Write-Host "QT_ROOT_DIR=${qtRoot}"
+        Add-Content -Path $env:GITHUB_ENV -Value "QT_ROOT_DIR=${qtRoot}"
+        Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_PREFIX_PATH=${qtRoot}"
+        # Put Qt's bin dir on PATH so the deployed .exe finds Qt6*.dll at
+        # runtime during the package.sh validation step.
+        Add-Content -Path $env:GITHUB_ENV -Value "PATH=${qtRoot}\bin;${env:PATH}"
+        # vcpkg on Windows defaults to the dynamic CRT triplet (x64-windows);
+        # no override needed — keep .dll staging simple in package.sh.
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_TRIPLET=x64-windows"
