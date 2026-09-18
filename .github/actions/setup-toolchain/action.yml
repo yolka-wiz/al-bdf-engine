@@ -83,8 +83,15 @@ runs:
         # HOMEBREW_NO_REQUIRE_TAP_TRUST: GitHub's macOS runner image carries an
         # untrusted `aws/tap` (brew tap-trust feature, 2026); without this
         # every `brew install` fails with "The following taps are not trusted".
-        HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
-          brew install cmake ninja gnu-tar fontconfig pkg-config qt
+        # Retry once on failure: brew on the macOS runner occasionally hits a
+        # transient tap-fetch / license-check stall that a clean retry clears
+        # (observed on the 0.4.0 release run's macOS legs).
+        if ! HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
+          brew install cmake ninja gnu-tar fontconfig pkg-config qt; then
+          echo "brew install failed once; retrying after brew update..." >&2
+          HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
+            brew install cmake ninja gnu-tar fontconfig pkg-config qt
+        fi
         # brew's pkgconfig dir is $(brew --prefix)/lib/pkgconfig — on Apple
         # Silicon that is /opt/homebrew, which is NOT in pkg-config's default
         # search path, so export it explicitly for the CMake configure step.

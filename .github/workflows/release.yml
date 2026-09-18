@@ -49,6 +49,10 @@ jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    # macOS / linux-aarch64 runners have hit first-boot and vcpkg cold-cache
+    # stalls (0.4.0's mac + aarch64 legs failed on this). Give them more
+    # headroom than the warm-cache linux-x86_64 / Windows path.
+    timeout-minutes: ${{ matrix.timeout-minutes || 90 }}
     strategy:
       fail-fast: false
       matrix:
@@ -59,12 +63,15 @@ jobs:
           - platform: linux-aarch64
             os: ubuntu-24.04-arm
             qt-arch: linux_gcc_arm64
+            timeout-minutes: 120
           - platform: macos-arm64
             os: macos-15
             qt-arch: mac_arm64
+            timeout-minutes: 120
           - platform: macos-x86_64
             os: macos-15-intel
             qt-arch: mac_x64
+            timeout-minutes: 120
           - platform: windows-x86_64
             os: windows-2022
             qt-arch: win64_msvc2022_64
