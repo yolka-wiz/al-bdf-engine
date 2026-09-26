@@ -129,7 +129,17 @@ if [ "$ONLY_FORMAT" -eq 0 ] && [ "$ONLY_SLOP" -eq 0 ]; then
               -DALBDF_BUILD_TESTS=ON > /tmp/ci-build.log 2>&1
         if [ $? -ne 0 ]; then echo "configure FAILED"; tail -20 /tmp/ci-build.log; FAILED=1; fi
         cmake --build build >> /tmp/ci-build.log 2>&1
-        if [ $? -ne 0 ]; then echo "build FAILED"; tail -20 /tmp/ci-build.log; FAILED=1; fi
+        if [ $? -ne 0 ]; then
+            echo "build FAILED"
+            # Surface the actual compiler errors first: a bare `tail -20` window
+            # of a -j build is mostly deprecation warnings and can push the
+            # error itself out of view (that is why the 0.4.0 macOS build
+            # failures were undiagnosable from the job log).
+            grep -nE 'error:|fatal error|FAILED: ' /tmp/ci-build.log | head -40
+            echo "--- last 20 lines ---"
+            tail -20 /tmp/ci-build.log
+            FAILED=1
+        fi
 
         step "2/5 ctest (offscreen)"
         export QT_QPA_PLATFORM=offscreen
@@ -151,7 +161,13 @@ if [ "$ONLY_FORMAT" -eq 0 ] && [ "$ONLY_SLOP" -eq 0 ]; then
               -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON > /tmp/ci-asan-cfg.log 2>&1
         if [ $? -ne 0 ]; then echo "asan configure FAILED"; tail -10 /tmp/ci-asan-cfg.log; FAILED=1; fi
         cmake --build build-asan >> /tmp/ci-asan-build.log 2>&1
-        if [ $? -ne 0 ]; then echo "asan build FAILED"; tail -10 /tmp/ci-asan-build.log; FAILED=1; fi
+        if [ $? -ne 0 ]; then
+            echo "asan build FAILED"
+            grep -nE 'error:|fatal error|FAILED: ' /tmp/ci-asan-build.log | head -40
+            echo "--- last 10 lines ---"
+            tail -10 /tmp/ci-asan-build.log
+            FAILED=1
+        fi
         export LD_LIBRARY_PATH="$SRC_DIR/build-asan/lib:${LD_LIBRARY_PATH:-}"
         export ASAN_OPTIONS=detect_leaks=0:abort_on_error=1
         export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
