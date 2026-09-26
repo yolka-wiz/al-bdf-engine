@@ -72,6 +72,22 @@ jobs:
       - name: ci/run-ci.sh stages 1-2 (configure + build, offscreen ctest)
         run: bash ci/run-ci.sh --skip-asan --skip-format
 
+  gate-macos:
+    name: Build + ctest (macOS arm64, offscreen)
+    runs-on: macos-15
+    # The release matrix ships macOS binaries, so a macOS-only compile failure
+    # must fail here rather than at tag time: the 0.4.0 tag shipped zero assets
+    # because the macOS legs died on a libc++ incompatibility that a
+    # Linux-only PR gate could not see. Mirrors the `gate` job's stage 1-2.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-toolchain
+      - name: ci/run-ci.sh stages 1-2 (configure + build, offscreen ctest)
+        run: bash ci/run-ci.sh --skip-asan --skip-format
+
   asan:
     name: ASAN/UBSAN build + ctest
     runs-on: ubuntu-24.04
