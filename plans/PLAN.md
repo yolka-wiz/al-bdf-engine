@@ -284,6 +284,19 @@ hardcoded in scripts.
   failures; re-run the workflow for `0.4.0` to attach the missing artifacts;
   add a `windows-x86_64` (MSVC 2022) leg so every tag ships Linux (×2), macOS
   (×2), and Windows binaries. `#52`, M.
+  - *Diagnosed 2026-09-26* (branch `m15/r6.1-release-binaries`): neither leg
+    failed for the reason the earlier hardening assumed. The macOS legs died
+    compiling `std::execution::seq` (libc++ ships `<execution>` without the PSTL
+    policies; libstdc++ has them); the linux-aarch64 leg died because aqt was
+    given the `linux` host for an arm64 arch and therefore read the arm64-less
+    linux_x64 index. Both fixed, and `ci.yml` gained a gating `gate-macos` leg
+    so a macOS-only break cannot go unseen again. The `windows-x86_64` leg
+    remains **unproven** (added in PR #19, never executed).
+  - *Remaining before this box can be ticked:* a green tag with assets
+    attached. Note the backfill path for the existing `0.4.0` release needs
+    `gh release upload` — the publish step uses `gh release create`, which
+    cannot target a release that already exists. Decide whether to backfill
+    `0.4.0` or ship the fix with the next tag.
 - [ ] **R6.2** Generate release notes from `CHANGELOG.md` (single source of
   truth) and keep the workflow title scheme (`albdf X.Y.Z`). `#53`, S.
 - [ ] **R6.3** Cut `0.5.0` once R1–R3 land (correctness + architecture are

@@ -5,17 +5,25 @@
 
 ## albdf (unreleased) — R3.1/R3.2 + R4.1/R4.2 + multi-platform release binaries
 
-Branch: `m15/multiplatform-releases` (PR #19), target `main`.
+Branch: `m15/multiplatform-releases` (PR #19), target `main`; R6.1 follow-up
+(binaries that actually build): `m15/r6.1-release-binaries`.
 
 ### Release engineering (R6.1)
 
-- **Multi-platform matrix hardened + Windows added.** The release build
-  matrix is now `{linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64,
-  windows-x86_64}` (MSVC 2022). This fixes the `0.4.0` failure mode where the
-  macOS + linux-aarch64 legs failed and no binary artifact was attached.
-  Hardening: per-platform `timeout-minutes` (120 on arm64 + macOS, 90 default)
-  for cold-cache stalls; macOS `brew install` retries once on transient
-  tap-fetch stalls.
+- **The real `0.4.0` failure mode diagnosed and fixed.** The earlier hardening
+  (per-platform `timeout-minutes`, a macOS `brew` retry) aimed at the wrong
+  causes: those legs died on genuine defects, not stalls. Measured from the
+  failed runs:
+
+  | Cause | Evidence | Fix |
+  |---|---|---|
+  | macOS legs could not compile | `error: no member named 'seq' in namespace 'std::execution'` in `pdfcms.cpp` / `pdfdiff.cpp`, on **both** macOS arches | guard `std::execution::seq` in the vendored `pdfexecutionpolicy.h` behind `__cpp_lib_execution >= 201603L` and fall back to the plain serial call — libc++ ships `<execution>` without the PSTL policies, libstdc++ does not |
+  | linux-aarch64 could not obtain Qt | `The packages ['qt_base'] were not found while parsing XML of package information!` on all 3 retries, then `qmake not found after Qt install` | aqtinstall needs the `linux_arm64` **host** for the `linux_gcc_arm64` arch; the action passed `linux` and therefore read the arm64-less linux_x64 index |
+  | a macOS-only break went unseen until tag time | `ci.yml` had no macOS job at all | new gating `gate-macos` job (`macos-15`) builds + ctests on every PR |
+
+  The matrix stays `{linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64,
+  windows-x86_64}` (MSVC 2022). Per-platform `timeout-minutes` and the macOS
+  `brew` retry are kept as stall insurance, not as the fix.
 - **Windows packaging.** New aqtinstall Windows block in the shared
   setup-toolchain action (Qt 6.8.3, `win64_msvc2022_64`, 3-attempt mirror
   retry). `scripts/package.sh` detects Windows and packages `albdf.exe` +
@@ -26,10 +34,20 @@ Branch: `m15/multiplatform-releases` (PR #19), target `main`.
 
 ### Verified
 
-- Local static gates: `bash -n scripts/package.sh`, `bash -n scripts/*.sh
-  ci/run-ci.sh`. `clang-format` N/A (no .cpp/.h changed).
-- Release workflow dry-run (`workflow_dispatch`) + tag assets: **pending,
-  after merge**.
+- Reproduced locally and fixed: the macOS PSTL failure reproduces with Apple
+  clang 21 (`_LIBCPP_VERSION 220106`) as `no member named 'seq' in namespace
+  'std::execution'`, and the guard takes the serial-fallback branch there.
+- aqt host resolution confirmed against the live Qt archives:
+  `aqt list-qt linux desktop --arch 6.8.3` → `linux_gcc_64` only;
+  `aqt list-qt linux_arm64 desktop --arch 6.8.3` → `linux_gcc_arm64`.
+- Static gates: `bash -n` on `ci/run-ci.sh` and `scripts/check-slop.sh`;
+  `bash scripts/check-slop.sh --self-test`. No authored `.cpp`/`.h` changed —
+  the only C++ edit is the vendored, format-gate-exempt
+  `pdfexecutionpolicy.h`.
+- Hosted CI (Linux `gate`, ASAN/UBSAN, format + slop, and the new
+  `gate-macos`) runs on the PR. A release-workflow dry-run
+  (`workflow_dispatch`) and tag assets remain **pending**; the `0.4.0` tag
+  itself is untouched by this change.
 
 ---
 

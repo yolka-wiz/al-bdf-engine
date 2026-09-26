@@ -22,6 +22,7 @@
   - [Container is ephemeral](#container-is-ephemeral)
   - [Lifecycle guard crashes (Hermes)](#lifecycle-guard-crashes-hermes)
   - [vcpkg / toolchain traps](#vcpkg--toolchain-traps)
+  - [Platform-portability traps](#platform-portability-traps)
   - [Release-packaging traps (W7)](#release-packaging-traps-w7)
   - [Determinism traps](#determinism-traps)
   - [Fork-hygiene traps](#fork-hygiene-traps)
@@ -176,6 +177,17 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
     `6.8.*` wildcard intermittently fails with "The packages ['qt_base'] were
     not found while parsing XML" (miurahr/aqtinstall#769) depending on which
     mirror edge the runner hits; a 3× retry loop rides through it.
+  - **Qt on aarch64 needs the per-arch aqt HOST (R6.1, fixed):** aqtinstall
+    treats arm64 Linux as a separate *host*, not as an arch of `linux`
+    (`aqt/installer.py`: `os_name == "linux"` → `linux_gcc_64`). So
+    `aqt install-qt linux desktop 6.8.3 linux_gcc_arm64` reads the linux_x64
+    index — which has **no** arm64 entries at all — and fails with the very
+    same "packages ['qt_base'] were not found" message on *every* mirror and
+    every retry. It is deterministic, not flaky: `linux_gcc_arm64` exists only
+    in the `linux_arm64` repository. Use `aqt install-qt linux_arm64 desktop …`
+    for that arch (the action now derives `QT_HOST` from `qt-arch`). All three
+    of the 0.4.0 retries failed this way, which is what sank the
+    linux-aarch64 release leg.
   - The Qt 6.8.3 online binaries need **ICU 73**, but ubuntu-24.04 ships ICU
     74 (ABI-incompatible, `ucnv_reset_73` undefined). No distro has ICU 73 —
     build it from the ICU release tarball (~1 min) **before** the aqt install
@@ -190,6 +202,30 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   regression). Strip commas in the parses. Also: benchmark now defaults
   `QT_QPA_PLATFORM=offscreen` internally so it never aborts (exit 134) on a
   headless box.
+
+### Platform-portability traps
+
+- **libc++ has no PSTL: `std::execution::seq` is undeclared on macOS.**
+  AppleClang's libc++ ships `<execution>` but not the parallel-algorithm
+  policies, and defines neither `__cpp_lib_execution` nor
+  `__cpp_lib_parallel_algorithm`; libstdc++ on Linux defines both. Any use of
+  `std::execution::seq` therefore compiles on Linux and fails on macOS with
+  `error: no member named 'seq' in namespace 'std::execution'` — exactly how
+  the 0.4.0 macOS release legs died (both arches, in `pdfcms.cpp` and
+  `pdfdiff.cpp`). Fix: guard with
+  `#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L` and fall
+  back to the plain serial call — `std::execution::seq` **is** the serial
+  policy, so the fallback is the identical operation.
+  `src/Pdf4QtLibCore/sources/pdfexecutionpolicy.h` is **vendored** (CRLF, from
+  `a52c18c`) and carries such a guard now; it is listed in `VENDORED_FILES`
+  (`scripts/check-slop.sh`, U2 advisory) and excluded from the format gate
+  (`ci/run-ci.sh`) so the vendored file is never reformatted. **Re-check the
+  guard whenever that file is re-vendored** — a clean upstream take would drop
+  it.
+- **A Linux-only PR gate hides macOS breakage.** `ci.yml` had no macOS job, so
+  the break above reached a release tag unseen. The `gate-macos` job now
+  builds + ctests on `macos-15` on every PR; if the release matrix keeps
+  shipping macOS, keep a macOS leg in `ci.yml`.
 
 ### Lifecycle guard crashes (agent tooling)
 

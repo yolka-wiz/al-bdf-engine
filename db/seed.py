@@ -107,6 +107,9 @@ TASKS = [
     ("tests", "R2: shared runTool test helper + add_albdf_test() CMake function", 1, "S", "test-agent", "open", "plan v3 R2.1/R2.2; dedupe 8 runTool copies + 16 CMake blocks", None),
     ("tests", "R2: scripts/check-slop.sh anti-slop gate + wire into CI/pre-commit", 1, "M", "infra-agent", "open", "plan v3 R2.3; enforces coding-standard §11", None),
     ("fork-base", "R0: plan hygiene (archive plans, fix RELEASES claim, refresh seed.py)", 1, "S", "docs-agent", "open", "plan v3 R0.2/R0.3/R0.4", None),
+    # v3 roadmap §R6 — release engineering, in progress.
+    ("tests", "R6.1: multi-platform release binaries — macOS libc++ PSTL guard + linux_arm64 aqt host + macOS PR gate", 1, "M", "infra-agent", "in_progress",
+     "0.4.0 shipped 0 assets: the release job was skipped by needs.build.result after 3 of 4 legs failed. Root causes: std::execution::seq undeclared in libc++ (both macOS legs), aqt host 'linux' cannot resolve linux_gcc_arm64 (linux-aarch64 leg), and ci.yml had no macOS leg so neither was seen pre-tag. Fixed on m15/r6.1-release-binaries; a green tag with attached assets is still required before closing (evidence gate).", None),
 ]
 
 DECISIONS = [
