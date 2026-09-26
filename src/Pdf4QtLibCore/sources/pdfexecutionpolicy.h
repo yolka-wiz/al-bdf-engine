@@ -138,7 +138,14 @@ public:
         }
         else
         {
+#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
             std::for_each(std::execution::seq, first, last, f);
+#else
+            // libc++ ships <execution> without the PSTL policies (Apple Clang), so
+            // std::execution::seq is undeclared there. A plain serial for_each is
+            // the identical operation.
+            std::for_each(first, last, f);
+#endif
         }
     }
 
@@ -148,7 +155,12 @@ public:
         Q_UNUSED(scope);
 
         // We always sort by single thread
+#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
         std::sort(std::execution::seq, first, last, f);
+#else
+        // libc++ has no PSTL policies; the serial policy is the same operation.
+        std::sort(first, last, f);
+#endif
     }
 
     /// Returns number of active threads for given scope
