@@ -130,17 +130,25 @@ runs:
         # so LD_LIBRARY_PATH already includes /tmp/icu-build/lib here — aqt's
         # post-install qmake verification needs it.
         python3 -m pip install --quiet "aqtinstall==3.3.*"
-        # aqt resolves the base Qt package through an Updates.xml fetch that is
-        # flaky on GH runners ("The packages ['qt_base'] were not found while
-        # parsing XML of package information!", miurahr/aqtinstall#769 /
-        # jurplel/install-qt-action#231) — it depends on which Qt mirror/CDN
-        # edge the runner reaches. Retry across mirrors; aqt rotates mirrors
-        # between attempts. Same command verified working locally.
         QT_DIR="${RUNNER_TEMP}/qt"
         QT_ARCH="${{ inputs.qt-arch }}"
+        # aqtinstall treats arm64 Linux as a separate HOST, not as an arch of
+        # "linux": `aqt install-qt linux ... linux_gcc_arm64` reads the
+        # linux_x64 repository, whose index contains no arm64 packages at all,
+        # so it fails with "The packages ['qt_base'] were not found while
+        # parsing XML of package information!" on every retry. That — not
+        # mirror flakiness — is what killed the 0.4.0 linux-aarch64 leg. The
+        # arm64 packages live only in the linux_arm64 repository.
+        QT_HOST="linux"
+        if [ "${QT_ARCH}" = "linux_gcc_arm64" ]; then
+          QT_HOST="linux_arm64"
+        fi
+        # The Updates.xml fetch can still be flaky on GH runners (miurahr/aqtinstall#769
+        # / jurplel/install-qt-action#231) depending on which Qt mirror/CDN edge
+        # the runner reaches. Retry; aqt rotates mirrors between attempts.
         for attempt in 1 2 3; do
-          echo "== aqt install attempt ${attempt}/3 (linux ${QT_ARCH}) =="
-          if python3 -m aqt install-qt linux desktop 6.8.3 "${QT_ARCH}" \
+          echo "== aqt install attempt ${attempt}/3 (${QT_HOST} ${QT_ARCH}) =="
+          if python3 -m aqt install-qt "${QT_HOST}" desktop 6.8.3 "${QT_ARCH}" \
               --archives qtbase qtsvg \
               --outputdir "${QT_DIR}" \
               --timeout 30; then
