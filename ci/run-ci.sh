@@ -77,6 +77,7 @@ AUTHORED_FILES="$(
         | grep -vE '^src/Pdf4QtLibCore/sources/pdffont\.cpp$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfpagecontentprocessor\.(cpp|h)$' \
         | grep -vE '^src/Pdf4QtLibCore/sources/pdfutils\.(cpp|h)$' \
+        | grep -vE '^src/Pdf4QtLibCore/sources/pdfexecutionpolicy\.h$' \
         | grep -vE '^src/PdfTool/pdftoolrender\.cpp$' \
         | grep -vE '^src/Pdf4QtLibGui/' \
         | grep -vE '^src/Pdf4QtLibWidgets/' \

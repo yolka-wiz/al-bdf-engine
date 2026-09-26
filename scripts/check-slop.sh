@@ -66,6 +66,7 @@ src/Pdf4QtLibCore/sources/pdfpagecontenteditorcontentstreambuilder.cpp
 src/Pdf4QtLibCore/sources/pdftextlayout.cpp
 src/Pdf4QtLibCore/sources/pdfdocumentbuilder.h
 src/Pdf4QtLibCore/sources/pdfdocumentbuilder.cpp
+src/Pdf4QtLibCore/sources/pdfexecutionpolicy.h
 src/Pdf4QtLibCore/sources/pdffont.cpp
 src/Pdf4QtLibCore/sources/pdfpagecontentprocessor.h
 src/Pdf4QtLibCore/sources/pdfpagecontentprocessor.cpp
