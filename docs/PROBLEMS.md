@@ -267,6 +267,19 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   the break above reached a release tag unseen. The `gate-macos` job now
   builds + ctests on `macos-15` on every PR; if the release matrix keeps
   shipping macOS, keep a macOS leg in `ci.yml`.
+- **The CLI could not start at all without a display server.** Qt's default
+  platform plugin on Unix is xcb, which needs `$DISPLAY`; on a container, CI
+  runner or headless server `QGuiApplication` aborts during construction —
+  `This application failed to start because no Qt platform plugin could be
+  initialized`, SIGABRT / exit 134 — before a single command runs. `main.cpp`
+  (`1039f81`) now sets `QT_QPA_PLATFORM=offscreen` when neither `$DISPLAY` nor
+  `$WAYLAND_DISPLAY` is set and the caller has not chosen a platform itself; an
+  explicit `QT_QPA_PLATFORM` always wins, and macOS is excluded because cocoa
+  works without `$DISPLAY`. CI never caught this — every job exports the
+  variable, so it took running the real binary headless to see it. `ctest`
+  still needs the variable (see Determinism traps). Note `main.cpp` is in the
+  gate's vendored-upstream set (U2 advisory, same class as the PSTL guards):
+  **re-apply this block on any re-vendor of the file.**
 
 ### Lifecycle guard crashes (agent tooling)
 
