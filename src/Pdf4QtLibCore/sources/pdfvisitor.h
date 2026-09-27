@@ -167,7 +167,14 @@ struct PDFApplyVisitorImpl<Visitor, PDFAbstractVisitor::Strategy::Parallel>
         const PDFObjectStorage::PDFObjects& objects = storage.getObjects();
         const PDFObject& trailerDictionary = storage.getTrailerDictionary();
 
+#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
         std::for_each(std::execution::par, objects.cbegin(), objects.cend(), [visitor](const PDFObjectStorage::Entry& entry) { entry.object.accept(visitor); });
+#else
+        // libc++ (Apple Clang) ships <execution> without the PSTL policies, so the
+        // policy argument is dropped here: same result, single-threaded. Same guard
+        // and rationale as pdfexecutionpolicy.h.
+        std::for_each(objects.cbegin(), objects.cend(), [visitor](const PDFObjectStorage::Entry& entry) { entry.object.accept(visitor); });
+#endif
         trailerDictionary.accept(visitor);
     }
 };
@@ -192,7 +199,11 @@ struct PDFApplyVisitorImpl<Visitor, PDFAbstractVisitor::Strategy::Merging>
             visitor->merge(&localVisitor);
         };
 
+#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
         std::for_each(std::execution::par, objects.cbegin(), objects.cend(), process);
+#else
+        std::for_each(objects.cbegin(), objects.cend(), process);
+#endif
         trailerDictionary.accept(visitor);
     }
 };
@@ -206,7 +217,11 @@ struct PDFApplyVisitorImpl<Visitor, PDFAbstractVisitor::Strategy::Sequential>
         const PDFObjectStorage::PDFObjects& objects = storage.getObjects();
         const PDFObject& trailerDictionary = storage.getTrailerDictionary();
 
+#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L
         std::for_each(std::execution::seq, objects.cbegin(), objects.cend(), [visitor](const PDFObjectStorage::Entry& entry) { entry.object.accept(visitor); });
+#else
+        std::for_each(objects.cbegin(), objects.cend(), [visitor](const PDFObjectStorage::Entry& entry) { entry.object.accept(visitor); });
+#endif
         trailerDictionary.accept(visitor);
     }
 };
