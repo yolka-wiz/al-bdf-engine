@@ -117,10 +117,11 @@ runs:
         # macOS uses CoreText and does NOT drag fontconfig in transitively,
         # so pkg_check_modules(FONTCONFIG REQUIRED) must find it here.
         # pkg-config: required by pkg_check_modules (fribidi, fontconfig).
-        # qt: brew Qt is used on macOS (NOT aqt) so the release binary links
-        # against the standard /opt/homebrew|/usr/local framework paths that
-        # users have after `brew install qt` — an aqt Qt in the CI temp dir
-        # would make the shipped binary un-runnable off the runner.
+        # qt: brew Qt is used on macOS (NOT aqt) because the rest of this action
+        # is brew-based there. Since W8 the release tarball bundles the Qt
+        # frameworks it links and rewrites every reference to @rpath, so the
+        # prefix Qt was linked from no longer reaches users — `brew install qt`
+        # is not a prerequisite any more.
         # HOMEBREW_NO_REQUIRE_TAP_TRUST: GitHub's macOS runner image carries an
         # untrusted `aws/tap` (brew tap-trust feature, 2026); without this
         # every `brew install` fails with "The following taps are not trusted".

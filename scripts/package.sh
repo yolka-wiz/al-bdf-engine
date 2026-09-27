@@ -11,6 +11,12 @@
 # @loader_path). GNU tar (or gtar on macOS) is preferred for deterministic
 # output; a Python tarfile fallback keeps bsdtar-only systems working.
 #
+# macOS is self-contained (W8): Qt's frameworks, fontconfig and the platform
+# plugins are copied into the tarball and every absolute reference is rewritten
+# to @rpath, because macOS has no system Qt to depend on. Linux is deliberately
+# the opposite — distro Qt is a documented prerequisite, nothing is shipped, so
+# the system's Qt is always the one in use and no duplicate can conflict.
+#
 # Determinism:
 #   - all files root-owned, normalized mtime (SOURCE_DATE_EPOCH, falling back
 #     to the last commit time), sorted entries, gzip -n (no filename/mtime
@@ -180,6 +186,11 @@ ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "libPdf4QtLibCore not 
 [ -f "$STAGE/include/Pdf4QtLibCore/pdf4qtlibcore_export.h" ] || fail "installed tree missing generated export header"
 [ -f "$STAGE/share/man/man1/albdf.1" ] || fail "installed tree missing man page"
 [ -f "$STAGE/share/licenses/albdf/LICENSE" ] || fail "installed tree missing license"
+# Ship the prerequisite list with the artifact: what a user needs in order to run
+# it should be in the thing they downloaded, not only in the repository.
+mkdir -p "$STAGE/share/doc/albdf"
+cp "$REPO_DIR/docs/PREREQUISITES.md" "$STAGE/share/doc/albdf/PREREQUISITES.md" \
+    || fail "could not stage docs/PREREQUISITES.md"
 
 # ---- validate the INSTALLED binary (headless) -----------------------------
 echo "== validating installed binary (offscreen) =="
@@ -212,6 +223,22 @@ if [ "$_IS_WINDOWS" -eq 0 ]; then
         fi
         echo "  RUNPATH check: $(printf '%s' "$RPATH" | tr '\n' ' ' | sed 's/  */ /g')"
     fi
+fi
+
+# ---- macOS: make the tarball self-contained (W8) --------------------------
+# macOS has no system Qt, so the tarball must carry it: the CLI cannot be a
+# release artifact if it needs `brew install qt` first. scripts/macos-bundle-deps.sh
+# copies the referenced frameworks, dylibs and platform plugins in, rewrites the
+# references to @rpath and fails the run if anything still points at Homebrew.
+# Linux ships none of this on purpose: distro Qt is a documented prerequisite
+# there, so the system's Qt is the only copy in use and nothing can conflict.
+MACOS_BUNDLED_LIBS=0
+MACOS_BUNDLED_PLUGINS=0
+if [ "$PLATFORM_OS" = "macos" ]; then
+    echo "== bundling macOS dependencies (Qt frameworks, fontconfig, plugins) =="
+    bash "$REPO_DIR/scripts/macos-bundle-deps.sh" "$STAGE" || fail "macOS dependency bundling failed"
+    MACOS_BUNDLED_LIBS="$(ls -1 "$STAGE/Frameworks" 2>/dev/null | wc -l | tr -d ' ')"
+    MACOS_BUNDLED_PLUGINS="$(ls -1 "$STAGE/plugins/platforms" 2>/dev/null | wc -l | tr -d ' ')"
 fi
 
 # ---- deterministic tarball (.tar.gz on all platforms) --------------------
@@ -283,5 +310,7 @@ echo "size_bytes=$SIZE"
 echo "files=$FILES"
 echo "validated=1"
 [ -n "$DEB" ] && echo "deb=$DEB"
+[ "$PLATFORM_OS" = "macos" ] && echo "macos_bundled_libraries=$MACOS_BUNDLED_LIBS"
+[ "$PLATFORM_OS" = "macos" ] && echo "macos_bundled_plugins=$MACOS_BUNDLED_PLUGINS"
 echo
 echo "package: OK - $TARBALL ($SIZE bytes, sha256 $SHA)"

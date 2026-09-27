@@ -289,6 +289,29 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 
 ### Release-packaging traps (W7)
 
+- **The macOS tarball linked Homebrew Qt, so it only ran where
+  `brew install qt` had already been run** — the user's symptom is
+  `dyld: Library not loaded: /opt/homebrew/opt/qtbase/lib/QtXml.framework/...`.
+  macOS ships no system Qt, so the bundle has to carry it:
+  `scripts/macos-bundle-deps.sh` (W8) copies the referenced Qt frameworks, plain
+  dylibs (fontconfig) and platform plugins into the prefix, rewrites every
+  reference to `@rpath/...`, adds `@executable_path/../Frameworks` and writes
+  `bin/qt.conf` (`Plugins = ../plugins`). The runtime smoke test **cannot** prove
+  this — a CI runner has Homebrew Qt and loads that instead — so the script
+  refuses to succeed while any `/opt/homebrew` path, or any `@rpath` reference
+  that does not resolve inside the bundle, survives. `package.sh` bails if it
+  does.
+- **`otool -L` prints a dylib's own install name as its first entry**, so
+  `tail -n +2` does not list dependencies. Treating it as one made the bundler
+  copy every plugin into `Frameworks/` as well. Exclude it via `otool -D`
+  (`macho_refs`). Covered by `ci/test-macos-bundle-fixture.sh`, which builds a
+  fake Qt tree with clang and runs the bundler against it — no Qt install, no
+  project build, so it runs in the macOS PR gate.
+- **Linux deliberately ships no Qt** (W8): distro Qt is the documented
+  prerequisite (`docs/PREREQUISITES.md`, also dropped into the tarball), so the
+  system's copy is the only one in use and a duplicate cannot conflict. On Linux
+  `qt6-svg` is **not** needed — verified by resolving the installed binary's
+  `NEEDED` entries — but the platform-plugin package is (`qt6-qpa-plugins`).
 - The built `albdf` carries a **build-tree RUNPATH** (`<build>/lib`) that CMake bakes in for libraries linked from the build tree. Staged installs must override it with `INSTALL_RPATH=$ORIGIN/../lib` (set in `src/CMakeLists.txt`, W7) or the release tarball leaks a machine-specific absolute path. `scripts/package.sh` verifies this with `readelf` and fails the run otherwise.
 - Reproducible tarballs need `tar --sort=name --numeric-owner --owner=0 --group=0 --mtime=@$SOURCE_DATE_EPOCH` **and** `gzip -n` (plain `tar -z` lets gzip stamp the input filename + mtime into its header). `scripts/package.sh` uses both; two runs from one build produce identical sha256 (asserted during W7 testing).
 

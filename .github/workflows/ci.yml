@@ -87,6 +87,11 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
       - name: ci/run-ci.sh stages 1-2 (configure + build, offscreen ctest)
         run: bash ci/run-ci.sh --skip-asan --skip-format
+      - name: macOS bundle regression test (scripts/macos-bundle-deps.sh)
+        # The release workflow only packages on a tag, so nothing else here
+        # exercises the bundler that makes the macOS tarball self-contained. It
+        # builds its own fake Qt tree with clang — no Qt install required.
+        run: bash ci/test-macos-bundle-fixture.sh
 
   asan:
     name: ASAN/UBSAN build + ctest
