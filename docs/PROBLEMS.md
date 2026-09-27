@@ -205,23 +205,27 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 
 ### Platform-portability traps
 
-- **libc++ has no PSTL: `std::execution::seq` is undeclared on macOS.**
-  AppleClang's libc++ ships `<execution>` but not the parallel-algorithm
+- **libc++ has no PSTL: the `std::execution::*` policies are undeclared on
+  macOS.** AppleClang's libc++ ships `<execution>` but not the parallel-algorithm
   policies, and defines neither `__cpp_lib_execution` nor
-  `__cpp_lib_parallel_algorithm`; libstdc++ on Linux defines both. Any use of
-  `std::execution::seq` therefore compiles on Linux and fails on macOS with
-  `error: no member named 'seq' in namespace 'std::execution'` — exactly how
-  the 0.4.0 macOS release legs died (both arches, in `pdfcms.cpp` and
-  `pdfdiff.cpp`). Fix: guard with
+  `__cpp_lib_parallel_algorithm`; libstdc++ on Linux defines both. Any use of a
+  policy therefore compiles on Linux and fails on macOS with
+  `error: no member named 'seq' / 'par' in namespace 'std::execution'` — how the
+  0.4.0 macOS release legs died (both arches). Fix: guard with
   `#if defined(__cpp_lib_execution) && __cpp_lib_execution >= 201603L` and fall
-  back to the plain serial call — `std::execution::seq` **is** the serial
-  policy, so the fallback is the identical operation.
-  `src/Pdf4QtLibCore/sources/pdfexecutionpolicy.h` is **vendored** (CRLF, from
-  `a52c18c`) and carries such a guard now; it is listed in `VENDORED_FILES`
-  (`scripts/check-slop.sh`, U2 advisory) and excluded from the format gate
-  (`ci/run-ci.sh`) so the vendored file is never reformatted. **Re-check the
-  guard whenever that file is re-vendored** — a clean upstream take would drop
-  it.
+  back to the plain serial call. For `seq` that is the identical operation; for
+  `par` the result is identical but the loop runs single-threaded on macOS.
+  - Vendored files carrying the guard (CRLF, from `a52c18c`):
+    `src/Pdf4QtLibCore/sources/pdfexecutionpolicy.h` (2 sites) and
+    `src/Pdf4QtLibCore/sources/pdfvisitor.h` (3 sites: two `par`, one `seq`).
+    Both are listed in `VENDORED_FILES` (`scripts/check-slop.sh`, U2 advisory)
+    and excluded from the format gate (`ci/run-ci.sh`) so vendored CRLF code is
+    never reformatted. **Re-check these guards on any re-vendor of either file**
+    — a clean upstream take would drop them.
+  - `grep -rn 'std::execution::' src/` is the complete inventory (5 sites in
+    those 2 files). Other files include `<execution>` without using a policy and
+    are fine. Fixing only the file the failing log named first is what made the
+    0.4.0-class macOS break need two rounds — enumerate, don't whack-a-mole.
 - **A Linux-only PR gate hides macOS breakage.** `ci.yml` had no macOS job, so
   the break above reached a release tag unseen. The `gate-macos` job now
   builds + ctests on `macos-15` on every PR; if the release matrix keeps

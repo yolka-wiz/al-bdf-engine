@@ -17,7 +17,7 @@ Branch: `m15/multiplatform-releases` (PR #19), target `main`; R6.1 follow-up
 
   | Cause | Evidence | Fix |
   |---|---|---|
-  | macOS legs could not compile | `error: no member named 'seq' in namespace 'std::execution'` in `pdfcms.cpp` / `pdfdiff.cpp`, on **both** macOS arches | guard `std::execution::seq` in the vendored `pdfexecutionpolicy.h` behind `__cpp_lib_execution >= 201603L` and fall back to the plain serial call — libc++ ships `<execution>` without the PSTL policies, libstdc++ does not |
+  | macOS legs could not compile | `error: no member named 'seq' / 'par' in namespace 'std::execution'` in `pdfcms.cpp` / `pdfdiff.cpp`, on **both** macOS arches | guard the 5 `std::execution::*` uses in the two vendored headers (`pdfexecutionpolicy.h`, `pdfvisitor.h`) behind `__cpp_lib_execution >= 201603L` and fall back to the plain serial call — libc++ ships `<execution>` without the PSTL policies, libstdc++ does not |
   | linux-aarch64 could not obtain Qt | `The packages ['qt_base'] were not found while parsing XML of package information!` on all 3 retries, then `qmake not found after Qt install` | aqtinstall needs the `linux_arm64` **host** for the `linux_gcc_arm64` arch; the action passed `linux` and therefore read the arm64-less linux_x64 index |
   | a macOS-only break went unseen until tag time | `ci.yml` had no macOS job at all | new gating `gate-macos` job (`macos-15`) builds + ctests on every PR |
 
