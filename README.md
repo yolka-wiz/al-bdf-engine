@@ -24,7 +24,10 @@ packages come from your distribution:
 
 The same list ships inside the tarball as
 `share/doc/albdf/PREREQUISITES.md`, together with why each one is a
-prerequisite rather than something bundled.
+prerequisite rather than something bundled. On Linux **Qt 6.8 or newer is
+required** (Ubuntu 24.04 LTS ships Qt 6.4, which is too old). Third-party
+licenses and the bundled-on-macOS components are listed in
+`docs/THIRD_PARTY_NOTICES.md`.
 
 ### Prerequisites (building from source)
 

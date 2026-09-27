@@ -191,6 +191,8 @@ ls "$STAGE"/$LIB_SUBDIR/$LIB_GLOB >/dev/null 2>&1 || fail "libPdf4QtLibCore not 
 mkdir -p "$STAGE/share/doc/albdf"
 cp "$REPO_DIR/docs/PREREQUISITES.md" "$STAGE/share/doc/albdf/PREREQUISITES.md" \
     || fail "could not stage docs/PREREQUISITES.md"
+cp "$REPO_DIR/docs/THIRD_PARTY_NOTICES.md" "$STAGE/share/doc/albdf/THIRD_PARTY_NOTICES.md" \
+    || fail "could not stage docs/THIRD_PARTY_NOTICES.md"
 
 # ---- validate the INSTALLED binary (headless) -----------------------------
 echo "== validating installed binary (offscreen) =="

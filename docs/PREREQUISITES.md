@@ -23,6 +23,15 @@ sudo apt install libqt6core6 libqt6gui6 libqt6xml6 libfontconfig1 \
                  libglvnd0 libopengl0 qt6-qpa-plugins
 ```
 
+**Qt 6.8 or newer is required.** The release binaries are built against Qt 6.8,
+so a distribution whose Qt is older will fail at start-up with a symbol error
+rather than a clear message. That means Debian 13, Ubuntu 25.04+, Fedora 42+ and
+newer; **Ubuntu 24.04 LTS ships Qt 6.4 and is too old.** Check with:
+
+```bash
+apt show libqt6core6 | grep -i version    # or: dnf info qt6-qtbase
+```
+
 ## Linux — Fedora
 
 ```bash
