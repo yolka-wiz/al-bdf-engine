@@ -10,7 +10,23 @@ portions stay MIT. It is the engine behind a future GUI.
 
 ## Install
 
-### Prerequisites
+### Running a released binary
+
+Download the tarball for your platform from the releases page, extract it and
+run `bin/albdf`. On **macOS nothing else is needed** — the tarball carries the
+Qt frameworks, fontconfig and platform plugins it uses. On **Linux** a few
+packages come from your distribution:
+
+| Distribution | Packages |
+| --- | --- |
+| Debian / Ubuntu | `libqt6core6 libqt6gui6 libqt6xml6 libfontconfig1 libglvnd0 libopengl0 qt6-qpa-plugins` |
+| Fedora | `qt6-qtbase qt6-qtbase-gui fontconfig libglvnd-glx libglvnd-opengl` |
+
+The same list ships inside the tarball as
+`share/doc/albdf/PREREQUISITES.md`, together with why each one is a
+prerequisite rather than something bundled.
+
+### Prerequisites (building from source)
 
 - CMake ≥ 3.25, Ninja, GCC/Clang (C++20)
 - Qt 6.8+ (Core/Gui/Xml/Svg/Test — **no Widgets/QML**; 6.10.2 tested)
