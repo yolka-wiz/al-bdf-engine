@@ -226,6 +226,22 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
     those 2 files). Other files include `<execution>` without using a policy and
     are fine. Fixing only the file the failing log named first is what made the
     0.4.0-class macOS break need two rounds — enumerate, don't whack-a-mole.
+- **macOS `openssl` is LibreSSL, and the PKCS#12 it writes is unreadable by
+  OpenSSL 3.** `/usr/bin/openssl` on macOS is LibreSSL, whose `pkcs12 -export`
+  writes the certificate bag as `pbeWithSHA1And40BitRC2-CBC`. OpenSSL 3 — which
+  the app links — refuses RC2 outright (legacy provider off by default):
+  `error:0308010C:digital envelope routines:inner_evp_generic_fetch:unsupported:` /
+  `Algorithm (RC2-40-CBC : 0)`. `UnitTestsFormSignature` mints its certificate
+  fixture with the `openssl` CLI, so on macOS the two certificate-dependent
+  tests (`test_signAndVerify`, `test_tamperedSignature`) fail while the other
+  five pass — `5 passed, 2 failed`, with `initTestCase` still succeeding because
+  LibreSSL writes the file happily. Linux has real OpenSSL 3 as `openssl`, so its
+  export is PBES2/PBKDF2/AES-256-CBC and reads back cleanly. Fix: CI puts
+  `$(brew --prefix openssl@3)/bin` on `GITHUB_PATH` (macOS branch of
+  `setup-toolchain`) — PATH only, so build linkage is unchanged. Verified
+  locally: the LibreSSL file yields 2 `unsupported` errors through OpenSSL 3,
+  the OpenSSL 3 file 0. **Local macOS dev hits the same wall** — put brew's
+  OpenSSL 3 first on PATH before running ctest.
 - **A Linux-only PR gate hides macOS breakage.** `ci.yml` had no macOS job, so
   the break above reached a release tag unseen. The `gate-macos` job now
   builds + ctests on `macos-15` on every PR; if the release matrix keeps
