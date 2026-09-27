@@ -87,10 +87,10 @@ runs:
         # transient tap-fetch / license-check stall that a clean retry clears
         # (observed on the 0.4.0 release run's macOS legs).
         if ! HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
-          brew install cmake ninja gnu-tar fontconfig pkg-config qt; then
+          brew install cmake ninja gnu-tar fontconfig pkg-config openssl@3 qt; then
           echo "brew install failed once; retrying after brew update..." >&2
           HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1 \
-            brew install cmake ninja gnu-tar fontconfig pkg-config qt
+            brew install cmake ninja gnu-tar fontconfig pkg-config openssl@3 qt
         fi
         # brew's pkgconfig dir is $(brew --prefix)/lib/pkgconfig — on Apple
         # Silicon that is /opt/homebrew, which is NOT in pkg-config's default
@@ -98,6 +98,15 @@ runs:
         echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> "${GITHUB_ENV}"
         # Point CMake at brew Qt for find_package(Qt6 6.8 REQUIRED).
         echo "CMAKE_PREFIX_PATH=$(brew --prefix qt)" >> "${GITHUB_ENV}"
+        # Put Homebrew's OpenSSL 3 ahead of /usr/bin for the CLI. macOS ships
+        # LibreSSL as /usr/bin/openssl, and LibreSSL's `pkcs12 -export` writes
+        # the certificate bag as pbeWithSHA1And40BitRC2-CBC. OpenSSL 3 (which
+        # the app links) refuses RC2 — the legacy provider is off by default —
+        # so the PKCS#12 fixture the formsignature test mints is unreadable and
+        # its two signature tests fail ("unsupported Algorithm (RC2-40-CBC : 0)").
+        # Linux has real OpenSSL 3 as `openssl`, so it never sees this. This is
+        # PATH-only: it does NOT change what the build links against.
+        echo "$(brew --prefix openssl@3)/bin" >> "${GITHUB_PATH}"
 
     - name: Build ICU 73 (Linux Qt 6.8.3 prebuilt needs it; ubuntu-24.04 ships ICU 74)
       if: runner.os == 'Linux' && inputs.install-qt == 'true'
