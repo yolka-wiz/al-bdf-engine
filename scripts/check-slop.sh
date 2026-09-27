@@ -72,6 +72,7 @@ src/Pdf4QtLibCore/sources/pdfpagecontentprocessor.h
 src/Pdf4QtLibCore/sources/pdfpagecontentprocessor.cpp
 src/Pdf4QtLibCore/sources/pdfutils.h
 src/Pdf4QtLibCore/sources/pdfutils.cpp
+src/Pdf4QtLibCore/sources/pdfvisitor.h
 "
 
 usage() {
