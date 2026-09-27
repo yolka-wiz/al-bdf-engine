@@ -173,10 +173,20 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-24.04
     needs: [build, appimage]
-    # Run only on tag pushes, and only if every platform build succeeded.
-    # appimage is continue-on-error (non-gating): its failure must not block
-    # the CLI release — the `needs.build.result` check excludes it.
-    if: startsWith(github.ref, 'refs/tags/') && needs.build.result == 'success'
+    # Publish on EVERY tag push — including when some platform legs failed.
+    #
+    # This job used to require `needs.build.result == 'success'`, i.e. every
+    # leg of the 5-platform matrix. That is the *aggregate* result, so one
+    # failing platform skipped the job entirely and discarded the artifacts the
+    # other platforms had just finished building — which is exactly how 0.4.0
+    # shipped ZERO assets while its linux-x86_64 leg had built successfully.
+    # A partial release is strictly better than no release, and the platforms
+    # that are absent are named in the release body instead of being silently
+    # lost.
+    #
+    # `always()` is required: without it a failed dependency skips the job no
+    # matter what `if` says. appimage stays continue-on-error (non-gating).
+    if: always() && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
 
@@ -184,6 +194,20 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Require at least one platform artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== dist contents =="
+          ls -la dist/ || true
+          shopt -s nullglob
+          files=(dist/*)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no platform artifacts were uploaded — nothing to publish" >&2
+            exit 1
+          fi
+          echo "found ${#files[@]} artifact file(s)"
 
       - name: Extract release notes from docs/RELEASES.md
         id: notes
@@ -204,16 +228,67 @@ jobs:
           PY
           echo "notes bytes: $(wc -c < /tmp/release-notes.md)"
 
-      - name: Create Release with gh
+      # MUST stay after the notes step above: that step writes
+      # /tmp/release-notes.md in 'w' mode and would clobber this table.
+      - name: Append platform availability to the release notes
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          # package.sh names artifacts albdf-<version>-<os>-<arch>.tar.gz, and
+          # ARCHIVE_EXT is tar.gz on every platform including Windows (Git Bash
+          # provides tar), with the arch token x86_64 or aarch64 — so Apple
+          # Silicon is "macos-aarch64".
+          {
+            echo
+            echo "### Platform availability"
+            echo
+            echo "| Platform | Artifact |"
+            echo "| --- | --- |"
+            for entry in \
+              "linux-x86_64:*-linux-x86_64.tar.gz" \
+              "linux-aarch64:*-linux-aarch64.tar.gz" \
+              "macos-arm64:*-macos-aarch64.tar.gz" \
+              "macos-x86_64:*-macos-x86_64.tar.gz" \
+              "windows-x86_64:*-windows-x86_64.tar.gz"
+            do
+              platform="${entry%%:*}"
+              pattern="${entry#*:}"
+              shopt -s nullglob
+              hits=(dist/${pattern})
+              shopt -u nullglob
+              if [ "${#hits[@]}" -gt 0 ]; then
+                echo "| ${platform} | \`$(basename "${hits[0]}")\` |"
+              else
+                echo "| ${platform} | **not built in this release** |"
+              fi
+            done
+          } >> /tmp/release-notes.md
+          echo "== notes tail =="
+          tail -12 /tmp/release-notes.md
+
+      - name: Publish assets to the GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
           echo "== dist contents =="
           ls -la dist/
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "albdf ${VERSION}" \
-            --notes-file /tmp/release-notes.md
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # The release already exists: either an earlier tag run published a
+            # partial set, or a leg has since been fixed and this run adds it.
+            # Upload with --clobber so re-runs are idempotent instead of dying
+            # on "release already exists", and refresh the notes.
+            echo "release ${TAG} already exists — uploading assets"
+            gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "albdf ${VERSION}" \
+              --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "albdf ${VERSION}" \
+              --notes-file /tmp/release-notes.md
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
