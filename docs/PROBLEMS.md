@@ -203,6 +203,27 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   `QT_QPA_PLATFORM=offscreen` internally so it never aborts (exit 134) on a
   headless box.
 
+- **apt's CMake is too old for vcpkg's own scripts — and only arm64 notices.**
+  ubuntu-24.04 ships cmake **3.28.3**, but vcpkg-scripts 2026-07-29 calls
+  `string(JSON ... STRING_ENCODE)` in `scripts/cmake/z_vcpkg_spdx.cmake`, and
+  that mode does not exist even in CMake **4.2.3**
+  (`string sub-command JSON got an invalid mode 'STRING_ENCODE'`). The failure
+  is asymmetric and therefore easy to misread as an arm64-only bug:
+  - **x86_64 leg:** invisible. vcpkg sees the system cmake is too old
+    ("A suitable version of cmake was not found (required v4.4.0)"), downloads
+    its own 4.4.0 to run ports, and builds fine.
+  - **linux-aarch64 leg:** fatal. vcpkg has no CMake asset to fetch for
+    arm64-linux, silently falls back to the system 3.28.3, and
+    `asmjit:arm64-linux` dies with `BUILD_FAILED`. The tell is the generated
+    issue body saying **`CMake Version: 0`** — vcpkg could not even identify
+    the cmake it was forced to use.
+  Fix: both Linux legs now install Kitware CMake **4.4.0** (arch-mapped from
+  `RUNNER_ARCH`) and skip apt's cmake — the same version vcpkg already uses for
+  its ports on x86_64. Verified on an aarch64 host using the exact asset and
+  `--strip-components=1` layout: 4.4.0 accepts `STRING_ENCODE`, while apt's
+  4.2.3 on the same image reproduces the error verbatim. Note the trap bites
+  any future old-CMake CI base, not just arm64.
+
 ### Platform-portability traps
 
 - **libc++ has no PSTL: the `std::execution::*` policies are undeclared on
