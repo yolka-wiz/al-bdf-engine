@@ -24,12 +24,27 @@
 #include "pdfconstants.h"
 #include "pdfexception.h"
 
+#include <QByteArray>
 #include <QGuiApplication>
 #include <QCommandLineParser>
 #include <QTextStream>
 
 int main(int argc, char *argv[])
 {
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+    // albdf only ever writes files, but Qt's default platform plugin on Unix
+    // needs a display server (xcb reads $DISPLAY, wayland reads
+    // $WAYLAND_DISPLAY) and aborts while QGuiApplication is being constructed
+    // when there is none - before any command can run. Fall back to the
+    // offscreen plugin so the tool works in containers and CI pipelines. An
+    // explicit QT_QPA_PLATFORM from the caller always wins.
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsEmpty("DISPLAY") &&
+        qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
+    {
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+    }
+#endif
+
     QGuiApplication a(argc, argv);
     QCoreApplication::setOrganizationName("MelkaJ");
     QCoreApplication::setApplicationName("albdf");
