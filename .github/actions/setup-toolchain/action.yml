@@ -60,11 +60,52 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends cmake ninja-build \
+        # cmake is deliberately NOT taken from apt here — see the Kitware step
+        # below (ubuntu-24.04 ships 3.28.3, which vcpkg's own scripts reject).
+        sudo apt-get install -y --no-install-recommends ninja-build \
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
             libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
             libgl1-mesa-dev \
             libfontconfig1-dev libfreetype-dev
+
+    - name: Install CMake 4.4.0 (Linux, both arches)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Pinned, arch-aware, and identical on x86_64 and arm64.
+        #
+        # Why not apt's cmake: ubuntu-24.04 ships 3.28.3, but vcpkg's own
+        # scripts (vcpkg-scripts 2026-07-29) call `string(JSON ... STRING_ENCODE)`
+        # in scripts/cmake/z_vcpkg_spdx.cmake, which CMake 4.2.3 still rejects
+        # ("string sub-command JSON got an invalid mode 'STRING_ENCODE'").
+        # On x86_64 this is invisible: vcpkg notices the system cmake is too old
+        # ("A suitable version of cmake was not found (required v4.4.0)"),
+        # downloads its own 4.4.0 to run ports, and everything builds. On Linux
+        # arm64 vcpkg has no CMake asset to fetch, silently falls back to the
+        # system 3.28.3, and asmjit:arm64-linux dies with BUILD_FAILED (the
+        # error body's "CMake Version: 0" is the tell). Installing 4.4.0 here
+        # gives both arches the same cmake — the version vcpkg already uses for
+        # its ports on x86_64.
+        #
+        # Adopted only after checking it cannot break the working x86_64 leg:
+        # the tree's only cmake_minimum_required are 3.16 (src/) and 3.25
+        # (root), both above the 3.5 floor CMake 4 hard-enforces; the eight
+        # subdirectory CMakeLists declare none; nothing needs
+        # CMAKE_POLICY_VERSION_MINIMUM; and the vcpkg ports already build under
+        # CMake 4.4.0 on x86_64 today.
+        ALBDF_CMAKE_VERSION="4.4.0"
+        case "${RUNNER_ARCH}" in
+          X64)   CMAKE_ASSET="linux-x86_64"  ;;
+          ARM64) CMAKE_ASSET="linux-aarch64" ;;
+          *) echo "unsupported RUNNER_ARCH: ${RUNNER_ARCH}" >&2; exit 1 ;;
+        esac
+        curl -fsSL -o /tmp/cmake.tar.gz \
+          "https://github.com/Kitware/CMake/releases/download/v${ALBDF_CMAKE_VERSION}/cmake-${ALBDF_CMAKE_VERSION}-${CMAKE_ASSET}.tar.gz"
+        sudo mkdir -p /opt/cmake
+        sudo tar xzf /tmp/cmake.tar.gz -C /opt/cmake --strip-components=1
+        echo "/opt/cmake/bin" >> "${GITHUB_PATH}"
+        /opt/cmake/bin/cmake --version | head -1
 
     - name: Install build tools (macOS)
       if: runner.os == 'macOS'
