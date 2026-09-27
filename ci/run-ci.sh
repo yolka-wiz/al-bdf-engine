@@ -145,7 +145,13 @@ if [ "$ONLY_FORMAT" -eq 0 ] && [ "$ONLY_SLOP" -eq 0 ]; then
         step "2/5 ctest (offscreen)"
         export QT_QPA_PLATFORM=offscreen
         ctest --test-dir build --output-on-failure > /tmp/ci-ctest.log 2>&1
-        if [ $? -ne 0 ]; then echo "ctest FAILED"; tail -20 /tmp/ci-ctest.log; FAILED=1; else
+        if [ $? -ne 0 ]; then
+            echo "ctest FAILED"
+            grep -nE '(FAIL!|FAILED|Failed|error:) .*' /tmp/ci-ctest.log | head -40
+            echo "--- last 20 lines ---"
+            tail -20 /tmp/ci-ctest.log
+            FAILED=1
+        else
             tail -2 /tmp/ci-ctest.log
         fi
     fi
