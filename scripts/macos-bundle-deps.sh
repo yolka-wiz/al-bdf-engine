@@ -106,10 +106,19 @@ while [ "$pass" -lt 4 ]; do
 done
 [ -s "$FW_ROOTS" ] || fail "the binary references no framework at all — nothing to bundle?"
 
-# Locate Qt's platform plugins: ask qmake, then the Homebrew layout, then the
-# upstream one derived from the Qt prefixes the frameworks came from.
+# Locate Qt's platform plugins. The frameworks just copied are the Qt the binary
+# actually links, so their prefix decides FIRST: if a qmake from some other Qt
+# were consulted first (a CI runner's Homebrew Qt, a developer's second Qt
+# install), the bundle would pair plugins from one Qt version with frameworks
+# from another — which fails at run time with an unresolved symbol, not at
+# packaging time.
 qt_plugins_dir=""
-if command -v qmake >/dev/null 2>&1; then
+for root in $(sort -u "$FW_ROOTS"); do
+    for cand in "$root/../../share/qt/plugins" "$root/../../plugins"; do
+        [ -d "$cand/platforms" ] && { qt_plugins_dir="$cand"; break 2; }
+    done
+done
+if [ ! -d "${qt_plugins_dir:-}/platforms" ] && command -v qmake >/dev/null 2>&1; then
     qt_plugins_dir="$(qmake -query QT_INSTALL_PLUGINS 2>/dev/null || true)"
 fi
 if [ ! -d "${qt_plugins_dir:-}/platforms" ]; then
@@ -119,14 +128,7 @@ if [ ! -d "${qt_plugins_dir:-}/platforms" ]; then
         [ -n "$cand" ] && [ -d "$cand/platforms" ] && { qt_plugins_dir="$cand"; break; }
     done
 fi
-if [ ! -d "${qt_plugins_dir:-}/platforms" ]; then
-    for root in $(sort -u "$FW_ROOTS"); do
-        for cand in "$root/../../share/qt/plugins" "$root/../../plugins"; do
-            [ -d "$cand/platforms" ] && { qt_plugins_dir="$cand"; break 2; }
-        done
-    done
-fi
-[ -n "$qt_plugins_dir" ] || fail "Qt platform plugins not found (tried qmake, Homebrew and the Qt prefixes of the linked frameworks)"
+[ -n "$qt_plugins_dir" ] || fail "Qt platform plugins not found (tried the Qt prefixes of the linked frameworks, qmake, and Homebrew)"
 
 # Headless CLI: offscreen is mandatory (main.cpp selects it with no display);
 # cocoa covers a normal desktop session; minimal is a cheap extra fallback.

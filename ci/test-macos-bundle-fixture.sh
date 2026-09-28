@@ -26,6 +26,7 @@
 # Exit:  0 = pass, 1 = bundler or assertions failed, 2 = bad usage.
 
 set -u
+export LC_ALL=C   # stable sort order for the assertions below
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUNDLER="$REPO/scripts/macos-bundle-deps.sh"
@@ -152,7 +153,22 @@ fi
 
 hr "3. bundle: run scripts/macos-bundle-deps.sh over the prefix"
 mv "$FX/fakeqt-hidden" "$FX/fakeqt"
-bash "$BUNDLER" "$PFX" || note_fail "the bundler exited non-zero"
+# Decoy Qt on PATH. A CI runner has Homebrew Qt, and the bundler's plugin search
+# once consulted its qmake — pairing real plugins with the fixture's frameworks,
+# which is how step 4 failed with an unresolved symbol from that other Qt. The
+# search must prefer the Qt the binary actually links, so plant a decoy and let
+# the assertions catch any use of it.
+mkdir -p "$FX/decoy/bin" "$FX/decoy/plugins/platforms"
+cp "$PLUGDIR/libqoffscreen.dylib" "$FX/decoy/plugins/platforms/libqdecoy.dylib"
+cat > "$FX/decoy/bin/qmake" <<DECOY
+#!/usr/bin/env bash
+case "\${1:-}" in
+    -query) echo "$FX/decoy/plugins" ;;
+esac
+exit 0
+DECOY
+chmod +x "$FX/decoy/bin/qmake"
+PATH="$FX/decoy/bin:$PATH" bash "$BUNDLER" "$PFX" || note_fail "the bundler exited non-zero"
 
 hr "4. proof: hide the Qt tree again and run the BUNDLED binary"
 mv "$FX/fakeqt" "$FX/fakeqt-hidden"
@@ -177,6 +193,17 @@ for p in libqoffscreen libqcocoa; do
 done
 [ -f "$PFX/bin/qt.conf" ] || note_fail "qt.conf is missing (Qt would not find the plugins)"
 [ -d "$PFX/Frameworks/QtSvg.framework" ] || note_fail "the transitive QtSvg framework was not bundled"
+
+# Exact-set assertions. If the bundler ever consults a Qt outside the fixture — a
+# CI runner has Homebrew Qt on PATH — extra real plugins and libraries land in the
+# bundle, and step 4 then dies on an unresolved symbol belonging to that Qt. That
+# is exactly how this test first failed on CI, so pin the sets.
+want_plugins="libqcocoa.dylib libqoffscreen.dylib"
+got_plugins="$(ls -1 "$PFX/plugins/platforms" 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$got_plugins" = "$want_plugins" ] || note_fail "bundled plugins are [$got_plugins], expected [$want_plugins] — a Qt outside the fixture was used"
+want_libs="QtCore.framework QtGui.framework QtSvg.framework libfontconfig.1.dylib"
+got_libs="$(ls -1 "$PFX/Frameworks" 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$got_libs" = "$want_libs" ] || note_fail "bundled libraries are [$got_libs], expected [$want_libs] — a Qt outside the fixture was used"
 
 echo
 if [ "$FAILED" -eq 0 ]; then
