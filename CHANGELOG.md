@@ -6,7 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- CI and release workflows pin Node 24-native action releases —
+  `actions/checkout@v5.1.0`, `actions/cache@v5.1.0`,
+  `actions/upload-artifact@v7.0.1`, `actions/download-artifact@v8.0.1`. The
+  previous `@v4` pins declared `runs.using: node20` and were only executing on
+  the runner's forced Node 24 shim, past GitHub's 2026-09-23 removal date. No
+  workflow logic changed; the lines were chosen for durability (oldest Node 24
+  line still receiving releases) and every input was verified against the
+  pinned tag.
 
 ## [0.4.1] - 2026-09-29
 
