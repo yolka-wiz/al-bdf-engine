@@ -3,10 +3,21 @@
 > The concise, user-facing changelog lives in [`/CHANGELOG.md`](../CHANGELOG.md);
 > this file holds the detailed per-release engineering notes.
 
-## albdf (unreleased) — R3.1/R3.2 + R4.1/R4.2 + multi-platform release binaries
+## albdf 0.5.0 — release binaries that actually ship + R3/R4 integration
 
-Branch: `m15/multiplatform-releases` (PR #19), target `main`; R6.1 follow-up
-(binaries that actually build): `m15/r6.1-release-binaries`.
+Date: 2026-09-29
+Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
+
+The first release whose artifacts are actually attached: Linux (x86_64,
+aarch64), macOS (arm64, x86_64) and Windows (x86_64) tarballs are built,
+validated and published from the `0.5.0` tag by `.github/workflows/release.yml`.
+It also carries the shared page write-back path (R3) and the RTL backend seam
+(R4), which landed after `0.4.0` and had never been released.
+
+The `0.4.0` release itself stays asset-less: its tag (`51897f21`) predates every
+fix below, so re-running it would rebuild the broken commit under the old
+all-or-nothing gate. The backfill-vs-next-tag decision is tracked as R6.1 in
+`plans/PLAN.md`.
 
 ### Release engineering (R6.1)
 
@@ -32,6 +43,54 @@ Branch: `m15/multiplatform-releases` (PR #19), target `main`; R6.1 follow-up
 - **Per-platform `qt-arch`** in the matrix instead of a single default,
   removing runner-arch ambiguity.
 
+### Packaging
+
+- **macOS tarballs are self-contained** (`4ba142a`): the Qt frameworks,
+  fontconfig and the platform plugins the binary uses are bundled, with
+  `@loader_path`-relative install names, so the artifact runs on a Mac that has
+  never had Homebrew Qt installed.
+- **The bundled plugins are the ones the linked Qt actually has** (`9f5a057`):
+  the plugin set is derived from the Qt the binary links, not from the runner's
+  default Qt, so the tarball no longer depends on the runner image.
+- `docs/PREREQUISITES.md` ships inside every tarball as
+  `share/doc/albdf/PREREQUISITES.md` (`f2b9117`), together with
+  `THIRD_PARTY_NOTICES.md` and the Qt 6.8 floor (`cbcfeb7`).
+- The GUI AppImage job is gone (`d74a90e`) — this repository ships CLI
+  binaries, and the job was a permanent non-gating red leg.
+- **Windows x86_64 (MSVC 2022)** was added to the matrix. Its tarball carries
+  `albdf.exe` + `Pdf4QtLibCore.dll` and **no Qt runtime**, so it needs its own
+  Qt 6.8 installation — documented as a known limitation rather than presented
+  as a drop-in binary.
+
+### R3 — shared page write-back (R3.1/R3.2)
+
+- `PDFPageContentRewriter` is now the single core path for updating a page's
+  content (replace resources → compress content → build content/page dicts →
+  merge → finalize): `10540e8`, with `add-text` routed through it at `5105e2a`
+  and `delete-object` at `e5da2f4`; covered by `803162b` (including
+  `/Contents` arrays and indirect resources).
+- `Q_ASSERT`-as-validation in the two custom commands is gone (R3.2): bounds
+  are checked explicitly and failures return documented error codes instead of
+  aborting the process in a Release build.
+
+### R4 — RTL backend seam (R4.1/R4.2)
+
+- New internal `PDFBidi` (FriBidi) and `PDFShaper` (HarfBuzz) interfaces: the
+  only `<fribidi.h>` / `<hb.h>` uses in core now sit behind the seam
+  (`3283509`), and the RTL writer routes through them (`5bcadd4`).
+- The duplicated visual↔logical inversion logic (previously in
+  `pdfrtltextnormalizer.cpp` and `pdftextsearchengine.cpp`) is consolidated
+  behind the seam (`a351b53`) and unit-tested without the engine (`65dbc2a`,
+  `UnitTestsRtlBidi`).
+
+### CLI correctness
+
+- `albdf` starts with no display server: with neither `$DISPLAY` nor
+  `$WAYLAND_DISPLAY` set it selects the offscreen platform itself (`d88b800`).
+- Exceptions are guarded and the documented exit-code contract is enforced
+  (`bbd37a2`) and regression-tested (`7d1e6e3`); `--help-all` is treated as
+  help (`4bd6ee6`).
+
 ### Verified
 
 - Reproduced locally and fixed: the macOS PSTL failure reproduces with Apple
@@ -44,10 +103,12 @@ Branch: `m15/multiplatform-releases` (PR #19), target `main`; R6.1 follow-up
   `bash scripts/check-slop.sh --self-test`. No authored `.cpp`/`.h` changed —
   the only C++ edit is the vendored, format-gate-exempt
   `pdfexecutionpolicy.h`.
-- Hosted CI (Linux `gate`, ASAN/UBSAN, format + slop, and the new
-  `gate-macos`) runs on the PR. A release-workflow dry-run
-  (`workflow_dispatch`) and tag assets remain **pending**; the `0.4.0` tag
-  itself is untouched by this change.
+- Hosted CI on the release PR: Linux `gate` (Release build + ctest),
+  ASAN/UBSAN, clang-format + slop, the new `gate-macos`, plus the non-gating
+  GUI / benchmark / fuzz jobs.
+- **Assets**: the `0.5.0` tag run builds the five platforms and attaches the
+  tarballs and their `.sha256` files; the platform-by-platform result is the
+  *Platform availability* table the workflow appends to this release body.
 
 ---
 
