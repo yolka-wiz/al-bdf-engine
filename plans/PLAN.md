@@ -38,11 +38,12 @@ tracks may run together.
 
 ---
 
-## 1. Snapshot (2026-09-17)
+## 1. Snapshot (2026-09-29)
 
-**Shipped:** 0.1.0 → 0.4.0 — RTL write + search, object deletion, add-text,
+**Shipped:** 0.1.0 → **0.4.1** — RTL write + search, object deletion, add-text,
 forms & signatures, page ops, redaction, deterministic builds, hosted CI,
-optional GUI. Details in Appendix A and `docs/RELEASES.md`.
+optional GUI. Since `0.4.1` releases also carry **attached binaries**
+(Linux ×2, macOS ×2). Details in Appendix A and `docs/RELEASES.md`.
 
 **Repository hygiene pass landed** (`main`, PR #9 — commits `edb44f3`,
 `3cdc791`, `87ce856`, `2796128`):
@@ -62,8 +63,18 @@ optional GUI. Details in Appendix A and `docs/RELEASES.md`.
 **Known gaps carried into the roadmap:**
 
 - `0.4.0` has **no binary assets** — the multi-platform release workflow failed
-  on macOS + linux-aarch64 (logs expired). → R6.
-- `docs/RELEASES.md` still claims 0.4.0 shipped native macOS binaries (false).
+  on macOS + linux-aarch64 and the publisher was all-or-nothing. Fixed in
+  `0.4.1`. The `0.4.0` tag itself predates the fixes, so it stays asset-less
+  unless its still-live `dist-linux-x86_64` artifact (run `31901784692`,
+  downloadable until 2026-11-13) is backfilled with `gh release upload`.
+- `docs/RELEASES.md` claimed 0.4.0 shipped native macOS binaries (false) —
+  corrected in R0.2.
+- No **Windows** artifact: the `windows-x86_64` leg cannot configure (the MSVC
+  runner has no `pkg-config`; `src/CMakeLists.txt:52` requires it) and is
+  dropped from the matrix → R6.4.
+- The workflows pin **Node 20-era actions** (`checkout@v4`, `cache@v4`, the
+  artifact actions at `@v4`), which only run through the forced Node 24 shim
+  with a deprecation warning → R6.5.
 - Dead remote branches: `handoff-migration` (contains a force-added
   `db/albdf.db`), `m14/form-field-ap`, `m14/freetext-ap` (merged).
 - `REPO_MAP.md` has duplicated "unmapped" rows from the generator.
@@ -229,8 +240,11 @@ Highest structural leverage for expandability. The base file is **frozen**
   (`PDFPageContentRewriter`: replace resources → compress content → build
   content/page dicts → merge → finalize) and use it in `add-text` (LTR+RTL) and
   `delete-object`; add tests for `/Contents` arrays and indirect resources.
-  `#48`, M. **DONE** (`d61aa37` + `94b95e6` + `f86a4e6`, test `843edf3`;
-  `UnitTestsPageContentRewriter` green) — merged via `m15/r3-r4-integration`.
+  `#48`, M. **DONE** (`10540e8` helper + `5105e2a` add-text + `e5da2f4`
+  delete-object, test `803162b`; `UnitTestsPageContentRewriter` green) — merged
+  via `m15/r3-r4-integration`. *(Hashes refreshed 2026-09-29: the earlier
+  `d61aa37`/`94b95e6`/`f86a4e6`/`843edf3` are the pre-rebase branch commits —
+  the rebase-merge rewrote them.)*
 - [x] **R3.2** Replace `Q_ASSERT`-as-validation in the custom commands with
   explicit bounds checks + error codes (e.g. `pdftooladdtext.cpp:173`,
   `pdftooldeleteobject.cpp:147`). `#49`, S. **DONE** (in the R3.1 branch;
@@ -250,11 +264,13 @@ growing; `add-text`/`delete-object` share one write-back path.
 - [x] **R4.1** Introduce an internal `PDFBidi` / `PDFShaper` interface; move the
   three `<fribidi.h>` call sites and the `<hb.h>` usage behind it; unit-test the
   seam (bidirectional inversion, lam-alef collapse, digit folding). `#50`, M.
-  **DONE** (`18e6414` + `fabfdbb`, test `30d97ff`; `UnitTestsRtlBidi` green) —
-  merged via `m15/r3-r4-integration`.
+  **DONE** (`3283509` seam + `5bcadd4` writer, test `65dbc2a`; `UnitTestsRtlBidi`
+  green) — merged via `m15/r3-r4-integration`. *(Hashes refreshed 2026-09-29;
+  `18e6414`/`fabfdbb`/`30d97ff` are the pre-rebase branch commits.)*
 - [x] **R4.2** Consolidate the duplicated visual↔logical inversion logic
   (`pdfrtltextnormalizer.cpp` vs `pdftextsearchengine.cpp`). `#51`, S.
-  **DONE** (`d6ea522`; seam owns the only `<fribidi.h>` include in core).
+  **DONE** (`a351b53`; seam owns the only `<fribidi.h>` include in core).
+  *(Hash refreshed 2026-09-29; `d6ea522` is the pre-rebase commit.)*
 
 **Exit:** only the seam headers include FriBidi/HarfBuzz; RTL logic is testable
 without the full engine.
@@ -280,30 +296,65 @@ hardcoded in scripts.
 
 ### R6 — Release engineering (P2)
 
-- [ ] **R6.1** Diagnose and fix the macOS + linux-aarch64 release-build
+- [x] **R6.1** Diagnose and fix the macOS + linux-aarch64 release-build
   failures; re-run the workflow for `0.4.0` to attach the missing artifacts;
   add a `windows-x86_64` (MSVC 2022) leg so every tag ships Linux (×2), macOS
-  (×2), and Windows binaries. `#52`, M.
+  (×2), and Windows binaries. `#52`, M. **DONE** — tag `0.4.1`.
   - *Diagnosed 2026-09-26* (branch `m15/r6.1-release-binaries`): neither leg
     failed for the reason the earlier hardening assumed. The macOS legs died
     compiling `std::execution::seq` (libc++ ships `<execution>` without the PSTL
     policies; libstdc++ has them); the linux-aarch64 leg died because aqt was
     given the `linux` host for an arm64 arch and therefore read the arm64-less
     linux_x64 index. Both fixed, and `ci.yml` gained a gating `gate-macos` leg
-    so a macOS-only break cannot go unseen again. The `windows-x86_64` leg
-    remains **unproven** (added in PR #19, never executed).
-  - *Remaining before this box can be ticked:* a green tag with assets
-    attached. Note the backfill path for the existing `0.4.0` release needs
-    `gh release upload` — the publish step uses `gh release create`, which
-    cannot target a release that already exists. Decide whether to backfill
-    `0.4.0` or ship the fix with the next tag.
+    so a macOS-only break cannot go unseen again.
+  - *Closed 2026-09-29*: the first tag through the fixed pipeline (`0.5.0`, run
+    `36559286727`) built `linux-x86_64`, `linux-aarch64`, `macos-arm64` and
+    `macos-x86_64` and the `always()` publisher attached the artifacts — the
+    gate fix proven end-to-end. That tag was re-cut as **`0.4.1`** (a
+    release-pipeline fix is not a minor version; nothing had been downloaded).
+  - The one leg that failed was **Windows**: `Could NOT find PkgConfig (missing:
+    PKG_CONFIG_EXECUTABLE)` at `src/CMakeLists.txt:52`, after ~26 min. Dropped
+    from the matrix → R6.4. `0.4.0` itself stays asset-less on purpose (its tag
+    predates every fix); its `dist-linux-x86_64` artifact remains downloadable
+    until 2026-11-13 if a `gh release upload` backfill is ever wanted.
 - [ ] **R6.2** Generate release notes from `CHANGELOG.md` (single source of
   truth) and keep the workflow title scheme (`albdf X.Y.Z`). `#53`, S.
-- [ ] **R6.3** Cut `0.5.0` once R1–R3 land (correctness + architecture are
-  user-visible quality). `#TBD`, S.
+  Today's body is extracted from the `## albdf <version>` section of
+  `docs/RELEASES.md` and then extended with the workflow's own
+  *Platform availability* table.
+- [x] **R6.3** Cut `0.5.0` once R1–R3 land (correctness + architecture are
+  user-visible quality). `#TBD`, S. **DONE** as **`0.4.1`** — PR #21
+  (`3acb8dc`, `47c06fa`) plus the re-cut PR; version bumped in
+  `src/CMakeLists.txt`, `CHANGELOG.md`, `docs/RELEASES.md`, `docs/albdf.1`,
+  `README.md`.
+- [ ] **R6.4** Restore the `windows-x86_64` release leg. Root cause: the MSVC
+  runner image has no `pkg-config`, and `src/CMakeLists.txt:52` calls
+  `find_package(PkgConfig REQUIRED)`, so the leg dies at configure (~26 min
+  into the run). Directions: install `pkg-config`/`pkgconf` in the Windows
+  branch of `.github/actions/setup-toolchain` (Chocolatey `pkgconfiglite`, or
+  the MSYS2 `pkg-config`, and export `PKG_CONFIG_EXECUTABLE`), or make the
+  require conditional on the platform. Then re-add the matrix entry (the aqt
+  Windows block and `scripts/package.sh`'s Windows path are still in place,
+  marked inert) and verify a tag run publishes `albdf-<v>-windows-x86_64.tar.gz`.
+  Note the Windows tarball carries **no Qt runtime** (`package.sh` stages
+  `albdf.exe` + `Pdf4QtLibCore.dll` only) — a `windeployqt` step is needed
+  before it can be advertised as a drop-in binary. `#TBD`, M.
+- [ ] **R6.5** Move the workflow action pins to Node 24-native majors.
+  `checkout@v4`, `cache@v4`, `upload-artifact@v4` and `download-artifact@v4` all
+  declare `runs.using: node20`; the runner force-runs them on Node 24 and warns
+  (`##[warning]Node.js 20 is deprecated …`). GitHub's removal date was
+  **2026-09-23** — already past — so a green run today is not a guarantee.
+  Verified-compatible targets (inputs used here all exist in them):
+  `checkout@v5`+ (v7 latest), `cache@v5`+ (v6 latest), `upload-artifact@v6`+
+  (v7 latest), `download-artifact@v7`+ (**v6 is still Node 20**; v8 latest).
+  Node 24 needs runner ≥ 2.327.1, which hosted runners already satisfy. The
+  repository currently uses `workflow_dispatch` dry-runs as the post-change
+  verification path. `#TBD`, S. Details in `docs/PROBLEMS.md`
+  ("GitHub Actions runner traps").
 
-**Exit:** all four platform builds green on a tag; release assets attached;
-notes auto-derived.
+**Exit:** every matrix leg green on a tag — or explicitly named as missing in
+the release body — with the artifacts attached; notes auto-derived. The matrix
+is four platforms (Linux ×2, macOS ×2) as of `0.4.1`, pending R6.4.
 
 ### R7 — Deferred / not now
 
@@ -371,7 +422,7 @@ where a decision was made; the next phase's DB tasks created.
 | Refactors break RTL output | golden-image + corpus tests; ASAN; byte-determinism checks |
 | Parallel agents clobber files | one writer per file; stage own paths; sequential integration |
 | Root build shim untested | R5.1 adds a root-build CI job before relying on it |
-| Release workflow stays red | R6.1 owns it; assets verified before 0.5.0 |
+| Release workflow stays red | R6.1 closed — 4 legs green on tag 0.4.1; Windows deferred (R6.4) |
 | Subagent budget exhaustion | pre-verified contracts in briefs; orchestrator finishes work |
 | Upstream drift | upstream remote + cherry-picks; baseline anchors behavior |
 | Scope creep | §2 non-goals; proposals go to DB, not code |
@@ -417,5 +468,5 @@ where a decision was made; the next phase's DB tasks created.
 - Should the tracking DB live in git (e.g. a dedicated `handoff` branch) or
   stay gitignored with a reproducible `seed.py`? (R0.1 forces the decision.)
 - Should `REPO_MAP.md` remain committed or be generated on demand? (R5.2.)
-- Does the project want `v`-prefixed tags (`v0.5.0`) for a conventional
+- Does the project want `v`-prefixed tags (`v0.4.1`) for a conventional
   release URL scheme? Current tags are unprefixed; titles are `albdf X.Y.Z`.

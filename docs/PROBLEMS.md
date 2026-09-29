@@ -24,6 +24,7 @@
   - [vcpkg / toolchain traps](#vcpkg--toolchain-traps)
   - [Platform-portability traps](#platform-portability-traps)
   - [Release-packaging traps (W7)](#release-packaging-traps-w7)
+  - [GitHub Actions runner traps](#github-actions-runner-traps)
   - [Determinism traps](#determinism-traps)
   - [Fork-hygiene traps](#fork-hygiene-traps)
   - [Agent-workflow traps](#agent-workflow-traps)
@@ -314,6 +315,54 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   `NEEDED` entries — but the platform-plugin package is (`qt6-qpa-plugins`).
 - The built `albdf` carries a **build-tree RUNPATH** (`<build>/lib`) that CMake bakes in for libraries linked from the build tree. Staged installs must override it with `INSTALL_RPATH=$ORIGIN/../lib` (set in `src/CMakeLists.txt`, W7) or the release tarball leaks a machine-specific absolute path. `scripts/package.sh` verifies this with `readelf` and fails the run otherwise.
 - Reproducible tarballs need `tar --sort=name --numeric-owner --owner=0 --group=0 --mtime=@$SOURCE_DATE_EPOCH` **and** `gzip -n` (plain `tar -z` lets gzip stamp the input filename + mtime into its header). `scripts/package.sh` uses both; two runs from one build produce identical sha256 (asserted during W7 testing).
+- **The release workflow fires only on a `0.*` tag push.** `workflow_dispatch`
+  builds and uploads artifacts but deliberately creates **no** Release, so a
+  month of merged fixes ships nothing until someone tags — that is how the
+  `0.4.0` release sat at 0 assets from 2026-08-15 to 2026-09-29. Tags are
+  unprefixed and annotated (`0.4.1`), and three things must agree at tag time:
+  `set(ALBDF_VERSION …)` in `src/CMakeLists.txt`, the tag name, and a
+  `## albdf <version>` heading in `docs/RELEASES.md` — the publisher greps
+  exactly that heading for the release body and silently degrades to a bare
+  `albdf <version>` string when it is missing.
+- **`release` must keep `if: always()`.** Gating the publisher on
+  `needs.build.result == 'success'` tests the *aggregate* matrix result, so a
+  single red platform skips the job and throws away every artifact the other
+  legs just built. That is precisely how `0.4.0` shipped zero assets while its
+  `linux-x86_64` leg had built successfully.
+- **Retagging a release is only safe while `downloadCount` is 0** — check the
+  API first, then `gh release delete <tag> --cleanup-tag` (removes release +
+  tag together), fix the version strings, and re-tag. Never re-tag with a lower
+  version than an already-published tag.
+- **The `windows-x86_64` leg cannot configure**: the GitHub Windows runner has
+  no `pkg-config`, and `src/CMakeLists.txt:52` calls
+  `find_package(PkgConfig REQUIRED)` → `Configure + build` dies with
+  `Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE)` after ~26 min of
+  vcpkg work. The leg was dropped from the matrix in `0.4.1`; restoring it
+  needs a `pkg-config` on the runner (R6.4).
+
+### GitHub Actions runner traps
+
+- **Node 20 actions are already past their removal date.** The runner force-runs
+  any action declaring `runs.using: node20` on Node 24 and prints
+  `##[warning]Node.js 20 is deprecated. The following actions target Node.js 20
+  but are being forced to run on Node.js 24: actions/cache@v4,
+  actions/checkout@v4.` ([GitHub changelog](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/),
+  removal date updated to **2026-09-23**). The workflows here pin `checkout@v4`,
+  `cache@v4`, `upload-artifact@v4`, `download-artifact@v4` — all Node 20 — so a
+  green run today is no guarantee about tomorrow.
+- **Node 24-native pins, with inputs verified against each action's
+  `action.yml`:** `actions/checkout@v5`+ (v7 latest), `actions/cache@v5`+
+  (v6 latest), `actions/upload-artifact@v6`+ (v7 latest),
+  `actions/download-artifact@v7`+ (v8 latest — **v6 is still Node 20**).
+  Everything used here (`fetch-depth`; `path`/`key`/`restore-keys`;
+  `name`/`path`/`if-no-files-found`; `path`/`merge-multiple`) exists in those
+  majors. Migration notes that do **not** bite this repo:
+  `download-artifact@v5` changed path handling for single-artifact-by-ID
+  downloads (we use `merge-multiple`), and the `checkout` lines all backported
+  `allow-unsafe-pr-checkout`, which blocks fork checkouts for
+  `pull_request_target`/`workflow_run` (we use `pull_request` + tag push).
+  Node 24 needs runner ≥ 2.327.1; GitHub-hosted runners already satisfy it.
+  Tracked as R6.5.
 
 ### Determinism traps
 

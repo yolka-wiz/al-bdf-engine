@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed the albdf tracking DB with the current known state (2026-09-17).
+"""Seed the albdf tracking DB with the current known state (2026-09-29).
 
 Run after `python3 scripts/db.py init`. Idempotent-ish: components are
 INSERT OR IGNORE, tasks/decisions/questions are inserted fresh (run once).
@@ -102,14 +102,20 @@ TASKS = [
     ("forms-signatures", "M14 RTL form-field AP: headless form-fill emits NO appearance stream (no-op); fix to embed shaped Type0 font via PDFRTLTextEngine + add --font option", 1, None, "yolka", "done", "M14 shipped: form-field AP via PDFRTLTextEngine + --font; R#5 resolved. Merge b149864 (impl 21c4287).", "b149864"),
     ("rtl-writer", "M14 RTL FreeText annotation AP: QPainter path cannot embed Type0; additive early-return branch in updateAnnotationAppearanceStreams", 1, None, "yolka", "done", "M14 shipped: FreeText RTL AP embeds shaped Type0 font. Merge 4b9a5dd (impl 507ff44).", "4b9a5dd"),
     # v3 roadmap (plan §R0–R2), open.
-    ("cli", "R1: top-level exception guard + enforce exit-code contract (unknown cmd/args)", 1, "S", "cli-agent", "open", "plan v3 R1.1/R1.2; guard is defense-in-depth (a main() guard cannot catch Qt Concurrent worker-thread exceptions; F#1 was fixed by render page-range validation 7a70767); unknown command currently exits 0", None),
-    ("tests", "R1: CLI exit-code contract regression test (QProcess, real binary)", 1, "S", "test-agent", "open", "plan v3 R1.3; depends on R1.2", None),
+    ("cli", "R1: top-level exception guard + enforce exit-code contract (unknown cmd/args)", 1, "S", "cli-agent", "done", "plan v3 R1.1/R1.2; PDFException / std::exception / catch-all guards added and the documented exit-code contract enforced, so an unknown command or option exits 7 instead of 0 (bbd37a2). Guard stays defense-in-depth (a main() guard cannot catch Qt Concurrent worker-thread exceptions; F#1 was fixed by render-page range validation 7a70767).", "bbd37a2"),
+    ("tests", "R1: CLI exit-code contract regression test (real binary)", 1, "S", "test-agent", "done", "plan v3 R1.3; implemented in src/tests/smoke.sh (not QProcess): --version/--help/help -> 0, unknown command -> 7, unknown option -> 7, add-text --help -> 0; command_present() requires non-empty stdout because an unknown command reports on stderr (7d1e6e3).", "7d1e6e3"),
     ("tests", "R2: shared runTool test helper + add_albdf_test() CMake function", 1, "S", "test-agent", "open", "plan v3 R2.1/R2.2; dedupe 8 runTool copies + 16 CMake blocks", None),
     ("tests", "R2: scripts/check-slop.sh anti-slop gate + wire into CI/pre-commit", 1, "M", "infra-agent", "open", "plan v3 R2.3; enforces coding-standard §11", None),
     ("fork-base", "R0: plan hygiene (archive plans, fix RELEASES claim, refresh seed.py)", 1, "S", "docs-agent", "open", "plan v3 R0.2/R0.3/R0.4", None),
-    # v3 roadmap §R6 — release engineering, in progress.
-    ("tests", "R6.1: multi-platform release binaries — macOS libc++ PSTL guard + linux_arm64 aqt host + macOS PR gate", 1, "M", "infra-agent", "in_progress",
-     "0.4.0 shipped 0 assets: the release job was skipped by needs.build.result after 3 of 4 legs failed. Root causes: std::execution::seq undeclared in libc++ (both macOS legs), aqt host 'linux' cannot resolve linux_gcc_arm64 (linux-aarch64 leg), and ci.yml had no macOS leg so neither was seen pre-tag. Fixed on m15/r6.1-release-binaries; a green tag with attached assets is still required before closing (evidence gate).", None),
+    # v3 roadmap §R6 — release engineering.
+    ("tests", "R6.1: multi-platform release binaries — macOS libc++ PSTL guard + linux_arm64 aqt host + macOS PR gate", 1, "M", "infra-agent", "done",
+     "CLOSED 2026-09-29 by tag 0.4.1. The first tag through the fixed pipeline (0.5.0, run 36559286727) built linux-x86_64, linux-aarch64, macos-arm64 and macos-x86_64 and the always() publisher attached the tarballs + .sha256 — the evidence gate passed; the release object was then re-cut 0.5.0 -> 0.4.1 (a pipeline fix is not a minor version; downloadCount was 0). Root causes fixed earlier: std::execution::seq undeclared in libc++ (both macOS legs), aqt host 'linux' cannot resolve linux_gcc_arm64 (linux-aarch64 leg), ci.yml had no macOS leg so neither was seen pre-tag. Windows remains out: no pkg-config on the MSVC runner -> R6.4.", "47c06fa"),
+    ("tests", "R6.3: cut the release once R1–R3 land (correctness + architecture are user-visible quality)", 1, "S", "docs-agent", "done",
+     "SHIPPED as 0.4.1 — PR #21 (3acb8dc cut, 47c06fa merged; PR #22 carries the re-cut). Version bumped in five places: src/CMakeLists.txt, CHANGELOG.md, docs/RELEASES.md, docs/albdf.1, README.md.", "47c06fa"),
+    ("tests", "R6.4: restore the windows-x86_64 release leg — pkg-config missing on the MSVC runner", 2, "M", "infra-agent", "open",
+     "plan v3 R6.4. Root cause: src/CMakeLists.txt:52 calls find_package(PkgConfig REQUIRED) and the windows-2022 image has no pkg-config, so Configure + build dies after ~26 min with 'Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE)'. Fix direction: install pkg-conf/pkconfiglite in the Windows branch of .github/actions/setup-toolchain (and export PKG_CONFIG_EXECUTABLE), or make the require platform-conditional; then re-add the matrix entry. Second, independent gap: the Windows tarball ships no Qt runtime (package.sh stages albdf.exe + Pdf4QtLibCore.dll only), so a windeployqt step is needed before it can be advertised as a drop-in binary.", None),
+    ("tests", "R6.5: move the workflow action pins to Node 24-native majors", 1, "S", "infra-agent", "open",
+     "plan v3 R6.5. checkout@v4, cache@v4, upload-artifact@v4 and download-artifact@v4 declare runs.using: node20 and now only run through the forced Node 24 shim ('##[warning]Node.js 20 is deprecated ...'). GitHub's removal date was 2026-09-23 — already past. Verified-compatible, inputs unchanged: checkout >= v5 (v7 latest), cache >= v5 (v6 latest), upload-artifact >= v6 (v7 latest), download-artifact >= v7 (v6 is still node20; v8 latest). Details in docs/PROBLEMS.md ('GitHub Actions runner traps').", None),
 ]
 
 DECISIONS = [
