@@ -217,6 +217,9 @@ runs:
         # Ensure the Qt lib dir is also on LD_LIBRARY_PATH for the build steps.
         echo "LD_LIBRARY_PATH=${QT_ROOT_DIR}/lib:/tmp/icu-build/lib:\${LD_LIBRARY_PATH:-}" >> "${GITHUB_ENV}"
 
+    # Inert while the windows-x86_64 release leg is disabled (R6.4 — the MSVC
+    # runner has no pkg-config, which src/CMakeLists.txt:52 requires). Kept so
+    # re-enabling the leg is a matrix edit, not a rewrite.
     - name: Install Qt 6.8.3 + tools (Windows, qtbase + qtsvg, MSVC)
       if: runner.os == 'Windows' && inputs.install-qt == 'true'
       shell: pwsh
