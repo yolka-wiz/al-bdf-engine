@@ -1,0 +1,55 @@
+# TEMPORARY — verifies that the newly pinned artifact actions round-trip on
+# Node 24 using exactly the pattern release.yml's publisher uses
+# (merge-multiple into one flat directory). Deleted in the follow-up commit of
+# the same PR; it is not part of the pinned set.
+name: pin-check (temporary)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: upload with actions/upload-artifact@v7.0.1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build two small artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out-a out-b
+          head -c 200000 /dev/urandom > out-a/payload.bin
+          sha256sum out-a/payload.bin | awk '{print $1}' > out-a/payload.sha256
+          echo marker > out-b/marker.txt
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: pincheck-a
+          path: out-a/
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: pincheck-b
+          path: out-b/
+
+  download:
+    name: download with actions/download-artifact@v8.0.1
+    needs: upload
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Assert flat merge into dist/ and digest integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la dist
+          test -f dist/payload.bin
+          test -f dist/marker.txt
+          # the digest check that v8 enables by default must have passed for the
+          # download to succeed at all; assert the payload is byte-identical too
+          test "$(cat dist/payload.sha256)" = "$(sha256sum dist/payload.bin | awk '{print $1}')"
+          echo "PIN CHECK OK: upload@v7.0.1 + download@v8.0.1 round-trip, merge-multiple flat, digest verified"
