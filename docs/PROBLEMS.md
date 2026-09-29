@@ -342,27 +342,41 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
 
 ### GitHub Actions runner traps
 
-- **Node 20 actions are already past their removal date.** The runner force-runs
+- **Node 20 actions were running on a borrowed runtime.** The runner force-runs
   any action declaring `runs.using: node20` on Node 24 and prints
   `##[warning]Node.js 20 is deprecated. The following actions target Node.js 20
   but are being forced to run on Node.js 24: actions/cache@v4,
   actions/checkout@v4.` ([GitHub changelog](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/),
-  removal date updated to **2026-09-23**). The workflows here pin `checkout@v4`,
-  `cache@v4`, `upload-artifact@v4`, `download-artifact@v4` — all Node 20 — so a
-  green run today is no guarantee about tomorrow.
-- **Node 24-native pins, with inputs verified against each action's
-  `action.yml`:** `actions/checkout@v5`+ (v7 latest), `actions/cache@v5`+
-  (v6 latest), `actions/upload-artifact@v6`+ (v7 latest),
-  `actions/download-artifact@v7`+ (v8 latest — **v6 is still Node 20**).
-  Everything used here (`fetch-depth`; `path`/`key`/`restore-keys`;
-  `name`/`path`/`if-no-files-found`; `path`/`merge-multiple`) exists in those
-  majors. Migration notes that do **not** bite this repo:
-  `download-artifact@v5` changed path handling for single-artifact-by-ID
-  downloads (we use `merge-multiple`), and the `checkout` lines all backported
-  `allow-unsafe-pr-checkout`, which blocks fork checkouts for
-  `pull_request_target`/`workflow_run` (we use `pull_request` + tag push).
-  Node 24 needs runner ≥ 2.327.1; GitHub-hosted runners already satisfy it.
-  Tracked as R6.5.
+  removal date updated to **2026-09-23**). That date has passed, so those pins
+  were on borrowed time: a green run proved nothing about the next one.
+- **Fixed in R6.5 — the workflows pin exact tags on Node 24-native lines**,
+  picked for durability (the oldest line that is *still receiving releases*,
+  never the newest major) and verified input-by-input against each action's own
+  `action.yml`:
+
+  | Action | Pin | Why this line |
+  |---|---|---|
+  | `actions/checkout` | `v5.1.0` | Oldest Node 24 line and still backported (released in lockstep with `v6.1.0`/`v7.0.1`). Its `[BREAKING] allow-unsafe-pr-checkout` backport only affects `pull_request_target`/`workflow_run`; this repo uses `pull_request` + tag push |
+  | `actions/cache` | `v5.1.0` | Node 24, and the most-patched Node 24 line (`v5.0.0` → `v5.1.0`, released alongside `v6.1.0`). Avoids the `v6` ESM rewrite in a component that needs no churn |
+  | `actions/upload-artifact` | `v7.0.1` | **`v5.0.0` is still Node 20** — `v6` is the first Node 24-by-default line. `v7` adds only an *opt-in* `archive: false` direct upload (the default still zips) plus ESM internals, which are transparent to callers |
+  | `actions/download-artifact` | `v8.0.1` | **`v5` and `v6` are still Node 20**; `v8` is the current line. Its new fail-closed digest check (`digest-mismatch: error` by default) is *wanted* here — a release publisher must fail rather than attach a corrupted tarball. Escape hatch if it ever misfires: `digest-mismatch: warn` |
+
+- **Inputs**: the pinned tags carry every input this repo passes —
+  `fetch-depth` (×9); `path`/`key`/`restore-keys`;
+  `name`/`path`/`if-no-files-found`; `path`/`merge-multiple`. Node 24 also
+  needs runner ≥ 2.327.1, which hosted runners already satisfy (these actions
+  were already executing on the forced Node 24 shim before the pin change).
+- **Bumping them later**: read the candidate tag's `action.yml`
+  (`gh api repos/<owner>/<action>/contents/action.yml?ref=<tag>`) and confirm
+  `runs.using: node24` plus the inputs above. Prefer the oldest line that still
+  gets releases over the newest major. A workflow-file push must go over the
+  **SSH** remote: the `yolka-wiz` PAT has no `workflow` scope and GitHub
+  rejects such pushes outright.
+- **Tooling trap found while verifying this**: `gh pr checks --json` does not
+  exist before gh 2.55 (Debian ships 2.46). It fails with `unknown flag: --json`
+  **on stderr**, so a watcher redirecting stderr to `/dev/null` sees empty
+  stdout and concludes "no checks yet" forever. Use `gh run view <id> --json`
+  or the REST API instead.
 
 ### Determinism traps
 

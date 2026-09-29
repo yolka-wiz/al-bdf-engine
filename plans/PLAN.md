@@ -72,9 +72,10 @@ optional GUI. Since `0.4.1` releases also carry **attached binaries**
 - No **Windows** artifact: the `windows-x86_64` leg cannot configure (the MSVC
   runner has no `pkg-config`; `src/CMakeLists.txt:52` requires it) and is
   dropped from the matrix → R6.4.
-- The workflows pin **Node 20-era actions** (`checkout@v4`, `cache@v4`, the
-  artifact actions at `@v4`), which only run through the forced Node 24 shim
-  with a deprecation warning → R6.5.
+- ~~Workflows pinned Node 20-era actions (`@v4`) that only ran through the
+  forced Node 24 shim~~ → **closed in R6.5**: pins are now Node 24-native exact
+  tags (`checkout@v5.1.0`, `cache@v5.1.0`, `upload-artifact@v7.0.1`,
+  `download-artifact@v8.0.1`).
 - Dead remote branches: `handoff-migration` (contains a force-added
   `db/albdf.db`), `m14/form-field-ap`, `m14/freetext-ap` (merged).
 - `REPO_MAP.md` has duplicated "unmapped" rows from the generator.
@@ -342,18 +343,21 @@ hardcoded in scripts.
   Note the Windows tarball carries **no Qt runtime** (`package.sh` stages
   `albdf.exe` + `Pdf4QtLibCore.dll` only) — a `windeployqt` step is needed
   before it can be advertised as a drop-in binary. `#TBD`, M.
-- [ ] **R6.5** Move the workflow action pins to Node 24-native majors.
-  `checkout@v4`, `cache@v4`, `upload-artifact@v4` and `download-artifact@v4` all
-  declare `runs.using: node20`; the runner force-runs them on Node 24 and warns
-  (`##[warning]Node.js 20 is deprecated …`). GitHub's removal date was
-  **2026-09-23** — already past — so a green run today is not a guarantee.
-  Verified-compatible targets (inputs used here all exist in them):
-  `checkout@v5`+ (v7 latest), `cache@v5`+ (v6 latest), `upload-artifact@v6`+
-  (v7 latest), `download-artifact@v7`+ (**v6 is still Node 20**; v8 latest).
-  Node 24 needs runner ≥ 2.327.1, which hosted runners already satisfy. The
-  repository currently uses `workflow_dispatch` dry-runs as the post-change
-  verification path. `#TBD`, S. Details in `docs/PROBLEMS.md`
-  ("GitHub Actions runner traps").
+- [x] **R6.5** Move the workflow action pins to Node 24-native majors.
+  `#TBD`, S. **DONE** — 14 pins across `ci.yml`, `release.yml` and
+  `.github/actions/setup-toolchain/action.yml`, pinned to exact tags on the most
+  *durable* Node 24 lines rather than the newest majors:
+  `checkout@v5.1.0`, `cache@v5.1.0`, `upload-artifact@v7.0.1`,
+  `download-artifact@v8.0.1`. Rationale, plus the trap that `upload-artifact@v5`
+  and `download-artifact@v5`/`v6` are **still Node 20**, in
+  `docs/PROBLEMS.md` ("GitHub Actions runner traps").
+  - Every input the repo passes was checked against the pinned tag's own
+    `action.yml`, and `download-artifact@v8.0.1`'s round-trip (two artifacts,
+    `merge-multiple: true`, flat merge — the release publisher's exact pattern)
+    was proven in CI before merge.
+  - Evidence for the pin change itself: the PR run's annotations carry **no**
+    `Node.js 20 is deprecated` warning — the only proof that counts, since what
+    breaks is the runner's runtime, not the declared tag.
 
 **Exit:** every matrix leg green on a tag — or explicitly named as missing in
 the release body — with the artifacts attached; notes auto-derived. The matrix
