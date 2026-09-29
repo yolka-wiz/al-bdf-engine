@@ -311,7 +311,10 @@ hardcoded in scripts.
     `36559286727`) built `linux-x86_64`, `linux-aarch64`, `macos-arm64` and
     `macos-x86_64` and the `always()` publisher attached the artifacts — the
     gate fix proven end-to-end. That tag was re-cut as **`0.4.1`** (a
-    release-pipeline fix is not a minor version; nothing had been downloaded).
+    release-pipeline fix is not a minor version; nothing had been downloaded),
+    and the re-cut run `36574261580` published the release cleanly: 5/5 jobs
+    green, 8 assets, every published `.sha256` re-verified against the
+    downloaded bytes, tarball carries `./bin/albdf`.
   - The one leg that failed was **Windows**: `Could NOT find PkgConfig (missing:
     PKG_CONFIG_EXECUTABLE)` at `src/CMakeLists.txt:52`, after ~26 min. Dropped
     from the matrix → R6.4. `0.4.0` itself stays asset-less on purpose (its tag

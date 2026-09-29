@@ -104,9 +104,15 @@ all-or-nothing gate.
 - Hosted CI on the release PR: Linux `gate` (Release build + ctest),
   ASAN/UBSAN, clang-format + slop, the new `gate-macos`, plus the non-gating
   GUI / benchmark / fuzz jobs.
-- **Assets**: the `0.4.1` tag run builds the four platforms and attaches the
-  tarballs and their `.sha256` files; the platform-by-platform result is the
-  *Platform availability* table the workflow appends to this release body.
+- **Shipped and verified** — tag `0.4.1`, run
+  [`36574261580`](https://github.com/yolka-wiz/al-bdf-engine/actions/runs/36574261580): all five jobs green
+  (`Build macos-arm64` 4m15s, `Build linux-x86_64` 6m28s, `Build linux-aarch64`
+  11m11s, `Build macos-x86_64` 23m31s, `Create GitHub Release` 10s), producing
+  **8 assets** (four tarballs + four `.sha256`). Every published `.sha256` was
+  re-checked against the downloaded bytes and matches, and
+  `albdf-0.4.1-linux-x86_64.tar.gz` contains `./bin/albdf`. The
+  platform-by-platform result is the *Platform availability* table the workflow
+  appends to the release body — four rows, no Windows row.
 
 ### Known limitations
 
