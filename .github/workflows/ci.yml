@@ -1,5 +1,9 @@
 # albdf — hosted CI gate.
 #
+# Action pins are EXACT tags on Node 24-native lines, chosen for
+# durability (oldest line still receiving releases) and verified
+# input-by-input — see docs/PROBLEMS.md, "GitHub Actions runner traps".
+# Update them deliberately, not by floating a major tag.
 # Mirrors the local gate (ci/run-ci.sh — the single source of truth) on
 # GitHub-hosted Ubuntu 24.04 runners:
 #   gate       — stage 1+2: Release build + offscreen ctest
@@ -65,7 +69,7 @@ jobs:
     name: Build + ctest (Release, offscreen)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0   # ci/run-ci.sh's format gate diffs against fork base 6bf5047
       - uses: ./.github/actions/setup-toolchain
@@ -81,7 +85,7 @@ jobs:
     # Linux-only PR gate could not see. Mirrors the `gate` job's stage 1-2.
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
@@ -97,7 +101,7 @@ jobs:
     name: ASAN/UBSAN build + ctest
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
@@ -108,7 +112,7 @@ jobs:
     name: clang-format gate (authored files)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - name: Install clang-format 21.1.8 (matches dev container)
@@ -127,7 +131,7 @@ jobs:
     # blocks the PR.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
@@ -146,7 +150,7 @@ jobs:
     # never blocks the PR.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
@@ -156,7 +160,7 @@ jobs:
         run: bash scripts/benchmark.sh --work-dir "$RUNNER_TEMP/albdf-bench"
       - name: Upload benchmark summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: benchmark-summary
           path: ${{ runner.temp }}/albdf-bench/benchmark-summary.txt
@@ -169,7 +173,7 @@ jobs:
     # the summary); a failure here never blocks the PR (continue-on-error).
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.1.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-toolchain
@@ -179,7 +183,7 @@ jobs:
         run: bash scripts/fuzz.sh --iterations 200 --max-time 240 --work-dir "$RUNNER_TEMP/albdf-fuzz"
       - name: Upload fuzz summary + cases + reproducers
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: fuzz-summary
           path: |
