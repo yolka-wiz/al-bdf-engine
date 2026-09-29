@@ -10,8 +10,10 @@
 #     for testing the matrix before tagging
 #
 # Layout:
-#   build     — matrix over 5 platforms; headless Release build + package.sh
-#               (deterministic tarball + sha256).
+#   build     — matrix over 4 platforms; headless Release build + package.sh
+#               (deterministic tarball + sha256). Windows is temporarily out of
+#               the matrix: the MSVC runner has no pkg-config and
+#               src/CMakeLists.txt:52 requires it (see docs/PROBLEMS.md, R6.4).
 #   release   — needs build; downloads all artifacts and creates the GitHub
 #               Release with `gh` (GITHUB_TOKEN, contents: write). Runs on every
 #               tag push, and publishes whichever platforms built even if others
@@ -50,7 +52,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     # macOS / linux-aarch64 runners have hit first-boot and vcpkg cold-cache
     # stalls (0.4.0's mac + aarch64 legs failed on this). Give them more
-    # headroom than the warm-cache linux-x86_64 / Windows path.
+    # headroom than the warm-cache linux-x86_64 path.
     timeout-minutes: ${{ matrix.timeout-minutes || 90 }}
     strategy:
       fail-fast: false
@@ -71,9 +73,6 @@ jobs:
             os: macos-15-intel
             qt-arch: mac_x64
             timeout-minutes: 120
-          - platform: windows-x86_64
-            os: windows-2022
-            qt-arch: win64_msvc2022_64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -177,10 +176,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # package.sh names artifacts albdf-<version>-<os>-<arch>.tar.gz, and
-          # ARCHIVE_EXT is tar.gz on every platform including Windows (Git Bash
-          # provides tar), with the arch token x86_64 or aarch64 — so Apple
-          # Silicon is "macos-aarch64".
+          # package.sh names artifacts albdf-<version>-<os>-<arch>.tar.gz, with
+          # the arch token x86_64 or aarch64 — so Apple Silicon is
+          # "macos-aarch64".
           {
             echo
             echo "### Platform availability"
@@ -191,8 +189,7 @@ jobs:
               "linux-x86_64:*-linux-x86_64.tar.gz" \
               "linux-aarch64:*-linux-aarch64.tar.gz" \
               "macos-arm64:*-macos-aarch64.tar.gz" \
-              "macos-x86_64:*-macos-x86_64.tar.gz" \
-              "windows-x86_64:*-windows-x86_64.tar.gz"
+              "macos-x86_64:*-macos-x86_64.tar.gz"
             do
               platform="${entry%%:*}"
               pattern="${entry#*:}"
