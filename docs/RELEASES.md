@@ -3,21 +3,21 @@
 > The concise, user-facing changelog lives in [`/CHANGELOG.md`](../CHANGELOG.md);
 > this file holds the detailed per-release engineering notes.
 
-## albdf 0.5.0 — release binaries that actually ship + R3/R4 integration
+## albdf 0.4.1 — release binaries that actually ship (patch release)
 
 Date: 2026-09-29
 Branch: `main` (GitHub: yolka-wiz/al-bdf-engine)
 
-The first release whose artifacts are actually attached: Linux (x86_64,
-aarch64), macOS (arm64, x86_64) and Windows (x86_64) tarballs are built,
-validated and published from the `0.5.0` tag by `.github/workflows/release.yml`.
-It also carries the shared page write-back path (R3) and the RTL backend seam
-(R4), which landed after `0.4.0` and had never been released.
+A **patch release that only fixes the release itself**: `0.4.0` published zero
+assets, and this is the first tag since — so four platforms (Linux x86_64 and
+aarch64, macOS arm64 and x86_64) now publish tarballs plus `.sha256` from
+`.github/workflows/release.yml`. No user-facing feature work is claimed here;
+the R3/R4 refactors that merged in the meantime ride along because they are
+already on `main`, and they are listed at the end for completeness.
 
-The `0.4.0` release itself stays asset-less: its tag (`51897f21`) predates every
-fix below, so re-running it would rebuild the broken commit under the old
-all-or-nothing gate. The backfill-vs-next-tag decision is tracked as R6.1 in
-`plans/PLAN.md`.
+The `0.4.0` release stays asset-less: its tag (`51897f21`) predates every fix
+below, so re-running it would rebuild the broken commit under the old
+all-or-nothing gate.
 
 ### Release engineering (R6.1)
 
@@ -31,17 +31,21 @@ all-or-nothing gate. The backfill-vs-next-tag decision is tracked as R6.1 in
   | macOS legs could not compile | `error: no member named 'seq' / 'par' in namespace 'std::execution'` in `pdfcms.cpp` / `pdfdiff.cpp`, on **both** macOS arches | guard the 5 `std::execution::*` uses in the two vendored headers (`pdfexecutionpolicy.h`, `pdfvisitor.h`) behind `__cpp_lib_execution >= 201603L` and fall back to the plain serial call — libc++ ships `<execution>` without the PSTL policies, libstdc++ does not |
   | linux-aarch64 could not obtain Qt | `The packages ['qt_base'] were not found while parsing XML of package information!` on all 3 retries, then `qmake not found after Qt install` | aqtinstall needs the `linux_arm64` **host** for the `linux_gcc_arm64` arch; the action passed `linux` and therefore read the arm64-less linux_x64 index |
   | a macOS-only break went unseen until tag time | `ci.yml` had no macOS job at all | new gating `gate-macos` job (`macos-15`) builds + ctests on every PR |
+  | one red leg discarded the whole release | the `release` job was gated on `needs.build.result == 'success'`, the **aggregate** matrix result | `if: always() && startsWith(github.ref, 'refs/tags/')` + a "require at least one platform artifact" guard; the body now names the platforms that did not build |
 
-  The matrix stays `{linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64,
-  windows-x86_64}` (MSVC 2022). Per-platform `timeout-minutes` and the macOS
-  `brew` retry are kept as stall insurance, not as the fix.
-- **Windows packaging.** New aqtinstall Windows block in the shared
-  setup-toolchain action (Qt 6.8.3, `win64_msvc2022_64`, 3-attempt mirror
-  retry). `scripts/package.sh` detects Windows and packages `albdf.exe` +
-  `Pdf4QtLibCore*.dll` (under `bin/`, no RPATH check). Git Bash on the runner
-  reuses the existing deterministic `.tar.gz` path.
-- **Per-platform `qt-arch`** in the matrix instead of a single default,
-  removing runner-arch ambiguity.
+- **First tag through the fixed pipeline** (`0.5.0`, run
+  `36559286727`): `linux-x86_64`, `linux-aarch64`, `macos-arm64` and
+  `macos-x86_64` all built, the publisher ran with `always()` and attached the
+  artifacts — the gate fix proven end-to-end on its first outing. That tag was
+  re-cut as **`0.4.1`** (this release) because a release-pipeline fix does not
+  warrant a minor version; nothing had been downloaded.
+- **The one leg that did not build: Windows.** `windows-x86_64` failed at
+  `Configure + build` with
+  `Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE)` — the MSVC runner
+  has no `pkg-config` and `src/CMakeLists.txt:52` requires it — after ~26
+  minutes of vcpkg work. The leg is **dropped from the matrix** in this release
+  (R6.4 covers restoring it), so no Windows artifact is published and the
+  packaging path for it is documented as inert rather than advertised.
 
 ### Packaging
 
@@ -57,10 +61,6 @@ all-or-nothing gate. The backfill-vs-next-tag decision is tracked as R6.1 in
   `THIRD_PARTY_NOTICES.md` and the Qt 6.8 floor (`cbcfeb7`).
 - The GUI AppImage job is gone (`d74a90e`) — this repository ships CLI
   binaries, and the job was a permanent non-gating red leg.
-- **Windows x86_64 (MSVC 2022)** was added to the matrix. Its tarball carries
-  `albdf.exe` + `Pdf4QtLibCore.dll` and **no Qt runtime**, so it needs its own
-  Qt 6.8 installation — documented as a known limitation rather than presented
-  as a drop-in binary.
 
 ### R3 — shared page write-back (R3.1/R3.2)
 
@@ -100,15 +100,25 @@ all-or-nothing gate. The backfill-vs-next-tag decision is tracked as R6.1 in
   `aqt list-qt linux desktop --arch 6.8.3` → `linux_gcc_64` only;
   `aqt list-qt linux_arm64 desktop --arch 6.8.3` → `linux_gcc_arm64`.
 - Static gates: `bash -n` on `ci/run-ci.sh` and `scripts/check-slop.sh`;
-  `bash scripts/check-slop.sh --self-test`. No authored `.cpp`/`.h` changed —
-  the only C++ edit is the vendored, format-gate-exempt
-  `pdfexecutionpolicy.h`.
+  `bash scripts/check-slop.sh --self-test`.
 - Hosted CI on the release PR: Linux `gate` (Release build + ctest),
   ASAN/UBSAN, clang-format + slop, the new `gate-macos`, plus the non-gating
   GUI / benchmark / fuzz jobs.
-- **Assets**: the `0.5.0` tag run builds the five platforms and attaches the
+- **Assets**: the `0.4.1` tag run builds the four platforms and attaches the
   tarballs and their `.sha256` files; the platform-by-platform result is the
   *Platform availability* table the workflow appends to this release body.
+
+### Known limitations
+
+- No **Windows** artifact — the leg is disabled pending a runner-side
+  `pkg-config` (R6.4, `docs/PROBLEMS.md`).
+- Linux binaries need the distribution Qt listed in
+  `share/doc/albdf/PREREQUISITES.md` (Qt 6.8+; Ubuntu 24.04's Qt 6.4 is too
+  old).
+- The workflow pins Node 20-era actions (`checkout@v4`, `cache@v4`, the artifact
+  actions at `@v4`). They currently run on the forced Node 24 shim with a
+  deprecation warning; the Node 24-native pins are identified and tracked as
+  R6.5 (`docs/PROBLEMS.md`).
 
 ---
 

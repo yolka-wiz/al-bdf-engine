@@ -29,9 +29,10 @@ required** (Ubuntu 24.04 LTS ships Qt 6.4, which is too old). Third-party
 licenses and the bundled-on-macOS components are listed in
 `docs/THIRD_PARTY_NOTICES.md`.
 
-A **Windows** tarball (`albdf.exe` + `Pdf4QtLibCore.dll`) is published as an
-experimental build: it is *not* self-contained and needs a Qt 6.8 (MSVC 2022,
-64-bit) installation of its own.
+Windows is **not** a release target yet: the `windows-x86_64` leg was dropped
+from the release matrix in `0.4.1` (it could not configure — the runner has no
+`pkg-config`), so there is no Windows tarball to download. See R6.4 in
+`plans/PLAN.md`.
 
 ### Prerequisites (building from source)
 
@@ -72,7 +73,7 @@ works. Pass `-DALBDF_BUILD_GUI=ON` to additionally build the optional GUI.
 ### Verify
 
 ```bash
-build/bin/albdf --version                          # → albdf 0.5.0
+build/bin/albdf --version                          # → albdf 0.4.1
 QT_QPA_PLATFORM=offscreen ctest --test-dir build   # → 100% passed (17 tests)
 ```
 
