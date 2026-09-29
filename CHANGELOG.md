@@ -8,75 +8,62 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
-## [0.5.0] - 2026-09-29
+## [0.4.1] - 2026-09-29
 
-Release binaries that actually ship, plus the shared write-back path (R3) and
-the RTL backend seam (R4).
-
-### Added
-
-- **Release artifacts for five platforms** — `linux-x86_64`, `linux-aarch64`,
-  `macos-arm64`, `macos-x86_64` and `windows-x86_64` (MSVC 2022) — built,
-  validated and attached to the GitHub Release by
-  `.github/workflows/release.yml` on a version tag. Each tarball carries the
-  CLI, `Pdf4QtLibCore`, the headers, the man page, the license, and
-  `PREREQUISITES.md` + `THIRD_PARTY_NOTICES.md`.
-- A gating `gate-macos` job in `ci.yml`: a macOS-only compile break now fails on
-  the pull request instead of surfacing at tag time — the gap that let `0.4.0`
-  ship with zero assets.
-- `docs/PREREQUISITES.md`: what a *prebuilt* tarball needs on the machine that
-  runs it, shipped inside the tarball, including why those libraries are
-  prerequisites rather than bundled.
-- `PDFPageContentRewriter` (R3.1): one core helper for page write-back
-  (replace resources → compress content → build content/page dicts → merge →
-  finalize), with tests for `/Contents` arrays and indirect resources.
-- `PDFBidi` / `PDFShaper` (R4.1/R4.2): the internal RTL seam that owns the only
-  FriBidi and HarfBuzz includes in core and the only visual↔logical inversion
-  logic, unit-tested without the full engine.
-
-### Changed
-
-- `add-text` (LTR and RTL) and `delete-object` now share the `R3.1` write-back
-  path, so page updates behave identically across both commands.
-- `Q_ASSERT`-as-validation in those commands (R3.2) is replaced by explicit
-  bounds checks and error codes.
-- macOS tarballs are self-contained: the Qt frameworks, fontconfig and the
-  platform plugins the binary uses are bundled and referenced relatively, so
-  they run on a Mac that has never had Homebrew Qt installed.
+**Patch release: the first one that actually ships binaries.** `0.4.0` published
+zero assets — three of its four matrix legs failed and the publisher was gated
+all-or-nothing, so even the leg that built was discarded. This release fixes
+those legs and that gate. It is the first tag since `0.4.0` (2026-08-15), which
+is also why a month of merged work reaches users only now: the release workflow
+fires on a `0.*` tag and nothing had been tagged.
 
 ### Fixed
 
-- **A failing release leg no longer discards the whole release.** The `release`
-  job was gated on `needs.build.result == 'success'` — the *aggregate* result of
-  the matrix — so a single red platform skipped the job and threw away the
-  artifacts the other legs had just built. That is exactly how `0.4.0` shipped
-  with zero assets. The job now publishes whatever built and names the platforms
-  that did not in the release body.
+- **Release binaries ship.** `linux-x86_64`, `linux-aarch64`, `macos-arm64` and
+  `macos-x86_64` tarballs (plus `.sha256`) are attached to this release.
+- The publisher job no longer discards the whole release when one platform leg
+  fails. It was gated on `needs.build.result == 'success'` — the *aggregate* of
+  the matrix — so one red leg skipped the job and threw away the artifacts the
+  other legs had just built; that is exactly how `0.4.0` shipped with zero
+  assets. It now publishes whatever built and names the platforms that did not.
+- macOS legs compile: the `std::execution::seq` / `::par` uses in the vendored
+  headers are guarded behind `__cpp_lib_execution` (libc++ ships `<execution>`
+  without the PSTL policies; libstdc++ has them), with a serial fallback.
+- `linux-aarch64` obtains Qt: aqtinstall is given the `linux_arm64` host, so
+  Qt 6.8 resolves for the `linux_gcc_arm64` arch instead of reading the
+  arm64-less `linux_x64` index.
 - Packaging bundles the plugins of the Qt the binary actually links, not the
   runner's default Qt, so the tarball no longer depends on the runner image.
-- macOS builds: the `std::execution::seq` / `::par` uses in the vendored headers
-  are guarded behind `__cpp_lib_execution` (libc++ ships `<execution>` without
-  the PSTL policies; libstdc++ has them), with a serial fallback. Both macOS
-  legs compile again.
-- `linux-aarch64` builds: aqtinstall is given the `linux_arm64` host, so Qt 6.8
-  resolves for the `linux_gcc_arm64` arch instead of reading the arm64-less
-  `linux_x64` index.
-- `albdf` starts without a display server: with neither `$DISPLAY` nor
-  `$WAYLAND_DISPLAY` set it selects the offscreen platform itself.
-- `--help-all` is treated as help rather than an unknown command.
-- CLI exceptions are guarded and the documented exit-code contract is enforced
+- macOS tarballs are self-contained: the Qt frameworks, fontconfig and the
+  platform plugins the binary uses are bundled and referenced relatively.
+- `albdf` starts with no display server, `--help-all` is treated as help, and
+  CLI exceptions are guarded with the documented exit-code contract enforced
   and regression-tested.
+
+### Changed
+
+- A gating `gate-macos` job in `ci.yml` builds + ctests on macOS for every pull
+  request, so a macOS-only break fails on the PR instead of at tag time.
+- The GUI AppImage job is gone — this repository ships CLI binaries.
+- The `windows-x86_64` matrix leg is **dropped for now**: the MSVC runner has no
+  `pkg-config` and `src/CMakeLists.txt` requires it, so the leg died at
+  configure after ~26 minutes. Tracked as R6.4.
+
+### Also in this build (merged since 0.4.0, internal)
+
+- `PDFPageContentRewriter` (R3.1/R3.2): one core page write-back path shared by
+  `add-text` and `delete-object`; `Q_ASSERT`-as-validation replaced by explicit
+  bounds checks and error codes.
+- `PDFBidi` / `PDFShaper` (R4.1/R4.2): the RTL seam that owns the only FriBidi
+  and HarfBuzz includes and the only visual↔logical inversion logic.
 
 ### Known limitations
 
-- The **`windows-x86_64`** tarball is new and is **not self-contained**: it
-  carries `albdf.exe` and `Pdf4QtLibCore.dll` but no Qt runtime, so it needs a
-  Qt 6.8 (MSVC 2022, 64-bit) installation. Treat it as experimental.
 - Linux binaries need the distribution Qt listed in
   `share/doc/albdf/PREREQUISITES.md` (Qt 6.8 or newer; Ubuntu 24.04's Qt 6.4 is
   too old).
-- The `0.4.0` release itself stays asset-less — see `docs/RELEASES.md` for the
-  backfill options.
+- There is no Windows artifact: see R6.4.
+- The `0.4.0` release stays asset-less — its tag predates every fix above.
 
 ## [0.4.0] - 2026-08-15
 
@@ -156,7 +143,7 @@ Initial release, tagged as `pdfedit` before the rename.
   presentation forms, lam-alef, and Persian/Arabic digit unification).
 - CLI smoke suite and a golden-image render harness.
 
-[0.5.0]: https://github.com/yolka-wiz/al-bdf-engine/releases/tag/0.5.0
+[0.4.1]: https://github.com/yolka-wiz/al-bdf-engine/releases/tag/0.4.1
 [0.4.0]: https://github.com/yolka-wiz/al-bdf-engine/releases/tag/0.4.0
 [0.3.0]: https://github.com/yolka-wiz/al-bdf-engine/releases/tag/0.3.0
 [0.2.0]: https://github.com/yolka-wiz/al-bdf-engine/releases/tag/0.2.0
