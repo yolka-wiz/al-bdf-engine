@@ -372,6 +372,13 @@ The agent runtime's lifecycle guard crashes with exit -1 on inline terminal comm
   gets releases over the newest major. A workflow-file push must go over the
   **SSH** remote: the `yolka-wiz` PAT has no `workflow` scope and GitHub
   rejects such pushes outright.
+- **Upcoming runner-image change (watch, nothing to do today)**: the R6.5 PR
+  run carried the notice *"The ubuntu-latest label will migrate to Ubuntu 26
+  beginning October 19, 2026"*
+  ([runner-images#14748](https://github.com/actions/runner-images/issues/14748)).
+  Every job here runs on `ubuntu-latest`. When that migration lands, re-check
+  the Linux legs first — the ICU build, the vcpkg clone/cache, and the
+  `aqt`-installed Qt — before attributing a failure to a code change.
 - **Tooling trap found while verifying this**: `gh pr checks --json` does not
   exist before gh 2.55 (Debian ships 2.46). It fails with `unknown flag: --json`
   **on stderr**, so a watcher redirecting stderr to `/dev/null` sees empty
