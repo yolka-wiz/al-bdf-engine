@@ -38,6 +38,19 @@ apt show libqt6core6 | grep -i version    # or: dnf info qt6-qtbase
 sudo dnf install qt6-qtbase qt6-qtbase-gui fontconfig libglvnd-glx libglvnd-opengl
 ```
 
+## Windows — experimental
+
+The `windows-x86_64` tarball carries `albdf.exe` and `Pdf4QtLibCore.dll` and
+**nothing else from Qt**, so it needs its own Qt installation:
+
+- **Qt 6.8 (MSVC 2022, 64-bit)** with its `bin` directory on `PATH`. Unlike
+  macOS, the Qt runtime is *not* bundled — Windows has no distribution Qt to
+  link against, and bundling it is not implemented yet.
+- The **Microsoft Visual C++ 2022 redistributable** (`vc_redist.x64.exe`).
+
+Treat this artifact as a preview: it is built on every tag, but it is not
+self-contained.
+
 ## Why these, and why they are not bundled
 
 The base C runtime (glibc, libstdc++, libgcc, libm) exists on every installation
