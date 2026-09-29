@@ -38,7 +38,7 @@ runs:
   using: composite
   steps:
     - name: Cache vcpkg binary cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5.1.0
       with:
         path: ${{ github.workspace }}/vcpkg-bincache
         key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ env.ALBDF_VCPKG_REF }}-${{ hashFiles('src/vcpkg.json', 'src/vcpkg/**') }}
